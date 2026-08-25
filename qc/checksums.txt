@@ -1,0 +1,16 @@
+SHA256 Source Checksums -- Run: [populated by 01_verify_sources.sas at runtime]
+
+NOTE: These hash the .sas7bdat FILES, not the data they contain.
+A .sas7bdat embeds its creation datetime, so re-importing byte-identical
+data from the same source produces a DIFFERENT hash. A mismatch on a later
+run means the dataset was regenerated -- it is not evidence of corruption.
+These hashes prove Phase 4 merges the same bytes Phase 1 verified.
+
+master_data_1  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_2  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_3  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_4  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_5  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_6  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_7  [SHA256 hash -- run 01_verify_sources.sas to populate]
+master_data_8  [SHA256 hash -- run 01_verify_sources.sas to populate]

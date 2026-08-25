@@ -1,0 +1,12 @@
+Source Verification Report -- Run: [populated by 01_verify_sources.sas at runtime]
+
+Source              NOBS               Distinct_IDs
+------------------------------------------------
+master_data_1       [run to populate]  [run to populate]
+master_data_2       [run to populate]  [run to populate]
+master_data_3       [run to populate]  [run to populate]
+master_data_4       [run to populate]  [run to populate]
+master_data_5       [run to populate]  [run to populate]
+master_data_6       [run to populate]  [run to populate]
+master_data_7       [run to populate]  [run to populate]
+master_data_8       [run to populate]  [run to populate]

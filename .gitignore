@@ -1,0 +1,15 @@
+# PHI / data — never commit (PCM-C-03)
+*.sas7bdat
+*.xlsx
+*.xls
+*.csv
+data/
+raw/
+
+# SAS work files
+*.log.bak
+*.sas7bcat
+
+# OS
+.DS_Store
+Thumbs.db

@@ -200,3 +200,97 @@ filename qccnt clear;
 
 
 /* === plan 02 appends SRC-05, SRC-01 and SRC-02 assertions below this line === */
+
+/* ===== SRC-05: PRECEDE_STUDY_ID must be non-missing in every row ===== */
+/* Runs BEFORE SRC-01: a single blank is "unique" and would pass uniqueness,      */
+/* and several blanks would surface there as a confusing duplicate error instead. */
+%macro assert_no_blank_id(ds=);
+  proc sql noprint;
+    select sum(missing(PRECEDE_STUDY_ID)) into :n_blank trimmed
+    from src.&ds;
+  quit;
+  %if &n_blank > 0 %then %do;
+    %put ERROR: SRC-05 VIOLATION: &n_blank blank PRECEDE_STUDY_ID in &ds;
+    %put ERROR- A blank key passes uniqueness and the superset check, then becomes;
+    %put ERROR- a Phase 4 merge key joining unrelated patients. Fix at source.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: SRC-05 OK -- no blank PRECEDE_STUDY_ID in &ds;
+%mend assert_no_blank_id;
+
+%assert_no_blank_id(ds=master_data_1);
+%assert_no_blank_id(ds=master_data_2);
+%assert_no_blank_id(ds=master_data_3);
+%assert_no_blank_id(ds=master_data_4);
+%assert_no_blank_id(ds=master_data_5);
+%assert_no_blank_id(ds=master_data_6);
+%assert_no_blank_id(ds=master_data_7);
+%assert_no_blank_id(ds=master_data_8);
+
+
+/* ===== SRC-01 / PCM-F-01: PRECEDE_STUDY_ID unique per source ===== */
+%macro assert_unique_id(ds=);
+  proc sql noprint;
+    /* keep the offenders for diagnosis, then count them explicitly */
+    create table work._dups_&ds as
+      select PRECEDE_STUDY_ID, count(*) as n
+      from src.&ds
+      group by PRECEDE_STUDY_ID
+      having count(*) > 1;
+
+    select count(*) into :n_dups trimmed from work._dups_&ds;
+  quit;
+  %if &n_dups > 0 %then %do;
+    %put ERROR: PCM-F-01 VIOLATION: Duplicate PRECEDE_STUDY_ID in &ds (&n_dups IDs affected);
+    %put ERROR- Offending IDs retained in work._dups_&ds for inspection.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PCM-F-01 OK -- PRECEDE_STUDY_ID unique in &ds;
+%mend assert_unique_id;
+
+%assert_unique_id(ds=master_data_1);
+%assert_unique_id(ds=master_data_2);
+%assert_unique_id(ds=master_data_3);
+%assert_unique_id(ds=master_data_4);
+%assert_unique_id(ds=master_data_5);
+%assert_unique_id(ds=master_data_6);
+%assert_unique_id(ds=master_data_7);
+%assert_unique_id(ds=master_data_8);
+
+
+/* ===== SRC-02 / PCM-F-02: md3 is a complete superset of all other IDs ===== */
+proc sql noprint;
+  create table work._not_in_md3 as
+    select 'md1' as src length=3, PRECEDE_STUDY_ID from src.master_data_1
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3)
+    union all
+    select 'md2', PRECEDE_STUDY_ID from src.master_data_2
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3)
+    union all
+    select 'md4', PRECEDE_STUDY_ID from src.master_data_4
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3)
+    union all
+    select 'md5', PRECEDE_STUDY_ID from src.master_data_5
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3)
+    union all
+    select 'md6', PRECEDE_STUDY_ID from src.master_data_6
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3)
+    union all
+    select 'md7', PRECEDE_STUDY_ID from src.master_data_7
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3)
+    union all
+    select 'md8', PRECEDE_STUDY_ID from src.master_data_8
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from src.master_data_3);
+
+  select count(*) into :n_orphan trimmed from work._not_in_md3;
+quit;
+
+%if &n_orphan > 0 %then %do;
+  %put ERROR: PCM-F-02 VIOLATION: md3 is NOT a superset -- &n_orphan IDs missing from md3;
+  %put ERROR- Orphan IDs retained in work._not_in_md3 (column SRC names the source).;
+  %put ERROR- Phase 4 assumes md3 is the spine; a merge would silently grow past 41,150 rows.;
+  %abort cancel;
+%end;
+%else %put NOTE: PCM-F-02 OK -- md3 is a complete superset of md1,md2,md4-md8;
+
+libname src clear;

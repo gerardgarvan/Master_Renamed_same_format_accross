@@ -29,7 +29,10 @@
   2. The program emits an `abort` (or equivalent loud failure) if `PRECEDE_STUDY_ID` uniqueness fails for any source (PCM-F-01)
   3. The program emits an `abort` if md3 is not a complete superset of all IDs from md1, md2, md4–md8 (PCM-F-02)
   4. SHA-256 (or equivalent) checksums for all eight `.sas7bdat` files are written to a committed artifact in `qc/` at the start of every run
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Setup, checksums (SRC-04), and per-source counts (SRC-03)
+- [ ] 01-02-PLAN.md — Uniqueness (SRC-01) and md3-superset (SRC-02) assertions
 
 ### Phase 2: Ownership Map
 **Goal**: Every variable in the pipeline has exactly one declared owner source, and every conflict is named — so no silent last-wins overwrite is possible in downstream merge steps
@@ -117,7 +120,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Source Verification & Freeze | 0/? | Not started | - |
+| 1. Source Verification & Freeze | 0/2 | Not started | - |
 | 2. Ownership Map | 0/? | Not started | - |
 | 3. Per-Source Normalization | 0/? | Not started | - |
 | 4. Merge | 0/? | Not started | - |

@@ -31,7 +31,7 @@
   4. SHA-256 (or equivalent) checksums for all eight `.sas7bdat` files are written to a committed artifact in `qc/` at the start of every run
 **Plans**: 2 plans
 Plans:
-- [ ] 01-01-PLAN.md — Setup, checksums (SRC-04), and per-source counts (SRC-03)
+- [x] 01-01-PLAN.md — Setup, checksums (SRC-04), and per-source counts (SRC-03)
 - [ ] 01-02-PLAN.md — Uniqueness (SRC-01) and md3-superset (SRC-02) assertions
 
 ### Phase 2: Ownership Map
@@ -120,7 +120,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Source Verification & Freeze | 0/2 | Not started | - |
+| 1. Source Verification & Freeze | 1/2 | In Progress|  |
 | 2. Ownership Map | 0/? | Not started | - |
 | 3. Per-Source Normalization | 0/? | Not started | - |
 | 4. Merge | 0/? | Not started | - |

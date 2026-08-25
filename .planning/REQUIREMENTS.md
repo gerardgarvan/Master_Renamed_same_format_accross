@@ -88,13 +88,42 @@
 
 ## Traceability
 
-| REQ-ID | Phase |
-|--------|-------|
-| SRC-01, SRC-02, SRC-03, SRC-04 | Phase 1 — Source Verification & Freeze |
-| OWN-01, OWN-02, OWN-03, OWN-04 | Phase 2 — Ownership Map |
-| PREP-01, PREP-02, PREP-03, PREP-04, PREP-05, PREP-06 | Phase 3 — Per-Source Normalization |
-| MRG-01, MRG-02, MRG-03, MRG-04 | Phase 4 — Merge |
-| QC-01, QC-02, QC-03, QC-04, QC-05 | Phase 5 — Merge QC |
-| REC-01, REC-02, REC-03, REC-04, REC-05, REC-06 | Phase 6 — Variable Reconciliation |
-| COH-01, COH-02, COH-03, COH-04 | Phase 7 — Cohort & Missingness |
-| DOC-01, DOC-02, DOC-03, DOC-04 | Phase 8 — Documentation & Handoff |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SRC-01 | Phase 1 — Source Verification & Freeze | Pending |
+| SRC-02 | Phase 1 — Source Verification & Freeze | Pending |
+| SRC-03 | Phase 1 — Source Verification & Freeze | Pending |
+| SRC-04 | Phase 1 — Source Verification & Freeze | Pending |
+| OWN-01 | Phase 2 — Ownership Map | Pending |
+| OWN-02 | Phase 2 — Ownership Map | Pending |
+| OWN-03 | Phase 2 — Ownership Map | Pending |
+| OWN-04 | Phase 2 — Ownership Map | Pending |
+| PREP-01 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-02 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-03 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-04 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-05 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-06 | Phase 3 — Per-Source Normalization | Pending |
+| MRG-01 | Phase 4 — Merge | Pending |
+| MRG-02 | Phase 4 — Merge | Pending |
+| MRG-03 | Phase 4 — Merge | Pending |
+| MRG-04 | Phase 4 — Merge | Pending |
+| QC-01 | Phase 5 — Merge QC | Pending |
+| QC-02 | Phase 5 — Merge QC | Pending |
+| QC-03 | Phase 5 — Merge QC | Pending |
+| QC-04 | Phase 5 — Merge QC | Pending |
+| QC-05 | Phase 5 — Merge QC | Pending |
+| REC-01 | Phase 6 — Variable Reconciliation | Pending |
+| REC-02 | Phase 6 — Variable Reconciliation | Pending |
+| REC-03 | Phase 6 — Variable Reconciliation | Pending |
+| REC-04 | Phase 6 — Variable Reconciliation | Pending |
+| REC-05 | Phase 6 — Variable Reconciliation | Pending |
+| REC-06 | Phase 6 — Variable Reconciliation | Pending |
+| COH-01 | Phase 7 — Cohort & Missingness | Pending |
+| COH-02 | Phase 7 — Cohort & Missingness | Pending |
+| COH-03 | Phase 7 — Cohort & Missingness | Pending |
+| COH-04 | Phase 7 — Cohort & Missingness | Pending |
+| DOC-01 | Phase 8 — Documentation & Handoff | Pending |
+| DOC-02 | Phase 8 — Documentation & Handoff | Pending |
+| DOC-03 | Phase 8 — Documentation & Handoff | Pending |
+| DOC-04 | Phase 8 — Documentation & Handoff | Pending |

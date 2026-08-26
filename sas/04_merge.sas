@@ -113,7 +113,7 @@ quit;
   %macro _sort_assert_&dsn;
     %if &n_sorted ne &expected_nobs %then %do;
       %put ERROR: MRG PRECONDITION -- &dsn has duplicate PRECEDE_STUDY_ID keys.;
-      %put ERROR- Expected &expected_nobs unique rows; NODUPKEY kept &n_sorted.;
+      %put ERROR- Expected &expected_nobs unique rows%str(;) NODUPKEY kept &n_sorted.;
       %abort cancel;
     %end;
     %else %put NOTE: PRECONDITION OK -- &dsn has &n_sorted unique keys.;
@@ -285,8 +285,9 @@ data g.master_data_merged;
        are owned by md7 on a width override. Re-examine in Phase 6. */
     Frailty_Category                $24   /* md3 owns */
 
-    /* ISO_SEV character variable -- md3 is the source with md1|md2|md3 */
-    ISO_SEV_Exp_IntraOp_MAC_Average $21   /* md3 owns (md1 char $21); see PCM-D-03 block below */
+    /* ISO_SEV_Exp_IntraOp_MAC_Average: numeric in md2/md3 (type 1, length 8), char in md1.
+       md3 owns it (spine rule) so it is NUMERIC -- not declared in character LENGTH block.
+       md1's char copy is excluded by KEEP=. See PCM-D-03 block below. */
 
     /* md6 owns */
     IsDead_Y_N                      $1    /* md6 owns; single-source; see PCM-D-01 block above */

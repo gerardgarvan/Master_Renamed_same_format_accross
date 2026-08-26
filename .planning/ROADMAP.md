@@ -44,3 +44,20 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Write sas/04_merge.sas: preconditions, sort, DATA step merge with full LENGTH block, RENAME= ownership block for all 135 CONFLICT variables, provenance flags, five-part assertions, log output (MRG-01, MRG-04)
 - [x] 04-02-PLAN.md — Static validation + human-verify SAS run: confirm all 12 assertions pass, commit qc/04_merge_provenance.txt (MRG-02, MRG-03)
+
+### Phase 5: Merge QC
+
+**Goal**: `05_qc_merge.sas` runs against `g.master_data_merged` and asserts: exactly 41,150 rows, no truncated character widths, no surviving literal NULL strings, md8-only hemodynamic block populated for exactly 22,473 rows, and type-converted variables within expected clinical ranges — aborting loudly on any failure
+**Depends on**: Phase 4
+**Requirements**: QC-01, QC-02, QC-03, QC-04, QC-05
+**Success Criteria** (what must be TRUE):
+  1. `05_qc_merge.sas` runs and `abort`s if row count ≠ 41,150 (QC-01)
+  2. No character variable is truncated — max widths from prep are preserved (QC-02)
+  3. Zero surviving literal `NULL` strings anywhere in `g.master_data_merged` (QC-03)
+  4. md8-only hemodynamic block populated for exactly 22,473 rows (QC-04)
+  5. Type-converted variables verified within expected clinical ranges (QC-05)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Write sas/05_qc_merge.sas: SECTION 0-3 (assert_eq macro, preconditions, QC-01 row count, QC-02 owner-width truncation check, QC-03 all-char NULL scan) + SECTION 4-6 (QC-04 hemodynamic block Part B asserts / Part A logs, QC-05 guarded clinical ranges, close-out) (QC-01, QC-02, QC-03, QC-04, QC-05)
+- [ ] 05-02-PLAN.md — Static PCM validation + human SAS run: confirm 20 QC ASSERTION OK lines, review QC-04 Part A counts, commit qc/05_qc_merge_report.txt (QC-01, QC-02, QC-03, QC-04, QC-05)

@@ -10,4 +10,4 @@
 **Plans**: 2 plans
 Plans:
 - [x] 02-01-PLAN.md — Scaffolding (docs/DECISIONS.md stub) + ownership enumeration and table artifact (OWN-01, OWN-02)
-- [ ] 02-02-PLAN.md — Conflict detection to DECISIONS.md + BMI/Race coalesce assertions (OWN-03, OWN-04)
+- [x] 02-02-PLAN.md — Conflict detection to DECISIONS.md + BMI/Race coalesce assertions (OWN-03, OWN-04)

@@ -107,6 +107,30 @@ quit;
 %mend check_owmap;
 %check_owmap;
 
+/* 1e: qclib.ownership_map carries an OWNER column.
+   Section 4 filters on `where upcase(owner) = 'MD8'`. If Phase 4 ever writes resolved
+   owners back under a different name (owner_resolved), that filter fails inside a PROC SQL
+   subquery mid-QC instead of at a labelled precondition. Pairs with the `> 30` upper band
+   in %check_md8_list: between them, both failure modes of the ownership-map dependency
+   surface here rather than halfway through Section 4. */
+proc sql noprint;
+  select count(*) into :n_owcol trimmed
+  from dictionary.columns
+  where libname='QCLIB' and upcase(memname)='OWNERSHIP_MAP' and upcase(name)='OWNER';
+quit;
+
+%macro check_owcol;
+  %if &n_owcol ne 1 %then %do;
+    %put ERROR: QC PRECONDITION -- qclib.ownership_map has no OWNER column.;
+    %put ERROR- Section 4 derives the md8-only variable list from `where upcase(owner)='MD8'`.;
+    %put ERROR- If resolved owners were written back as owner_resolved, update the Section 4;
+    %put ERROR- filter to read that column instead.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PRECONDITION OK -- qclib.ownership_map has an OWNER column.;
+%mend check_owcol;
+%check_owcol;
+
 /* 1f: Open the report and write a header.
    This is the FIRST write -- use FILE (not MOD) to start fresh (RESEARCH Pitfall 6).
    After this, every subsequent write uses FILE ... MOD. */
@@ -283,7 +307,7 @@ run;
    map owner-column mismatch.
 
    in_md8 = 1 rows = 22,473 (from qc/04_merge_provenance.txt committed).
-   qclib assigned in Section 1 preconditions (ownership_map presence already verified).
+   qclib assigned in Section 1 preconditions (presence and OWNER column already verified).
    ========================================================================= */
 proc sql noprint;
   select name into :md8_only separated by ' '
@@ -323,23 +347,29 @@ quit;
    Static auditability of the eight representative names is preserved here, and this
    macro adds NO assertions to the QC-04 count. */
 %macro check_md8_expected;
-  %local i v missing;
+  %local expected n_exp i v missing;
+  /* The list is ONE line deliberately. %SCAN's default delimiter set does not include a
+     line-break character, so a newline inside the argument can survive into the returned
+     token; indexw then fails to match and this guard aborts reporting drift that does not
+     exist -- a false failure in the very check meant to separate real drift from noise.  */
+  %let expected = ABP_LESS_THAN_60_COUNT BIS_INDEX_LESS_30_COUNT NIBP_LESS_60_COUNT SD_ABP_Mean AVG_ABP_Mean Total_Midazolam_mg Total_Phenylephrine_HCl_Pressors ISO_SEV_MAC_TOTAL_Exp;
+  %let n_exp   = %sysfunc(countw(&expected));
   %let missing = 0;
-  %do i = 1 %to 8;
-    %let v = %scan(ABP_LESS_THAN_60_COUNT BIS_INDEX_LESS_30_COUNT NIBP_LESS_60_COUNT
-                   SD_ABP_Mean AVG_ABP_Mean Total_Midazolam_mg
-                   Total_Phenylephrine_HCl_Pressors ISO_SEV_MAC_TOTAL_Exp, &i);
+  /* Loop bound comes from countw(), not a hardcoded 8, so adding a name to the list above
+     is automatically checked rather than silently ignored. */
+  %do i = 1 %to &n_exp;
+    %let v = %scan(&expected, &i);
     %if %sysfunc(indexw(%upcase(&md8_only), %upcase(&v))) = 0 %then %do;
       %put ERROR: QC-04 -- expected md8-owned variable &v absent from the derived list.;
       %let missing = %eval(&missing + 1);
     %end;
   %end;
   %if &missing > 0 %then %do;
-    %put ERROR: QC-04 -- &missing of 8 representative md8-owned variables missing.;
+    %put ERROR: QC-04 -- &missing of &n_exp representative md8-owned variables missing.;
     %put ERROR- The ownership map and the merged file have drifted apart.;
     %abort cancel;
   %end;
-  %else %put NOTE: QC-04 -- all eight representative md8-owned variables present in the derived list.;
+  %else %put NOTE: QC-04 -- all &n_exp representative md8-owned variables present in the derived list.;
 %mend check_md8_expected;
 %check_md8_expected;
 
@@ -489,4 +519,8 @@ data _null_;
   put "=============================================================";
   put "ALL QC CHECKS PASSED (QC-01 through QC-05)";
 run;
-/* Leave g libname open; 99_run_all.sas manages libname lifecycle */
+
+/* qclib is assigned by THIS program for the Section 4 ownership lookup, so this program
+   clears it. The g libref is left open on purpose -- it is part of the shared pipeline
+   lifecycle that 99_run_all.sas manages. */
+libname qclib clear;

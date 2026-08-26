@@ -21,10 +21,15 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, %assert_eq macro
    =========================================================================
-   g_path and logs_path are copied VERBATIM from sas/04_merge.sas SECTION 0
-   so libname g resolves to the same g.master_data_merged location (RESEARCH Pitfall 7).
-   qc_path points to the repo qc/ folder on C: -- the QC report is a committed
-   repo artifact (mirrors how qc/04_merge_provenance.txt was committed).
+   g_path, logs_path and qc_path all live under the P: merge tree. Everything this
+   pipeline reads or writes is on P:; nothing is written to the local repo.
+
+   CONSEQUENCE, stated so it is a choice and not an accident: qc/05_qc_merge_report.txt
+   is no longer inside the git working tree, so it is not version-controlled and there is
+   no commit history for QC evidence. The report holds counts only -- no PHI -- so if you
+   later want it committed, copy it into the repo qc/ folder as a separate step rather
+   than pointing qc_path back at C:. qclib.ownership_map must live under this same
+   &qc_path (see the 1d precondition).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
 %let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
@@ -85,9 +90,12 @@ quit;
 %mend check_merged;
 %check_merged;
 
-/* 1d: qclib.ownership_map exists (gitignored .sas7bdat; must be present from Phase 2 run).
+/* 1d: qclib.ownership_map exists under &qc_path (a Phase 2 artifact).
    Fails here with a clear message rather than silently at the PROC SQL in Section 4,
-   which would produce a confusing "table not found" error mid-QC. */
+   which would produce a confusing "table not found" error mid-QC.
+   NOTE: Phase 2 wrote ownership_map.sas7bdat to the REPO qc/ folder on C:. With qc_path
+   now on P:, that file must be copied to &qc_path (or Phase 2 re-run against the P: path)
+   before this program can run. This precondition is what tells you so. */
 libname qclib "&qc_path";
 
 proc sql noprint;
@@ -99,8 +107,9 @@ quit;
 %macro check_owmap;
   %if &n_owmap ne 1 %then %do;
     %put ERROR: QC PRECONDITION -- qclib.ownership_map not found at &qc_path..;
-    %put ERROR- This dataset is a Phase 2 artifact (.sas7bdat) excluded from git (PCM-C-03).;
-    %put ERROR- It must be present on the machine that ran Phase 2. Section 4 cannot run.;
+    %put ERROR- This is a Phase 2 artifact. Phase 2 wrote it to the repo qc/ folder on C:;;
+    %put ERROR- copy ownership_map.sas7bdat into &qc_path, or re-run Phase 2 against the;
+    %put ERROR- P: qc path. Section 4 derives the md8-only variable list from it.;
     %abort cancel;
   %end;
   %else %put NOTE: PRECONDITION OK -- qclib.ownership_map present.;

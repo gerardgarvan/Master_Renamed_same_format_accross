@@ -32,10 +32,10 @@
 
 ### Merge
 
-- [ ] **MRG-01** — User can run `04_merge.sas` to produce `g.master_data_merged` with exactly 41,150 rows and 41,150 distinct IDs
+- [x] **MRG-01** — User can run `04_merge.sas` to produce `g.master_data_merged` with exactly 41,150 rows and 41,150 distinct IDs
 - [ ] **MRG-02** — User can verify zero blank `PRECEDE_STUDY_ID` values in the merged output
 - [ ] **MRG-03** — User can verify provenance flags `in_md1`–`in_md8` and `n_sources` are present and match source row counts
-- [ ] **MRG-04** — User can verify md3 is listed first (spine); no last-wins overwrite is possible for any variable
+- [x] **MRG-04** — User can verify md3 is listed first (spine); no last-wins overwrite is possible for any variable
 
 ### Merge QC
 
@@ -105,10 +105,10 @@
 | PREP-04 | Phase 3 — Per-Source Normalization | Complete |
 | PREP-05 | Phase 3 — Per-Source Normalization | Complete |
 | PREP-06 | Phase 3 — Per-Source Normalization | Complete |
-| MRG-01 | Phase 4 — Merge | Pending |
+| MRG-01 | Phase 4 — Merge | Complete |
 | MRG-02 | Phase 4 — Merge | Pending |
 | MRG-03 | Phase 4 — Merge | Pending |
-| MRG-04 | Phase 4 — Merge | Pending |
+| MRG-04 | Phase 4 — Merge | Complete |
 | QC-01 | Phase 5 — Merge QC | Pending |
 | QC-02 | Phase 5 — Merge QC | Pending |
 | QC-03 | Phase 5 — Merge QC | Pending |

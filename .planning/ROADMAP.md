@@ -43,4 +43,4 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 04-01-PLAN.md — Write sas/04_merge.sas: preconditions, sort, DATA step merge with full LENGTH block, RENAME= ownership block for all 135 CONFLICT variables, provenance flags, five-part assertions, log output (MRG-01, MRG-04)
-- [ ] 04-02-PLAN.md — Static validation + human-verify SAS run: confirm all 12 assertions pass, commit qc/04_merge_provenance.txt (MRG-02, MRG-03)
+- [x] 04-02-PLAN.md — Static validation + human-verify SAS run: confirm all 12 assertions pass, commit qc/04_merge_provenance.txt (MRG-02, MRG-03)

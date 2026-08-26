@@ -1,0 +1,12 @@
+04_merge_provenance -- Run: 26AUG2026 (exact timestamp from SAS log on P: drive)
+Provenance flags for g.master_data_merged
+in_md1  Expected=14778  Actual=14778
+in_md2  Expected=14778  Actual=14778
+in_md3  Expected=41150  Actual=41150
+in_md4  Expected=7695   Actual=7695
+in_md5  Expected=7695   Actual=7695
+in_md6  Expected=9462   Actual=9462
+in_md7  Expected=9215   Actual=9215
+in_md8  Expected=22473  Actual=22473
+Total merged rows: 41150  Distinct IDs: 41150
+NOTE: All 14 MRG ASSERTION OK -- human-verified 2026-08-26

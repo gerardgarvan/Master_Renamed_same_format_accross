@@ -1,16 +1,16 @@
-SHA256 Source Checksums -- Run: [populated by 01_verify_sources.sas at runtime]
-
+SHA256 Source Checksums -- Run:   25AUG2026:20:20:20
+ 
 NOTE: These hash the .sas7bdat FILES, not the data they contain.
 A .sas7bdat embeds its creation datetime, so re-importing byte-identical
 data from the same source produces a DIFFERENT hash. A mismatch on a later
 run means the dataset was regenerated -- it is not evidence of corruption.
 These hashes prove Phase 4 merges the same bytes Phase 1 verified.
-
-master_data_1  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_2  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_3  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_4  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_5  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_6  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_7  [SHA256 hash -- run 01_verify_sources.sas to populate]
-master_data_8  [SHA256 hash -- run 01_verify_sources.sas to populate]
+ 
+master_data_1  204ad1fbff64b82ae66fc4fe5eb811c420225b0aed75bcbb99e03a15100af935
+master_data_2  17a1919d602dbfe63ce95ad12f733247d57260e302feb64aab40e0240ab7ebd8
+master_data_3  0cfafea20903c8de3f2e542a870c5cf310b6cf391d9513a303586a3f91484fa8
+master_data_4  0547a8f8076dddcb7f1b2851ad127ac3c3bbbfb7e2f47c88a741e004f528dca6
+master_data_5  73aec89bc44fd857a0d6c06c18c0b94dc76981d1884e03d8b83d70836c18b507
+master_data_6  54e3969f209a357e09ac9a0ce742479bd72bbc00f10340f945f5836196c23e50
+master_data_7  fb1f63401f0ab277645777db8e91be58e77237ad0393565aca62354bb26ea392
+master_data_8  0b4c498b0054418eaf63312158f86b38b4d6f6858c06dc06b184aa6f86c9dd90

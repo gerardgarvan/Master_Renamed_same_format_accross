@@ -1,12 +1,12 @@
-Source Verification Report -- Run: [populated by 01_verify_sources.sas at runtime]
-
-Source              NOBS               Distinct_IDs
+Source Verification Report -- Run:   25AUG2026:20:20:20
+ 
+Source             NOBS           Distinct_IDs
 ------------------------------------------------
-master_data_1       [run to populate]  [run to populate]
-master_data_2       [run to populate]  [run to populate]
-master_data_3       [run to populate]  [run to populate]
-master_data_4       [run to populate]  [run to populate]
-master_data_5       [run to populate]  [run to populate]
-master_data_6       [run to populate]  [run to populate]
-master_data_7       [run to populate]  [run to populate]
-master_data_8       [run to populate]  [run to populate]
+master_data_1      14778          14778
+master_data_2      14778          14778
+master_data_3      41150          41150
+master_data_4      7695           7695
+master_data_5      7695           7695
+master_data_6      9462           9462
+master_data_7      9215           9215
+master_data_8      22473          22473

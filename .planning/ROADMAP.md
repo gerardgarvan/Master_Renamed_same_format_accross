@@ -59,5 +59,5 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Write sas/05_qc_merge.sas: SECTION 0-3 (assert_eq macro, preconditions, QC-01 row count, QC-02 owner-width truncation check, QC-03 all-char NULL scan) + SECTION 4-6 (QC-04 hemodynamic block Part B asserts / Part A logs, QC-05 guarded clinical ranges, close-out) (QC-01, QC-02, QC-03, QC-04, QC-05)
+- [x] 05-01-PLAN.md — Write sas/05_qc_merge.sas: SECTION 0-3 (assert_eq macro, preconditions, QC-01 row count, QC-02 owner-width truncation check, QC-03 all-char NULL scan) + SECTION 4-6 (QC-04 hemodynamic block Part B asserts / Part A logs, QC-05 guarded clinical ranges, close-out) (QC-01, QC-02, QC-03, QC-04, QC-05)
 - [ ] 05-02-PLAN.md — Static PCM validation + human SAS run: confirm 20 QC ASSERTION OK lines, review QC-04 Part A counts, commit qc/05_qc_merge_report.txt (QC-01, QC-02, QC-03, QC-04, QC-05)

@@ -39,11 +39,11 @@
 
 ### Merge QC
 
-- [ ] **QC-01** — User can run `05_qc_merge.sas` and see it fail loudly (`abort`) if row count deviates from 41,150
-- [ ] **QC-02** — User can verify no character variable is truncated (max widths preserved from prep)
-- [ ] **QC-03** — User can verify no surviving literal `NULL` strings anywhere in the merged file
-- [ ] **QC-04** — User can verify the md8-only hemodynamic block is populated for exactly 22,473 rows
-- [ ] **QC-05** — User can verify type-converted variables fall within expected clinical ranges
+- [x] **QC-01** — User can run `05_qc_merge.sas` and see it fail loudly (`abort`) if row count deviates from 41,150
+- [x] **QC-02** — User can verify no character variable is truncated (max widths preserved from prep)
+- [x] **QC-03** — User can verify no surviving literal `NULL` strings anywhere in the merged file
+- [x] **QC-04** — User can verify the md8-only hemodynamic block is populated for exactly 22,473 rows
+- [x] **QC-05** — User can verify type-converted variables fall within expected clinical ranges
 
 ### Variable Reconciliation
 
@@ -109,11 +109,11 @@
 | MRG-02 | Phase 4 — Merge | Complete |
 | MRG-03 | Phase 4 — Merge | Complete |
 | MRG-04 | Phase 4 — Merge | Complete |
-| QC-01 | Phase 5 — Merge QC | Pending |
-| QC-02 | Phase 5 — Merge QC | Pending |
-| QC-03 | Phase 5 — Merge QC | Pending |
-| QC-04 | Phase 5 — Merge QC | Pending |
-| QC-05 | Phase 5 — Merge QC | Pending |
+| QC-01 | Phase 5 — Merge QC | Complete |
+| QC-02 | Phase 5 — Merge QC | Complete |
+| QC-03 | Phase 5 — Merge QC | Complete |
+| QC-04 | Phase 5 — Merge QC | Complete |
+| QC-05 | Phase 5 — Merge QC | Complete |
 | REC-01 | Phase 6 — Variable Reconciliation | Pending |
 | REC-02 | Phase 6 — Variable Reconciliation | Pending |
 | REC-03 | Phase 6 — Variable Reconciliation | Pending |

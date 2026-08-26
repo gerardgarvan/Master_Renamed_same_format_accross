@@ -24,8 +24,8 @@ options mprint;   /* macro-generated code visible in the log for audit */
 ==========================================================================*/
 
 %let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let docs_path   = C:\Master_Renamed_same_format_accross\docs;
+%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
+%let docs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\docs;
 libname src "&source_path" access=readonly;
 
 

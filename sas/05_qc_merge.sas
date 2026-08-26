@@ -172,6 +172,21 @@ proc sql noprint;
     values ('Slow_Walking_Speed',                3, 'md7')
     values ('Unintended_Weight_Loss',            3, 'md7')
     values ('Week_Grip_Strength',                3, 'md7')
+    /* PCM-D-01 death-naming variants -- carried through UNRECONCILED pending Erin's
+       sign-off (Phase 6). All three are $1 character columns in the merged file and
+       MUST have reference rows or the QC-02 completeness guard aborts.            */
+    values ('IsDead_Y_N',                        1, 'md6')
+    values ('Death',                             1, 'md7')
+    values ('SSDI_Death',                        1, 'md7')
+    values ('SSDI_Death_Y_N',                    1, 'md4')
+    /* md4/md5 comorbidity naming variants -- the non-_YN spellings. Also unreconciled
+       (the _YN forms above are md3-owned; these are the md4/md5 names).            */
+    values ('Sleep_Apnea',                       1, 'md4')
+    values ('Diabetes',                          1, 'md4')
+    values ('Hyperlipidemia',                    1, 'md4')
+    values ('Hypertension',                      1, 'md4')
+    values ('MovementDisorder',                  1, 'md4')
+    values ('Cognitive_Disorder',                1, 'md4')
   ;
 quit;
 
@@ -268,9 +283,44 @@ quit;
     %put ERROR: QC-04 -- no md8-owned variables found. Check the ownership map owner column.;
     %abort cancel;
   %end;
+  %else %if &n_md8_only > 30 %then %do;
+    %put ERROR: QC-04 -- &n_md8_only md8-owned variables found; expected roughly 20.;
+    %put ERROR- This filter reads the Phase 2 `owner` column, where multi-source variables;
+    %put ERROR- carry the literal CONFLICT. If resolved owners (owner_resolved) were written;
+    %put ERROR- back to the map, md8 would silently pick up additional variables and QC-04;
+    %put ERROR- would widen beyond the md8-only block. Confirm which column to read.;
+    %abort cancel;
+  %end;
   %else %put NOTE: QC-04 -- &n_md8_only md8-owned variables to check: &md8_only;
 %mend check_md8_list;
 %check_md8_list;
+
+/* Membership check on the derived list. This REPLACES the duplicate spot-check
+   assertions an earlier version placed after the loop: those re-asserted eight
+   variables the loop had already covered, which broke the validation gate
+   (QC-04 OK count must equal &n_md8_only) and cost eight extra full-table passes.
+   Static auditability of the eight representative names is preserved here, and this
+   macro adds NO assertions to the QC-04 count. */
+%macro check_md8_expected;
+  %local i v missing;
+  %let missing = 0;
+  %do i = 1 %to 8;
+    %let v = %scan(ABP_LESS_THAN_60_COUNT BIS_INDEX_LESS_30_COUNT NIBP_LESS_60_COUNT
+                   SD_ABP_Mean AVG_ABP_Mean Total_Midazolam_mg
+                   Total_Phenylephrine_HCl_Pressors ISO_SEV_MAC_TOTAL_Exp, &i);
+    %if %sysfunc(indexw(%upcase(&md8_only), %upcase(&v))) = 0 %then %do;
+      %put ERROR: QC-04 -- expected md8-owned variable &v absent from the derived list.;
+      %let missing = %eval(&missing + 1);
+    %end;
+  %end;
+  %if &missing > 0 %then %do;
+    %put ERROR: QC-04 -- &missing of 8 representative md8-owned variables missing.;
+    %put ERROR- The ownership map and the merged file have drifted apart.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: QC-04 -- all eight representative md8-owned variables present in the derived list.;
+%mend check_md8_expected;
+%check_md8_expected;
 
 /* QC-04 Part B: Abort assertion -- md8-owned var non-missing outside md8 rows must be zero */
 %macro qc04_partB(var=);
@@ -290,28 +340,6 @@ quit;
   %end;
 %mend qc04_all;
 %qc04_all;
-
-/* QC-04 Part B explicit spot-checks: eight known SET B variables asserted individually.
-   These calls are redundant with the loop above but provide static-verifiable assertions
-   for the eight representative variables (one from each sub-group of SET B). */
-proc sql noprint;
-  select count(*) into :_qb_ABP60    trimmed from g.master_data_merged where in_md8 = 0 and ABP_LESS_THAN_60_COUNT is not missing;
-  select count(*) into :_qb_BIS30    trimmed from g.master_data_merged where in_md8 = 0 and BIS_INDEX_LESS_30_COUNT is not missing;
-  select count(*) into :_qb_NIBP60   trimmed from g.master_data_merged where in_md8 = 0 and NIBP_LESS_60_COUNT is not missing;
-  select count(*) into :_qb_SD_ABP   trimmed from g.master_data_merged where in_md8 = 0 and SD_ABP_Mean is not missing;
-  select count(*) into :_qb_AVG_ABP  trimmed from g.master_data_merged where in_md8 = 0 and AVG_ABP_Mean is not missing;
-  select count(*) into :_qb_Midaz    trimmed from g.master_data_merged where in_md8 = 0 and Total_Midazolam_mg is not missing;
-  select count(*) into :_qb_Phenyl   trimmed from g.master_data_merged where in_md8 = 0 and Total_Phenylephrine_HCl_Pressors is not missing;
-  select count(*) into :_qb_ISO      trimmed from g.master_data_merged where in_md8 = 0 and ISO_SEV_MAC_TOTAL_Exp is not missing;
-quit;
-%assert_eq(actual=&_qb_ABP60,   expected=0, label=QC-04 ABP_LESS_THAN_60_COUNT non-missing outside md8 rows);
-%assert_eq(actual=&_qb_BIS30,   expected=0, label=QC-04 BIS_INDEX_LESS_30_COUNT non-missing outside md8 rows);
-%assert_eq(actual=&_qb_NIBP60,  expected=0, label=QC-04 NIBP_LESS_60_COUNT non-missing outside md8 rows);
-%assert_eq(actual=&_qb_SD_ABP,  expected=0, label=QC-04 SD_ABP_Mean non-missing outside md8 rows);
-%assert_eq(actual=&_qb_AVG_ABP, expected=0, label=QC-04 AVG_ABP_Mean non-missing outside md8 rows);
-%assert_eq(actual=&_qb_Midaz,   expected=0, label=QC-04 Total_Midazolam_mg non-missing outside md8 rows);
-%assert_eq(actual=&_qb_Phenyl,  expected=0, label=QC-04 Total_Phenylephrine_HCl_Pressors non-missing outside md8 rows);
-%assert_eq(actual=&_qb_ISO,     expected=0, label=QC-04 ISO_SEV_MAC_TOTAL_Exp non-missing outside md8 rows);
 
 /* QC-04 Part A: INFORMATIONAL ONLY -- within-md8 non-missing counts with expected magnitudes.
    Design choice (BLOCKER 1 resolution): Part A is LOGGED, not asserted.

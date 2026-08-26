@@ -19,7 +19,7 @@
    Path notes:
      g_path    = P: drive location for g.prep_mdN and g.master_data_merged.
                  SAS7BDAT files are gitignored; no PHI reaches the repo.
-     logs_path = C: drive logs directory (this machine; NOT the P: drive).
+     logs_path = P: drive logs directory (sibling of merge/ on the network share).
                  The merge log and provenance text file are committed artifacts
                  from the C: side; they contain only row counts, not PHI.
      qc_path   = C: drive qc directory; qclib libname points here to read
@@ -29,7 +29,7 @@
    ========================================================================= */
 options nodate nonumber ps=max ls=200 mprint nofmterr;
 %let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
-%let logs_path = C:\Master_Renamed_same_format_accross\logs;
+%let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
 %let qc_path   = C:\Master_Renamed_same_format_accross\qc;
 libname g "&g_path";
 

@@ -127,16 +127,44 @@ filename excf clear;
 
 data g.prep_md5;
   length
-    PRECEDE_STUDY_ID       $12
-    Base_Procedure_Code_1  $10    /* PREP-07: NUM in source, CHAR $10 target */
-    Base_Procedure_1       $200   /* confirm width from qc/03_charvars_all.txt */
-    /* ----------------------------------------------------------------
-       ADD every remaining CHAR variable for MASTER_DATA_5 here,
-       with widths from qc/03_charvars_all.txt MASTER_DATA_5 rows.
-       Example format:
-         VariableName  $<width>
-       Widths from PROC CONTENTS via 03_prep_setup.sas.
-    ---------------------------------------------------------------- */
+    PRECEDE_STUDY_ID               $12
+    Base_Procedure_Code_1          $10   /* PREP-07: NUM in source, CHAR $10 target */
+    ENCRYPTED_MRN                  $36
+    ENCRYPTED_ENCOUNTER            $46
+    Day_of_Week__CHAR_             $3
+    Holidays                       $1
+    Weekend_Indicator              $1
+    EmployeeStatus                 $18
+    Education                      $19
+    Race                           $16
+    Ethnicity                      $15
+    Sex                            $6
+    Marital_Status                 $22
+    Service                        $32
+    Room_Type                      $21
+    Emergent                       $1
+    Base_Procedure_1               $198
+    CPT_1                          $6
+    CPT_1_Description              $75
+    Patient_Type                   $18
+    Payer                          $12
+    ICD10_Principal_Diagnosis_Desc $60
+    ICD10_Principal_Diagnosis      $7
+    Intraop_Ketamine               $1
+    Preop_block                    $1
+    Admit_Source                   $40
+    Dischg_Disposition             $43
+    Death_Date_Y_N                 $1
+    SSDI_Death_Y_N                 $1
+    Anesthesia_Type                $33
+    Sleep_Apnea                    $1
+    Diabetes                       $1
+    Hyperlipidemia                 $1
+    Hypertension                   $1
+    MovementDisorder               $1
+    Cognitive_Disorder             $1
+    Cognitive_Category             $22
+    Frailty_Category               $24
     ;
   set src.master_data_5 (rename=(Base_Procedure_Code_1=_bpc_n));
   if not missing(_bpc_n) then Base_Procedure_Code_1 = strip(put(_bpc_n, best12.));

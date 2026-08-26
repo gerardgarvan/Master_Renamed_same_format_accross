@@ -106,13 +106,46 @@ filename excf clear;
    ========================================================================= */
 data g.prep_md3;
   length
-    PRECEDE_STUDY_ID    $12
-    Base_Procedure_1    $200
-    /* INSERT all remaining character variables for MASTER_DATA_3 here,
-       with widths from qc/03_charvars_all.txt (MASTER_DATA_3 rows).
-       md3 is the spine with 124 variables -- the full list is critical.
-       Example format:
-         Variable_Name   $<width>
+    PRECEDE_STUDY_ID               $12
+    ENCRYPTED_MRN                  $40
+    ENCRYPTED_ENCOUNTER            $49
+    Day_of_Week__CHAR_             $3
+    Holidays                       $1
+    Weekend_Indicator              $1
+    EmployeeStatus                 $23
+    Education                      $19
+    Race                           $16
+    Ethnicity                      $15
+    Sex                            $6
+    Marital_Status                 $22
+    Service                        $32
+    Room_Type                      $22
+    Emergent                       $1
+    Base_Procedure_1               $199
+    Base_Procedure_Code_1          $10
+    CPT_1                          $8
+    CPT_1_Description              $75
+    CPT1_Label                     $96
+    Patient_Type                   $18
+    Payer                          $12
+    ICD10_Principal_Diagnosis_Desc $60
+    ICD10_Principal_Diagnosis      $7
+    Intraop_Ketamine               $1
+    Preop_block                    $1
+    Admit_Source                   $40
+    Dischg_Disposition             $43
+    Death_Date_Y_N                 $1
+    SSDI_Death_Date_Y_N            $1
+    Anesthesia_Type                $33
+    Sleep_Apnea_YN                 $1
+    Diabetes_YN                    $1
+    Hyperlipidemia_YN              $1
+    Hypertension_YN                $1
+    MovementDisorder_YN            $1
+    CognitiveDisorder_YN           $1
+    Cognitive_Category             $22
+    Frailty_Category               $24
+    /* RESEARCH NOTE: md3 is the spine with 124 variables -- the full list is critical.
        Do NOT omit any character variable -- a missing declaration allows
        SAS to infer width from the first observation (truncation risk,
        RESEARCH Pitfall 1).                                               */

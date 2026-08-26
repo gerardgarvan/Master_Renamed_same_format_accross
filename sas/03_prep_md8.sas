@@ -217,11 +217,20 @@ data work.prep_md8_s1;
     rt_INCISE_to_DRESS_mins     $4
     rt_RM_START_to_INCISION_mins $4
     rt_RM_START_to_RM_END_mins  $4
-    Base_Procedure_1            $200
-    /* TODO: declare all remaining md8 character variables here at their
-       source widths from qc/03_charvars_all.txt once 03_prep_setup.sas
-       has been run. Without the complete LENGTH block, SAS infers widths
-       from the source descriptor for undeclared variables.                  */
+    Base_Procedure_1            $198
+    ENCRYPTED_MRN               $40
+    ENCRYPTED_ENCOUNTER         $49
+    EmployeeStatus              $23
+    Education                   $19
+    Race                        $16
+    Ethnicity                   $15
+    Sex                         $6
+    Marital_Status              $22
+    Service                     $32
+    CPT_1                       $8
+    CPT_1_Description           $75
+    Cognitive_Category          $22
+    Frailty_Category            $24
     ;
   set src.master_data_8;
 
@@ -242,11 +251,20 @@ run;
 data g.prep_md8;
   length
     PRECEDE_STUDY_ID            $12
-    /* All other md8 character variables at source widths from
-       qc/03_charvars_all.txt (declare them here, excluding the eight
-       being converted to numeric below).                                    */
-    Base_Procedure_1            $200
-    /* TODO: remaining char vars from qc/03_charvars_all.txt               */
+    Base_Procedure_1            $198
+    ENCRYPTED_MRN               $40
+    ENCRYPTED_ENCOUNTER         $49
+    EmployeeStatus              $23
+    Education                   $19
+    Race                        $16
+    Ethnicity                   $15
+    Sex                         $6
+    Marital_Status              $22
+    Service                     $32
+    CPT_1                       $8
+    CPT_1_Description           $75
+    Cognitive_Category          $22
+    Frailty_Category            $24
     /* Eight forced-char numerics declared as NUMERIC (length 8, not 8.)
        A trailing period in a LENGTH statement is a syntax error.            */
     Admit_BMI                   8

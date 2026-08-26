@@ -88,10 +88,41 @@ proc sql noprint;
   from src.master_data_6
   where strip(upcase(PRECEDE_STUDY_ID)) = 'NULL'
      or strip(upcase(PRECEDE_Study_ID_1)) = 'NULL'
+     or strip(upcase(ENCRYPTED_MRN)) = 'NULL'
+     or strip(upcase(ENCRYPTED_ENCOUNTER)) = 'NULL'
+     or strip(upcase(Day_of_Week__CHAR_)) = 'NULL'
+     or strip(upcase(Holidays)) = 'NULL'
+     or strip(upcase(Race)) = 'NULL'
+     or strip(upcase(Ethnicity)) = 'NULL'
+     or strip(upcase(Sex)) = 'NULL'
+     or strip(upcase(Marital_Status)) = 'NULL'
+     or strip(upcase(EmployeeStatus)) = 'NULL'
+     or strip(upcase(Service)) = 'NULL'
+     or strip(upcase(Room_Type)) = 'NULL'
+     or strip(upcase(Emergent)) = 'NULL'
      or strip(upcase(Base_Procedure_1)) = 'NULL'
-     /* Add further character variables from qc/03_charvars_all.txt
-        MASTER_DATA_6 rows here -- one OR clause per variable.
-        Do NOT include Base_Procedure_Code_1 (it is NUM in md6). */
+     or strip(upcase(CPT_1)) = 'NULL'
+     or strip(upcase(CPT_1_Description)) = 'NULL'
+     or strip(upcase(CPT1_Label)) = 'NULL'
+     or strip(upcase(Patient_Type)) = 'NULL'
+     or strip(upcase(Payer)) = 'NULL'
+     or strip(upcase(ICD10_Principal_Diagnosis)) = 'NULL'
+     or strip(upcase(ICD10_Principal_Diagnosis_POA)) = 'NULL'
+     or strip(upcase(IsDead_Y_N)) = 'NULL'
+     or strip(upcase(SSDI_Death_Y_N)) = 'NULL'
+     or strip(upcase(Admit_Source)) = 'NULL'
+     or strip(upcase(Dischg_Disposition)) = 'NULL'
+     or strip(upcase(Anesthesia_Type)) = 'NULL'
+     or strip(upcase(Preop_block)) = 'NULL'
+     or strip(upcase(Intraop_Ketamine)) = 'NULL'
+     or strip(upcase(Cognitive_Category)) = 'NULL'
+     or strip(upcase(Frailty_Category)) = 'NULL'
+     or strip(upcase(Feels_Exausted)) = 'NULL'
+     or strip(upcase(Low_Physical_Activity)) = 'NULL'
+     or strip(upcase(Slow_Walking_Speed)) = 'NULL'
+     or strip(upcase(Unintended_Weight_Loss)) = 'NULL'
+     or strip(upcase(Week_Grip_Strength)) = 'NULL'
+     /* Base_Procedure_Code_1 is NUM in md6 -- excluded */
   ;
 
   select count(*) into :n_enc trimmed
@@ -165,17 +196,43 @@ quit;
 
 data g.prep_md6;
   length
-    PRECEDE_STUDY_ID       $12
-    Base_Procedure_Code_1  $10    /* PREP-07: NUM in source, CHAR $10 target */
-    Base_Procedure_1       $200   /* confirm width from qc/03_charvars_all.txt */
-    /* ----------------------------------------------------------------
-       ADD every remaining CHAR variable for MASTER_DATA_6 here,
-       EXCEPT PRECEDE_Study_ID_1 (it is being dropped).
-       With widths from qc/03_charvars_all.txt MASTER_DATA_6 rows.
-       Example format:
-         VariableName  $<width>
-       Widths from PROC CONTENTS via 03_prep_setup.sas.
-    ---------------------------------------------------------------- */
+    PRECEDE_STUDY_ID               $12
+    Base_Procedure_Code_1          $10   /* PREP-07: NUM in source, CHAR $10 target */
+    ENCRYPTED_MRN                  $36
+    ENCRYPTED_ENCOUNTER            $46
+    Day_of_Week__CHAR_             $3
+    Holidays                       $1
+    Race                           $15
+    Ethnicity                      $15
+    Sex                            $6
+    Marital_Status                 $22
+    EmployeeStatus                 $19
+    Service                        $32
+    Room_Type                      $22
+    Emergent                       $1
+    Base_Procedure_1               $199
+    CPT_1                          $6
+    CPT_1_Description              $75
+    CPT1_Label                     $96
+    Patient_Type                   $18
+    Payer                          $12
+    ICD10_Principal_Diagnosis      $7
+    ICD10_Principal_Diagnosis_POA  $6
+    IsDead_Y_N                     $1
+    SSDI_Death_Y_N                 $1
+    Admit_Source                   $40
+    Dischg_Disposition             $28
+    Anesthesia_Type                $33
+    Preop_block                    $1
+    Intraop_Ketamine               $1
+    Cognitive_Category             $22
+    Frailty_Category               $24
+    Feels_Exausted                 $1
+    Low_Physical_Activity          $1
+    Slow_Walking_Speed             $1
+    Unintended_Weight_Loss         $1
+    Week_Grip_Strength             $1
+    /* PRECEDE_Study_ID_1 intentionally omitted -- dropped (PREP-04/PCM-D-06) */
     ;
   set src.master_data_6 (rename=(Base_Procedure_Code_1=_bpc_n));
   if not missing(_bpc_n) then Base_Procedure_Code_1 = strip(put(_bpc_n, best12.));

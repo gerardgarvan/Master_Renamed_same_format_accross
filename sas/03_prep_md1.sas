@@ -101,15 +101,45 @@ filename excf clear;
    ========================================================================= */
 data g.prep_md1;
   length
-    PRECEDE_STUDY_ID    $12
-    Base_Procedure_1    $200
-    /* INSERT all remaining character variables for MASTER_DATA_1 here,
-       with widths from qc/03_charvars_all.txt (MASTER_DATA_1 rows).
-       Example format:
-         Variable_Name   $<width>
-       Do NOT omit any character variable -- a missing declaration allows
-       SAS to infer width from the first observation (truncation risk,
-       RESEARCH Pitfall 1).                                               */
+    PRECEDE_STUDY_ID                $12
+    ENCRYPTED_MRN                   $40
+    ENCRYPTED_ENCOUNTER             $49
+    Day_of_Week__CHAR_              $3
+    Holidays                        $1
+    Weekend_Indicator               $1
+    EmployeeStatus                  $23
+    Education                       $19
+    Race                            $16
+    Ethnicity                       $15
+    Sex                             $6
+    Marital_Status                  $22
+    Service                         $32
+    Room_Type                       $21
+    Emergent                        $1
+    Base_Procedure_1                $198
+    Base_Procedure_Code_1           $10
+    CPT_1                           $8
+    CPT_1_Description               $73
+    CPT1_Label                      $96
+    Patient_Type                    $18
+    Payer                           $12
+    ICD10_Principal_Diagnosis_Desc  $60
+    ICD10_Principal_Diagnosis       $7
+    Intraop_Ketamine                $1
+    Preop_block                     $1
+    Admit_Source                    $40
+    Dischg_Disposition              $42
+    _30_DAY_MORTALITY               $1
+    Death_Date_Y_N                  $1
+    SSDI_Death_Date_Y_N             $1
+    Anesthesia_Type                 $33
+    Sleep_Apnea_YN                  $1
+    Diabetes_YN                     $1
+    Hyperlipidemia_YN               $1
+    Hypertension_YN                 $1
+    MovementDisorder_YN             $1
+    CognitiveDisorder_YN            $1
+    ISO_SEV_Exp_IntraOp_MAC_Average $21
     ;
   set src.master_data_1;
 run;

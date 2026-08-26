@@ -29,7 +29,7 @@
 options nodate nonumber ps=max ls=200;
 %let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
 %let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%let qc_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
 libname g "&g_path";
 
 /* PCM-R-05: %abort cancel must live inside a named macro definition. Copied verbatim from

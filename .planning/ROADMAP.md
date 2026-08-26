@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Source Verification & Freeze** — Assert PCM-F-01/F-02 in code; checksum and freeze all eight source files
+- [x] **Phase 1: Source Verification & Freeze** — Assert PCM-F-01/F-02 in code; checksum and freeze all eight source files (completed 2026-08-26)
 - [ ] **Phase 2: Ownership Map** — Produce and commit variable→source ownership table; name all conflicts in DECISIONS.md
 - [ ] **Phase 3: Per-Source Normalization** — Run eight prep programs; clear md8 NULL sentinel; log all conversion counts
 - [ ] **Phase 4: Merge** — Produce `g.master_data_merged` (41,150 rows) via 1:1 merge onto md3 spine
@@ -32,7 +32,7 @@
 **Plans**: 2 plans
 Plans:
 - [x] 01-01-PLAN.md — Setup, checksums (SRC-04), and per-source counts (SRC-03)
-- [ ] 01-02-PLAN.md — Uniqueness (SRC-01) and md3-superset (SRC-02) assertions
+- [x] 01-02-PLAN.md — Uniqueness (SRC-01) and md3-superset (SRC-02) assertions
 
 ### Phase 2: Ownership Map
 **Goal**: Every variable in the pipeline has exactly one declared owner source, and every conflict is named — so no silent last-wins overwrite is possible in downstream merge steps
@@ -120,7 +120,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Source Verification & Freeze | 1/2 | In Progress|  |
+| 1. Source Verification & Freeze | 2/2 | Complete   | 2026-08-26 |
 | 2. Ownership Map | 0/? | Not started | - |
 | 3. Per-Source Normalization | 0/? | Not started | - |
 | 4. Merge | 0/? | Not started | - |

@@ -8,10 +8,10 @@
 
 ### Source Integrity
 
-- [ ] **SRC-01** — User can verify that `PRECEDE_STUDY_ID` is strictly one row per patient in all eight source files (PCM-F-01 asserted in code)
-- [ ] **SRC-02** — User can verify that `master_data_3` is a complete superset of all IDs from md1, md2, md4–md8 (PCM-F-02 asserted in code)
-- [ ] **SRC-03** — User can view per-source row/ID counts written to `qc/` as committed artifacts
-- [ ] **SRC-04** — User can confirm source files are checksummed at the start of every run (freeze point)
+- [x] **SRC-01** — User can verify that `PRECEDE_STUDY_ID` is strictly one row per patient in all eight source files (PCM-F-01 asserted in code)
+- [x] **SRC-02** — User can verify that `master_data_3` is a complete superset of all IDs from md1, md2, md4–md8 (PCM-F-02 asserted in code)
+- [x] **SRC-03** — User can view per-source row/ID counts written to `qc/` as committed artifacts
+- [x] **SRC-04** — User can confirm source files are checksummed at the start of every run (freeze point)
 
 ### Ownership Map
 
@@ -90,10 +90,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SRC-01 | Phase 1 — Source Verification & Freeze | Pending |
-| SRC-02 | Phase 1 — Source Verification & Freeze | Pending |
-| SRC-03 | Phase 1 — Source Verification & Freeze | Pending |
-| SRC-04 | Phase 1 — Source Verification & Freeze | Pending |
+| SRC-01 | Phase 1 — Source Verification & Freeze | Complete |
+| SRC-02 | Phase 1 — Source Verification & Freeze | Complete |
+| SRC-03 | Phase 1 — Source Verification & Freeze | Complete |
+| SRC-04 | Phase 1 — Source Verification & Freeze | Complete |
 | OWN-01 | Phase 2 — Ownership Map | Pending |
 | OWN-02 | Phase 2 — Ownership Map | Pending |
 | OWN-03 | Phase 2 — Ownership Map | Pending |

@@ -1,4 +1,4 @@
-/*==========================================================================
+﻿/*==========================================================================
   Program : 02_ownership.sas
   Phase   : Phase 2 -- Ownership Map
   Purpose : Preconditions, cross-source variable enumeration via PROC
@@ -193,6 +193,7 @@ libname qclib clear;
 %put NOTE: OWN-01/OWN-02 -- ownership table written (Plan 01 sections);
 
 /* === Plan 02 appends OWN-03 conflict block and OWN-04 coalesce assertions below this line === */
+
 
 
 /*==========================================================================

@@ -28,6 +28,7 @@
 - [x] **PREP-04** — User can verify the `PRECEDE_Study_ID_1` duplicate column in md6 is dropped
 - [x] **PREP-05** — User can see character variable widths declared via explicit `length` statements before every `merge`/`set` (PCM-R-02)
 - [x] **PREP-06** — User can see conversion counts logged to `logs/` for each prep program
+- [x] **PREP-07** — User can verify `Base_Procedure_Code_1` is harmonized from NUM to CHAR $10 in md4, md5, md6, and md7; CHARACTER type asserted via `dictionary.columns` in each prep program
 
 ### Merge
 

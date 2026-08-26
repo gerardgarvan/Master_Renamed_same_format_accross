@@ -16,6 +16,17 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-05 | Analytic cohort INPATIENT/OBSERVATION restriction | Pending | TBD |
 | PCM-D-06 | PRECEDE_Study_ID_1 drop vs retain | Resolved (drop, PREP-04) | Gerard |
 | PCM-D-07 | Age floor (minimum 64) | Pending | TBD |
+| PCM-D-08 | g library location | Resolved (P: drive, Phase 3) | Gerard |
+
+---
+
+## PCM-D-08: g library location
+
+**Decision:** Use `P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge` as the `g` libpath for all Phase 3+ prep datasets (`g.prep_mdN`, `g.master_data_merged`).
+
+**Rationale:** The git repo on the analysis machine is cloned into the `\merge` subdirectory on the P: drive. Keeping the `g` library in that same directory simplifies the two-machine workflow -- no separate `C:\PeCAN_work\data` directory needs to be created or maintained. The P: drive path is outside the git working tree (`.sas7bdat` files are gitignored), satisfying PHI safety (RESEARCH Pitfall 9 / PCM-C-04).
+
+**Resolved:** 2026-08-26 | Owner: Gerard
 
 ---
 

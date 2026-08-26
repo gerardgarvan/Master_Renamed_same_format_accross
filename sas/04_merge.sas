@@ -22,7 +22,7 @@
      logs_path = P: drive logs directory (sibling of merge/ on the network share).
                  The merge log and provenance text file are committed artifacts
                  from the C: side; they contain only row counts, not PHI.
-     qc_path   = C: drive qc directory; qclib libname points here to read
+     qc_path   = P: drive qc directory (sibling of merge/ on the network share); qclib libname points here to read
                  qclib.ownership_map (Phase 2 artifact).
    The g libname is left open at end of this program (no LIBNAME CLEAR) so
    that 99_run_all.sas can chain phases without re-assigning the library.
@@ -30,7 +30,7 @@
 options nodate nonumber ps=max ls=200 mprint nofmterr;
 %let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
 %let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%let qc_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
 libname g "&g_path";
 
 %put NOTE: ==== Phase 4 merge starting ====;

@@ -1,0 +1,561 @@
+/* Program: 04_merge.sas | Phase 4 | Requirements: MRG-01, MRG-04
+   Purpose: Ownership-map-governed DATA step merge producing g.master_data_merged
+            (41,150 rows). md3 is the spine (PCM-F-02, MRG-04). Ownership for every
+            variable is resolved at run time from qclib.ownership_map; keep lists are
+            generated, never transcribed by hand.
+   Author : Executor (Phase 4 Plan 01)
+   Created: 2026-08-26
+   PCM violations avoided:
+     PCM-T-01: no PROC SQL UPDATE
+     PCM-T-02: no data X; set X;
+     PCM-R-05: every %abort cancel is inside a named %macro
+     PCM-R-02: LENGTH before MERGE in the DATA step
+     All counts use SELECT COUNT(*) INTO :macvar TRIMMED (not the automatic counter)
+*/
+
+/* =========================================================================
+   SECTION 0: Options, paths, libname assignments
+   =========================================================================
+   Path notes:
+     g_path    = P: drive location for g.prep_mdN and g.master_data_merged.
+                 SAS7BDAT files are gitignored; no PHI reaches the repo.
+     logs_path = C: drive logs directory (this machine; NOT the P: drive).
+                 The merge log and provenance text file are committed artifacts
+                 from the C: side; they contain only row counts, not PHI.
+     qc_path   = C: drive qc directory; qclib libname points here to read
+                 qclib.ownership_map (Phase 2 artifact).
+   The g libname is left open at end of this program (no LIBNAME CLEAR) so
+   that 99_run_all.sas can chain phases without re-assigning the library.
+   ========================================================================= */
+options nodate nonumber ps=max ls=200 mprint nofmterr;
+%let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
+%let logs_path = C:\Master_Renamed_same_format_accross\logs;
+%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+libname g "&g_path";
+
+%put NOTE: ==== Phase 4 merge starting ====;
+
+/* =========================================================================
+   SECTION 1: Preconditions
+   All %abort cancel calls are inside named %macro definitions (PCM-R-05).
+   ========================================================================= */
+
+/* 1a: g library resolves */
+%macro check_libname_g;
+  %if %sysfunc(libref(g)) ne 0 %then %do;
+    %put ERROR: LIBNAME g could not be assigned. Check &g_path;
+    %abort cancel;
+  %end;
+  %else %put NOTE: LIBNAME g resolved: &g_path;
+%mend check_libname_g;
+%check_libname_g;
+
+/* 1b: logs/ and qc/ directories exist */
+%macro check_dir(path=, label=);
+  %if %sysfunc(fileexist(&path)) = 0 %then %do;
+    %put ERROR: &label directory missing: &path;
+    %abort cancel;
+  %end;
+  %else %put NOTE: &label directory found: &path;
+%mend check_dir;
+%check_dir(path=&logs_path, label=logs);
+%check_dir(path=&qc_path,   label=qc);
+
+/* 1c: All eight g.prep_mdN datasets exist */
+proc sql noprint;
+  select count(*) into :n_tables trimmed
+  from dictionary.tables
+  where libname='G'
+    and upcase(memname) in ('PREP_MD1','PREP_MD2','PREP_MD3','PREP_MD4',
+                            'PREP_MD5','PREP_MD6','PREP_MD7','PREP_MD8');
+quit;
+%macro check_eight_inputs;
+  %if &n_tables ne 8 %then %do;
+    %put ERROR: MRG PRECONDITION -- Expected 8 g.prep_mdN datasets, found &n_tables. Re-run Phase 3.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PRECONDITION OK -- all 8 g.prep_mdN datasets present.;
+%mend check_eight_inputs;
+%check_eight_inputs;
+
+/* 1d: PRECEDE_Study_ID_1 must NOT be present in g.prep_md6 (PREP-04 drop asserted) */
+proc sql noprint;
+  select count(*) into :n_dup trimmed
+  from dictionary.columns
+  where libname='G' and upcase(memname)='PREP_MD6'
+    and upcase(name)='PRECEDE_STUDY_ID_1';
+quit;
+%macro check_no_dup_key;
+  %if &n_dup ne 0 %then %do;
+    %put ERROR: PRECEDE_Study_ID_1 found in g.prep_md6 -- re-run Phase 3 prep for md6 (PREP-04 not applied).;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PRECONDITION OK -- PRECEDE_Study_ID_1 is absent from g.prep_md6 (PREP-04 confirmed).;
+%mend check_no_dup_key;
+%check_no_dup_key;
+
+/* =========================================================================
+   SECTION 2: Pre-sort all eight inputs to WORK with NODUPKEY duplicate-key check
+   =========================================================================
+   Pattern: PROC SORT with NODUPKEY writes to work.sort_prep_mdN (not in-place).
+   PCM-T-02: never sort in place over the source dataset.
+   The %sort_and_check macro uses %macro _sort_assert_&dsn inside itself so
+   every %abort cancel is inside a named macro (PCM-R-05).
+   Expected NODUPKEY counts are the Phase 1 SRC-01 verified row totals
+   (qc/src_counts.txt): md3=41150, md8=22473, md1=md2=14778, md6=9462,
+   md7=9215, md4=md5=7695.
+   ========================================================================= */
+%macro sort_and_check(dsn=, expected_nobs=);
+  proc sort data=g.&dsn out=work.sort_&dsn nodupkey; by PRECEDE_STUDY_ID; run;
+  proc sql noprint;
+    select count(*) into :n_sorted trimmed from work.sort_&dsn;
+  quit;
+  %macro _sort_assert_&dsn;
+    %if &n_sorted ne &expected_nobs %then %do;
+      %put ERROR: MRG PRECONDITION -- &dsn has duplicate PRECEDE_STUDY_ID keys.;
+      %put ERROR- Expected &expected_nobs unique rows; NODUPKEY kept &n_sorted.;
+      %abort cancel;
+    %end;
+    %else %put NOTE: PRECONDITION OK -- &dsn has &n_sorted unique keys.;
+  %mend _sort_assert_&dsn;
+  %_sort_assert_&dsn;
+%mend sort_and_check;
+
+%sort_and_check(dsn=prep_md1, expected_nobs=14778)
+%sort_and_check(dsn=prep_md2, expected_nobs=14778)
+%sort_and_check(dsn=prep_md3, expected_nobs=41150)
+%sort_and_check(dsn=prep_md4, expected_nobs=7695)
+%sort_and_check(dsn=prep_md5, expected_nobs=7695)
+%sort_and_check(dsn=prep_md6, expected_nobs=9462)
+%sort_and_check(dsn=prep_md7, expected_nobs=9215)
+%sort_and_check(dsn=prep_md8, expected_nobs=22473)
+
+/* =========================================================================
+   SECTION 2b: Resolve ownership and generate per-source KEEP= lists
+   =========================================================================
+   This section is the core of MRG-04. It NEVER hand-transcribes ownership:
+   all 163 variable assignments (28 single-source + 135 CONFLICT) flow from
+   qclib.ownership_map at run time. The work.ownership_resolved dataset is
+   also the reference for SECTION 5's reconciliation assertions.
+
+   Variable deletion before keep-list build:
+     PRECEDE_STUDY_ID   -- the merge key; supplied explicitly on all 8 inputs
+     PRECEDE_STUDY_ID_1 -- dropped in Phase 3 PREP-04; must not reach any list
+
+   MD3-OWNS MISSINGNESS TRADE-OFF (PCM-D-09):
+     Any variable owned by md3 inherits md3's missingness pattern -- that is,
+     the merged file will show missing values wherever md3 was missing, even if
+     another source had a non-missing value. For Admit_BMI this is provably free:
+     PCM-F-07 showed that coalescing every other source recovers nothing (all
+     28,424 missings are missing at source). For other md3-owned variables this
+     trade-off has NOT been verified. It is a deliberate design choice:
+     md3 is the spine (41,150 rows, complete superset); accepting its missingness
+     avoids arbitrary tie-breaking. Recorded in docs/DECISIONS.md as PCM-D-09.
+   ========================================================================= */
+   Source of truth: qclib.ownership_map (Phase 2 machine-readable artifact).
+   Resolution rule (from interfaces):
+     1. If md3 carries the variable -> md3 owns it (spine, 41,150 rows)
+     2. Otherwise highest row count: md3>md8>md1=md2>md6>md7>md4=md5
+     3. Ties broken by lowest source number
+   Exception: five frailty components override to md7 (width mismatch signal,
+     PCM-D-02 -- $3 in md7 vs $1 in md6 means they are NOT the same encoding).
+   PRECEDE_STUDY_ID and PRECEDE_STUDY_ID_1 are excluded from keep lists:
+     the merge key is kept explicitly on all eight; PRECEDE_STUDY_ID_1 was
+     dropped in Phase 3 (PREP-04) and must not appear in any keep list.
+   ========================================================================= */
+libname qclib "&qc_path";
+
+data work.ownership_resolved;
+  set qclib.ownership_map;
+  length owner_resolved $4;
+  /* sources_present is the pipe-delimited list built in Phase 2, e.g. 'md3|md6|md7' */
+  if      index(sources_present,'md3') then owner_resolved = 'md3';
+  else if index(sources_present,'md8') then owner_resolved = 'md8';
+  else if index(sources_present,'md1') then owner_resolved = 'md1';
+  else if index(sources_present,'md2') then owner_resolved = 'md2';
+  else if index(sources_present,'md6') then owner_resolved = 'md6';
+  else if index(sources_present,'md7') then owner_resolved = 'md7';
+  else if index(sources_present,'md4') then owner_resolved = 'md4';
+  else if index(sources_present,'md5') then owner_resolved = 'md5';
+
+  /* PCM-D-02 override: these five are $3 in md7 and $1 in md6. md6 wins on
+     row count (9,462 > 9,215) but cannot hold md7's 3-character values. Width
+     mismatch means the encodings differ -- take md7. Awaiting Erin sign-off
+     in Phase 6 to reconcile the char Y/N vs numeric variants.               */
+  if upcase(varname) in ('FEELS_EXAUSTED','LOW_PHYSICAL_ACTIVITY','SLOW_WALKING_SPEED',
+                         'UNINTENDED_WEIGHT_LOSS','WEEK_GRIP_STRENGTH')
+     then owner_resolved = 'md7';
+
+  /* Dropped in Phase 3 PREP-04 -- must never reach a keep list */
+  if upcase(varname) = 'PRECEDE_STUDY_ID_1' then delete;
+  /* Key variable -- kept explicitly on all 8 inputs; not in any per-source keep list */
+  if upcase(varname) = 'PRECEDE_STUDY_ID'   then delete;
+run;
+
+/* Guard: every remaining variable must have exactly one resolved owner */
+proc sql noprint;
+  select count(*) into :n_unresolved trimmed
+  from work.ownership_resolved where missing(owner_resolved);
+quit;
+%macro assert_resolved;
+  %if &n_unresolved > 0 %then %do;
+    %put ERROR: MRG-04 -- &n_unresolved variables have no resolved owner. Check sources_present in ownership_map.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: MRG-04 OK -- every mapped variable has exactly one owner.;
+%mend assert_resolved;
+%assert_resolved;
+
+/* Build one macro variable per source: &keep1 through &keep8 */
+%macro build_keeplists;
+  %local i;
+  %do i = 1 %to 8;
+    %global keep&i;
+    proc sql noprint;
+      select varname into :keep&i separated by ' '
+      from work.ownership_resolved where owner_resolved = "md&i";
+    quit;
+    %put NOTE: md&i owns %sysfunc(countw(&&keep&i)) variables.;
+  %end;
+%mend build_keeplists;
+%build_keeplists;
+
+/* =========================================================================
+   SECTION 3: Spine-first DATA step merge with generated KEEP= lists
+   LENGTH block declares each character variable at its OWNER's width.
+   PCM-R-02: LENGTH before MERGE.
+   PCM-F-02, MRG-04: work.sort_prep_md3 is the FIRST dataset in MERGE.
+   No RENAME= blocks (the prefix-suppress scheme overflows the 32-char name limit -- PCM violation).
+   Provenance flags in_md1..in_md8 and n_sources assigned immediately after BY.
+   ========================================================================= */
+data g.master_data_merged;
+  length
+    /* Key */
+    PRECEDE_STUDY_ID                $12
+
+    /* ---------------------------------------------------------------
+       Character variables at OWNER'S width (from qc/03_charvars_all.txt).
+       Under KEEP= only the owner's copy enters the PDV -- max-width would
+       be wasteful and misleading.
+       --------------------------------------------------------------- */
+
+    /* md3 owns: spine variables (Race $16, Emergent $1, etc.) */
+    ENCRYPTED_MRN                   $40   /* md3 owns; md1/md2 also $40 */
+    ENCRYPTED_ENCOUNTER             $49   /* md3 owns */
+    Day_of_Week__CHAR_              $3    /* md3 owns */
+    Holidays                        $1    /* md3 owns */
+    Weekend_Indicator               $1    /* md3 owns */
+    EmployeeStatus                  $23   /* md3 owns */
+    Education                       $19   /* md3 owns */
+    Race                            $16   /* md3 owns */
+    Ethnicity                       $15   /* md3 owns */
+    Sex                             $6    /* md3 owns */
+    Marital_Status                  $22   /* md3 owns */
+    Service                         $32   /* md3 owns */
+    Room_Type                       $22   /* md3 owns */
+    Emergent                        $1    /* md3 owns; md8's $4 is char-forced (not kept) */
+    Base_Procedure_1                $199  /* md3 owns */
+    Base_Procedure_Code_1           $10   /* md3 owns */
+    CPT_1                           $8    /* md3 owns */
+    CPT_1_Description               $75   /* md3 owns */
+    CPT1_Label                      $96   /* md3 owns */
+    Patient_Type                    $18   /* md3 owns */
+    Payer                           $12   /* md3 owns */
+    ICD10_Principal_Diagnosis_Desc  $60   /* md3 owns (md1/md2/md4/md5 also have it) */
+    ICD10_Principal_Diagnosis       $7    /* md3 owns */
+    Intraop_Ketamine                $1    /* md3 owns; md8's $4 is char-forced (not kept) */
+    Preop_block                     $1    /* md3 owns; md8's $4 is char-forced (not kept) */
+    Admit_Source                    $40   /* md3 owns */
+    Dischg_Disposition              $43   /* md3 owns */
+
+    /* PCM-D-01 PENDING: Death_Date_Y_N provisional owner md3; IsDead_Y_N (md6) and Death (md7)
+       land as separate columns. Re-examine in Phase 6 per Erin sign-off. */
+    Death_Date_Y_N                  $1    /* md3 owns provisionally (PCM-D-01) */
+    SSDI_Death_Date_Y_N             $1    /* md3 owns */
+    Anesthesia_Type                 $33   /* md3 owns */
+    Sleep_Apnea_YN                  $1    /* md3 owns */
+    Diabetes_YN                     $1    /* md3 owns */
+    Hyperlipidemia_YN               $1    /* md3 owns */
+    Hypertension_YN                 $1    /* md3 owns */
+    MovementDisorder_YN             $1    /* md3 owns */
+    CognitiveDisorder_YN            $1    /* md3 owns */
+    Cognitive_Category              $22   /* md3 owns */
+
+    /* PCM-D-02 PENDING: Frailty_Score/Cognitive_Score owner md3; the five frailty components
+       are owned by md7 on a width override. Re-examine in Phase 6. */
+    Frailty_Category                $24   /* md3 owns */
+
+    /* ISO_SEV character variable -- md3 is the source with md1|md2|md3 */
+    ISO_SEV_Exp_IntraOp_MAC_Average $21   /* md3 owns (md1 char $21); see PCM-D-03 block below */
+
+    /* md6 owns */
+    IsDead_Y_N                      $1    /* md6 owns; single-source; see PCM-D-01 block above */
+    ICD10_Principal_Diagnosis_POA   $6    /* md6 owns (md6|md7 both $6) */
+    SSDI_Death_Y_N                  $1    /* md6 owns (md4|md5|md6; md6 highest rows) */
+
+    /* PCM-D-03 PENDING: three ISO_SEV columns retained separately; md8's is a TOTAL, not an
+       average -- do not fold it in even when D-03 is decided. */
+
+    /* md7 owns (single-source) */
+    Death                           $1    /* md7 owns; single-source; see PCM-D-01 block above */
+    SSDI_Death                      $1    /* md7 owns; single-source */
+
+    /* md7 owns (PCM-D-02 override: $3 in md7 vs $1 in md6 -- width mismatch) */
+    Feels_Exausted                  $3
+    Low_Physical_Activity           $3
+    Slow_Walking_Speed              $3
+    Unintended_Weight_Loss          $3
+    Week_Grip_Strength              $3
+
+    /* md4 owns */
+    /* (md4 character variables: CPT1_Label $96 -- but md3 owns CPT1_Label; SORT_ID is numeric;
+       md4 owns: Sleep_Apnea $1, Diabetes $1, Hyperlipidemia $1, Hypertension $1,
+       MovementDisorder $1, Cognitive_Disorder $1 -- separate from the md3 _YN variants) */
+    Sleep_Apnea                     $1    /* md4 owns (md4|md5; md4 is lower number) */
+    Diabetes                        $1    /* md4 owns */
+    Hyperlipidemia                  $1    /* md4 owns */
+    Hypertension                    $1    /* md4 owns */
+    MovementDisorder                $1    /* md4 owns */
+    Cognitive_Disorder              $1    /* md4 owns */
+
+    /* md1 owns */
+    _30_DAY_MORTALITY               $1    /* md1 owns (md1|md2; md1 lower number) */
+
+    /* Provenance flags -- numeric length 3 */
+    in_md1 3 in_md2 3 in_md3 3 in_md4 3
+    in_md5 3 in_md6 3 in_md7 3 in_md8 3 n_sources 3
+    ;
+
+  merge
+    work.sort_prep_md3 (in=in3 keep=PRECEDE_STUDY_ID &keep3)   /* SPINE -- MUST be first (MRG-04, PCM-F-02) */
+    work.sort_prep_md1 (in=in1 keep=PRECEDE_STUDY_ID &keep1)
+    work.sort_prep_md2 (in=in2 keep=PRECEDE_STUDY_ID &keep2)
+    work.sort_prep_md4 (in=in4 keep=PRECEDE_STUDY_ID &keep4)
+    work.sort_prep_md5 (in=in5 keep=PRECEDE_STUDY_ID &keep5)
+    work.sort_prep_md6 (in=in6 keep=PRECEDE_STUDY_ID &keep6)
+    work.sort_prep_md7 (in=in7 keep=PRECEDE_STUDY_ID &keep7)
+    work.sort_prep_md8 (in=in8 keep=PRECEDE_STUDY_ID &keep8)
+    ;
+  by PRECEDE_STUDY_ID;
+
+  /* Provenance flags -- assigned immediately after BY (MRG-03 audit trail) */
+  in_md1 = in1; in_md2 = in2; in_md3 = in3; in_md4 = in4;
+  in_md5 = in5; in_md6 = in6; in_md7 = in7; in_md8 = in8;
+  n_sources = in_md1+in_md2+in_md3+in_md4+in_md5+in_md6+in_md7+in_md8;
+run;
+
+%put NOTE: DATA step merge complete. Proceeding to SECTION 4 log.;
+
+/* =========================================================================
+   SECTION 4: Merge summary log written to logs/04_merge_log.txt
+   =========================================================================
+   Two artifacts:
+     logs/04_merge_log.txt          -- session log, not committed (runtime info)
+     qc/04_merge_provenance.txt     -- committed QC artifact (same format as
+                                       qc/src_counts.txt from Phase 1); contains
+                                       only provenance totals and row counts, no PHI.
+   The n_sources distribution is written in a DATA _NULL_ step using FILE/PUT
+   (not PROC EXPORT, not PROC PRINT) so the format is deterministic.
+   All counts re-queried here using SELECT COUNT(*) INTO :macvar TRIMMED to avoid
+   dependence on macro variables set earlier in the session.
+   ========================================================================= */
+   and committed QC artifact qc/04_merge_provenance.txt.
+   All counts use PROC SQL SELECT COUNT(*) INTO :macvar TRIMMED (not the automatic counter).
+   ========================================================================= */
+
+/* Count provenance totals */
+proc sql noprint;
+  select count(*)                    into :n_rows     trimmed from g.master_data_merged;
+  select count(distinct PRECEDE_STUDY_ID) into :n_dist trimmed from g.master_data_merged;
+  select sum(in_md1)  into :n_in_md1 trimmed from g.master_data_merged;
+  select sum(in_md2)  into :n_in_md2 trimmed from g.master_data_merged;
+  select sum(in_md3)  into :n_in_md3 trimmed from g.master_data_merged;
+  select sum(in_md4)  into :n_in_md4 trimmed from g.master_data_merged;
+  select sum(in_md5)  into :n_in_md5 trimmed from g.master_data_merged;
+  select sum(in_md6)  into :n_in_md6 trimmed from g.master_data_merged;
+  select sum(in_md7)  into :n_in_md7 trimmed from g.master_data_merged;
+  select sum(in_md8)  into :n_in_md8 trimmed from g.master_data_merged;
+quit;
+
+/* Write merge summary log to logs/ */
+data _null_;
+  file "&logs_path.\04_merge_log.txt";
+  put "=== Phase 4 Merge Log ===";
+  put "Timestamp: %sysfunc(datetime(), datetime20.)";
+  put "Total rows in g.master_data_merged : &n_rows";
+  put "Distinct PRECEDE_STUDY_ID           : &n_dist";
+  put "--- Provenance flag totals ---";
+  put "in_md1  : &n_in_md1  (expected 14778)";
+  put "in_md2  : &n_in_md2  (expected 14778)";
+  put "in_md3  : &n_in_md3  (expected 41150)";
+  put "in_md4  : &n_in_md4  (expected 7695)";
+  put "in_md5  : &n_in_md5  (expected 7695)";
+  put "in_md6  : &n_in_md6  (expected 9462)";
+  put "in_md7  : &n_in_md7  (expected 9215)";
+  put "in_md8  : &n_in_md8  (expected 22473)";
+run;
+
+/* n_sources distribution */
+data _null_;
+  set g.master_data_merged end=eof;
+  retain _cnt1-_cnt8 0;
+  select(n_sources);
+    when(1) _cnt1+1; when(2) _cnt2+1; when(3) _cnt3+1; when(4) _cnt4+1;
+    when(5) _cnt5+1; when(6) _cnt6+1; when(7) _cnt7+1; when(8) _cnt8+1;
+    otherwise _cnt1+0; /* defensive: n_sources=0 would indicate merge error */
+  end;
+  if eof then do;
+    file "&logs_path.\04_merge_log.txt" mod;
+    put "--- n_sources distribution ---";
+    put "n_sources=1: " _cnt1;
+    put "n_sources=2: " _cnt2;
+    put "n_sources=3: " _cnt3;
+    put "n_sources=4: " _cnt4;
+    put "n_sources=5: " _cnt5;
+    put "n_sources=6: " _cnt6;
+    put "n_sources=7: " _cnt7;
+    put "n_sources=8: " _cnt8;
+    put "=== END ===";
+  end;
+run;
+
+/* Write committed QC artifact: qc/04_merge_provenance.txt (same format as src_counts.txt) */
+data _null_;
+  file "&qc_path.\04_merge_provenance.txt";
+  put "04_merge_provenance -- Run: %sysfunc(datetime(), datetime20.)";
+  put "Provenance flags for g.master_data_merged";
+  put "in_md1  Expected=14778  Actual=&n_in_md1";
+  put "in_md2  Expected=14778  Actual=&n_in_md2";
+  put "in_md3  Expected=41150  Actual=&n_in_md3";
+  put "in_md4  Expected=7695   Actual=&n_in_md4";
+  put "in_md5  Expected=7695   Actual=&n_in_md5";
+  put "in_md6  Expected=9462   Actual=&n_in_md6";
+  put "in_md7  Expected=9215   Actual=&n_in_md7";
+  put "in_md8  Expected=22473  Actual=&n_in_md8";
+  put "Total merged rows: &n_rows  Distinct IDs: &n_dist";
+run;
+
+/* =========================================================================
+   SECTION 5: Five-part assertion block (MRG-01, MRG-02, MRG-03, MRG-04)
+   =========================================================================
+   Assertions:
+     MRG-01: n_merged = 41,150 (spine drives the total)
+     MRG-01: n_dist  = 41,150 (one row per patient -- no accidental stacking)
+     MRG-02: n_blank_key = 0  (no PRECEDE_STUDY_ID missing from any merged row)
+     MRG-03: in_mdN totals match expected source row counts from qc/src_counts.txt
+             for all eight sources
+     NULL sentinel: md8-owned character columns have zero surviving 'NULL' strings
+     MRG-04: ownership reconciliation -- no orphaned columns, no absent mapped vars
+
+   The %assert_eq macro is defined here (not in SECTION 1) because it is
+   logic-layer rather than precondition-layer. All %abort cancel calls are
+   inside this macro (PCM-R-05).
+   ========================================================================= */
+   All %abort cancel inside %macro definitions (PCM-R-05).
+   All counts use PROC SQL SELECT COUNT(*) INTO :macvar TRIMMED (not the automatic counter).
+   ========================================================================= */
+
+%macro assert_eq(actual=, expected=, label=);
+  %if &actual ne &expected %then %do;
+    %put ERROR: MRG ASSERTION FAILED -- &label: expected &expected got &actual;
+    %abort cancel;
+  %end;
+  %else %put NOTE: MRG ASSERTION OK -- &label = &actual;
+%mend assert_eq;
+
+/* Five-part assertion counts (MRG-01, MRG-02, MRG-03) */
+proc sql noprint;
+  select count(*)                         into :n_merged    trimmed from g.master_data_merged;
+  select count(distinct PRECEDE_STUDY_ID) into :n_dist      trimmed from g.master_data_merged;
+  select count(*)                         into :n_blank_key trimmed from g.master_data_merged
+    where missing(PRECEDE_STUDY_ID);
+  select sum(in_md1) into :n_in_md1 trimmed from g.master_data_merged;
+  select sum(in_md2) into :n_in_md2 trimmed from g.master_data_merged;
+  select sum(in_md3) into :n_in_md3 trimmed from g.master_data_merged;
+  select sum(in_md4) into :n_in_md4 trimmed from g.master_data_merged;
+  select sum(in_md5) into :n_in_md5 trimmed from g.master_data_merged;
+  select sum(in_md6) into :n_in_md6 trimmed from g.master_data_merged;
+  select sum(in_md7) into :n_in_md7 trimmed from g.master_data_merged;
+  select sum(in_md8) into :n_in_md8 trimmed from g.master_data_merged;
+quit;
+
+/* MRG-01: row count and distinct IDs */
+%assert_eq(actual=&n_merged,    expected=41150, label=merged row count);
+%assert_eq(actual=&n_dist,      expected=41150, label=distinct PRECEDE_STUDY_ID);
+/* MRG-02: no blank key */
+%assert_eq(actual=&n_blank_key, expected=0,     label=blank PRECEDE_STUDY_ID count);
+/* MRG-03: provenance flag totals */
+%assert_eq(actual=&n_in_md1,    expected=14778, label=in_md1 total);
+%assert_eq(actual=&n_in_md2,    expected=14778, label=in_md2 total);
+%assert_eq(actual=&n_in_md3,    expected=41150, label=in_md3 total);
+%assert_eq(actual=&n_in_md4,    expected=7695,  label=in_md4 total);
+%assert_eq(actual=&n_in_md5,    expected=7695,  label=in_md5 total);
+%assert_eq(actual=&n_in_md6,    expected=9462,  label=in_md6 total);
+%assert_eq(actual=&n_in_md7,    expected=9215,  label=in_md7 total);
+%assert_eq(actual=&n_in_md8,    expected=22473, label=in_md8 total);
+
+/* NULL sentinel scan -- scoped to md8-owned character columns only.
+   md8 owns only the hemodynamic block (all numeric) and ENCRYPTED_MRN/ENCRYPTED_ENCOUNTER
+   (where it is NOT the owner -- md3 owns those). Derive the actual risk surface:         */
+proc sql noprint;
+  select count(*) into :n_md8_char trimmed
+  from dictionary.columns
+  where libname='G' and memname='MASTER_DATA_MERGED' and type='char'
+    and upcase(name) in (select upcase(varname) from work.ownership_resolved
+                         where owner_resolved='md8');
+
+  select name into :md8_charvars separated by ' '
+  from dictionary.columns
+  where libname='G' and memname='MASTER_DATA_MERGED' and type='char'
+    and upcase(name) in (select upcase(varname) from work.ownership_resolved
+                         where owner_resolved='md8');
+quit;
+
+%macro null_scan;
+  %if &n_md8_char = 0 %then %do;
+    %put NOTE: MRG -- md8 owns no character variables in the merged file.;
+    %put NOTE- The NULL sentinel is unreachable by construction. md8's owned columns;
+    %put NOTE- are entirely numeric (hemodynamic block converted in PREP-03).;
+    %put NOTE- This is a stronger result than a scan -- no md8-char values to corrupt.;
+    %let n_null_merged = 0;
+  %end;
+  %else %do;
+    %put NOTE: MRG -- md8 owns &n_md8_char character variables: &md8_charvars;
+    data _null_;
+      set g.master_data_merged end=eof;
+      retain _n_null 0;
+      array _m8 {*} &md8_charvars;
+      do _i = 1 to dim(_m8);
+        if strip(upcase(_m8{_i})) = 'NULL' then _n_null + 1;
+      end;
+      drop _i;
+      if eof then call symputx('n_null_merged', _n_null, 'G');
+    run;
+  %end;
+%mend null_scan;
+%null_scan;
+%assert_eq(actual=&n_null_merged, expected=0, label=surviving NULL sentinel strings in md8-owned char vars);
+
+/* MRG-04 ownership reconciliation: every column in the merged file must appear
+   in the ownership map; every mapped variable must appear in the merged file.   */
+proc sql noprint;
+  select count(*) into :n_unmapped trimmed
+  from dictionary.columns
+  where libname='G' and memname='MASTER_DATA_MERGED'
+    and upcase(name) not in (select upcase(varname) from work.ownership_resolved)
+    and upcase(name) not in ('PRECEDE_STUDY_ID','IN_MD1','IN_MD2','IN_MD3','IN_MD4',
+                             'IN_MD5','IN_MD6','IN_MD7','IN_MD8','N_SOURCES');
+
+  select count(*) into :n_absent trimmed
+  from work.ownership_resolved
+  where upcase(varname) not in (select upcase(name) from dictionary.columns
+                                where libname='G' and memname='MASTER_DATA_MERGED');
+quit;
+%assert_eq(actual=&n_unmapped, expected=0, label=unmapped columns in merged file);
+%assert_eq(actual=&n_absent,   expected=0, label=mapped variables absent from merged file);
+
+/* =========================================================================
+   SECTION 6: Close-out
+   ========================================================================= */
+%put NOTE: ==== Phase 4 merge complete ====;
+/* Leave g and qclib libnames open; 99_run_all.sas will manage libname lifecycle */

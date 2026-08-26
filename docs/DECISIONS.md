@@ -17,6 +17,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-06 | PRECEDE_Study_ID_1 drop vs retain | Resolved (drop, PREP-04) | Gerard |
 | PCM-D-07 | Age floor (minimum 64) | Pending | TBD |
 | PCM-D-08 | g library location | Resolved (P: drive, Phase 3) | Gerard |
+| PCM-D-09 | md3-owns missingness trade-off (Phase 4 merge) | Resolved (accepted, Phase 4) | Gerard |
 
 ---
 
@@ -27,6 +28,29 @@ All entries are ASCII only (session encoding is not UTF-8).
 **Rationale:** The git repo on the analysis machine is cloned into the `\merge` subdirectory on the P: drive. Keeping the `g` library in that same directory simplifies the two-machine workflow -- no separate `C:\PeCAN_work\data` directory needs to be created or maintained. The P: drive path is outside the git working tree (`.sas7bdat` files are gitignored), satisfying PHI safety (RESEARCH Pitfall 9 / PCM-C-04).
 
 **Resolved:** 2026-08-26 | Owner: Gerard
+
+---
+
+## PCM-D-09: md3-owns missingness trade-off (Phase 4 merge)
+
+**Decision:** Any variable assigned to md3 in the ownership resolution step inherits
+md3's missingness pattern. If md3 has a missing value for a patient on a given variable,
+the merged file will also be missing for that patient -- even if another source carried a
+non-missing value -- because under KEEP= only md3's copy enters the merge PDV.
+
+**Rationale:** md3 is the spine (41,150 rows, complete superset of all patient IDs,
+PCM-F-02). Accepting its missingness avoids arbitrary tie-breaking where sources
+disagree. For Admit_BMI this is provably free (PCM-F-07: coalescing every other source
+recovers nothing; all 28,424 missings in the 41,150-row merged file are missing at
+source in md3 and equally missing in every other source that has the patient). For other
+md3-owned variables this has NOT been verified. This is a deliberate design choice.
+
+**Implication for analysts:** Where md3 has a missing value on a variable it owns,
+analysts should not assume that the variable was unavailable for that patient in ALL
+sources. They should check the per-source prep datasets (g.prep_mdN) if imputation or
+recovery from another source is later authorized.
+
+**Resolved:** 2026-08-26 | Owner: Gerard | Phase 4 Plan 01
 
 ---
 

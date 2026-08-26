@@ -25,7 +25,7 @@ Plans:
   6. Conversion counts for each prep program are written to `logs/`
 **Plans**: 5 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 0 setup: create data/ (g library), confirm dirs, PROC CONTENTS inventory + char-var width extract (PREP-01, PREP-05, PREP-06)
+- [x] 03-01-PLAN.md — Wave 0 setup: create data/ (g library), confirm dirs, PROC CONTENTS inventory + char-var width extract (PREP-01, PREP-05, PREP-06)
 - [ ] 03-02-PLAN.md — md8 primary normalization: NULL sentinel clear + eight forced-char-to-numeric conversions, exception report, assertions (PREP-01, PREP-02, PREP-03, PREP-05, PREP-06)
 - [ ] 03-03-PLAN.md — md1/md2/md3 structural prep (md3 spine 41,150 asserted) (PREP-01, PREP-02, PREP-05, PREP-06)
 - [ ] 03-04-PLAN.md — md4/md5/md6 structural prep; drop PRECEDE_Study_ID_1 from md6 (PREP-01, PREP-02, PREP-04, PREP-05, PREP-06)

@@ -22,12 +22,12 @@
 
 ### Per-Source Normalization
 
-- [ ] **PREP-01** — User can run one prep program per source (`03_prep_md1.sas` … `03_prep_md8.sas`); each is independently runnable
+- [x] **PREP-01** — User can run one prep program per source (`03_prep_md1.sas` … `03_prep_md8.sas`); each is independently runnable
 - [ ] **PREP-02** — User can view an exception report before any type conversion executes; zero rows is the pass condition
 - [ ] **PREP-03** — User can verify the md8 literal `NULL` sentinel is cleared and all md8 numerics are correctly typed
 - [ ] **PREP-04** — User can verify the `PRECEDE_Study_ID_1` duplicate column in md6 is dropped
-- [ ] **PREP-05** — User can see character variable widths declared via explicit `length` statements before every `merge`/`set` (PCM-R-02)
-- [ ] **PREP-06** — User can see conversion counts logged to `logs/` for each prep program
+- [x] **PREP-05** — User can see character variable widths declared via explicit `length` statements before every `merge`/`set` (PCM-R-02)
+- [x] **PREP-06** — User can see conversion counts logged to `logs/` for each prep program
 
 ### Merge
 
@@ -98,12 +98,12 @@
 | OWN-02 | Phase 2 — Ownership Map | Complete |
 | OWN-03 | Phase 2 — Ownership Map | Complete |
 | OWN-04 | Phase 2 — Ownership Map | Complete |
-| PREP-01 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-01 | Phase 3 — Per-Source Normalization | Complete |
 | PREP-02 | Phase 3 — Per-Source Normalization | Pending |
 | PREP-03 | Phase 3 — Per-Source Normalization | Pending |
 | PREP-04 | Phase 3 — Per-Source Normalization | Pending |
-| PREP-05 | Phase 3 — Per-Source Normalization | Pending |
-| PREP-06 | Phase 3 — Per-Source Normalization | Pending |
+| PREP-05 | Phase 3 — Per-Source Normalization | Complete |
+| PREP-06 | Phase 3 — Per-Source Normalization | Complete |
 | MRG-01 | Phase 4 — Merge | Pending |
 | MRG-02 | Phase 4 — Merge | Pending |
 | MRG-03 | Phase 4 — Merge | Pending |

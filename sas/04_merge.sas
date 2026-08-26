@@ -151,7 +151,7 @@ quit;
      trade-off has NOT been verified. It is a deliberate design choice:
      md3 is the spine (41,150 rows, complete superset); accepting its missingness
      avoids arbitrary tie-breaking. Recorded in docs/DECISIONS.md as PCM-D-09.
-   ========================================================================= */
+
    Source of truth: qclib.ownership_map (Phase 2 machine-readable artifact).
    Resolution rule (from interfaces):
      1. If md3 carries the variable -> md3 owns it (spine, 41,150 rows)
@@ -358,7 +358,6 @@ run;
    (not PROC EXPORT, not PROC PRINT) so the format is deterministic.
    All counts re-queried here using SELECT COUNT(*) INTO :macvar TRIMMED to avoid
    dependence on macro variables set earlier in the session.
-   ========================================================================= */
    and committed QC artifact qc/04_merge_provenance.txt.
    All counts use PROC SQL SELECT COUNT(*) INTO :macvar TRIMMED (not the automatic counter).
    ========================================================================= */
@@ -450,7 +449,6 @@ run;
    The %assert_eq macro is defined here (not in SECTION 1) because it is
    logic-layer rather than precondition-layer. All %abort cancel calls are
    inside this macro (PCM-R-05).
-   ========================================================================= */
    All %abort cancel inside %macro definitions (PCM-R-05).
    All counts use PROC SQL SELECT COUNT(*) INTO :macvar TRIMMED (not the automatic counter).
    ========================================================================= */

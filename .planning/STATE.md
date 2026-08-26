@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-08-26T00:00:15.282Z"
+last_updated: "2026-08-26T13:56:41.730Z"
 progress:
-  total_phases: 8
-  completed_phases: 1
+  total_phases: 1
+  completed_phases: 0
   total_plans: 2
-  completed_plans: 2
-  percent: 100
+  completed_plans: 1
+  percent: 50
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-25 | **Last Session:** 2026-08-25 — Stopped at: Completed 01-02-PLAN.md
+**Project:** PCM | **Last Updated:** 2026-08-25 | **Last Session:** 2026-08-26T13:56:41.726Z
 
 ---
 
@@ -22,13 +22,13 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 01 — source-verification-freeze
+**Current Focus:** Phase 02 — ownership-map
 
 ---
 
 ## Current Position
 
-Phase: 01 (source-verification-freeze) — EXECUTING
+Phase: 02 (ownership-map) — EXECUTING
 Plan: 2 of 2
 | Field | Value |
 |-------|-------|
@@ -37,7 +37,7 @@ Plan: 2 of 2
 | Phase Status | Not started |
 | Milestone | 1 of 1 |
 
-**Progress:** [██████████] 100%
+**Progress:** [█████░░░░░] 50%
 
 ---
 
@@ -73,6 +73,10 @@ Plan: 2 of 2
 - Encoding damage confined to `Base_Procedure_1`, ≤9 rows per file — flag only, do not re-encode
 - SRC-05 runs before SRC-01: blank key is "unique" when it occurs once and must be caught first (01-02)
 - &SQLOBS not used anywhere in 01_verify_sources.sas; all counts use explicit SELECT COUNT(*) into :macvar trimmed (01-02)
+- docs/DECISIONS.md created as committed stub before 02_ownership.sas runs (avoids MOD-creates-blank-file edge case, RESEARCH Pitfall 6) (02-01)
+- Stale-artifact filter uses IN not IN: -- IN: prefix match would readmit master_data_7b for the literal MASTER_DATA_7 (RESEARCH Pitfall 1) (02-01)
+- PROC CONTENTS writes to work.allvars; filter step writes to work.allvars_src -- no in-place rewrite (PCM-R-01) (02-01)
+- src libname left open at end of 02_ownership.sas Plan 01 sections; Plan 02 needs src for coalesce reads (02-01)
 
 ### Pending Decisions (blockers)
 

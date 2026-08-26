@@ -15,8 +15,8 @@
 
 ### Ownership Map
 
-- [ ] **OWN-01** — User can run `02_ownership.sas` to produce a variable→source ownership table written to disk
-- [ ] **OWN-02** — User can review the ownership map before any merge executes (committed artifact)
+- [x] **OWN-01** — User can run `02_ownership.sas` to produce a variable→source ownership table written to disk
+- [x] **OWN-02** — User can review the ownership map before any merge executes (committed artifact)
 - [ ] **OWN-03** — User can see all variable name conflicts across sources explicitly named in `docs/DECISIONS.md`
 - [ ] **OWN-04** — User can see coalesce-wanted variables explicitly named in `02_ownership.sas` with disagreement checks
 
@@ -94,8 +94,8 @@
 | SRC-02 | Phase 1 — Source Verification & Freeze | Complete |
 | SRC-03 | Phase 1 — Source Verification & Freeze | Complete |
 | SRC-04 | Phase 1 — Source Verification & Freeze | Complete |
-| OWN-01 | Phase 2 — Ownership Map | Pending |
-| OWN-02 | Phase 2 — Ownership Map | Pending |
+| OWN-01 | Phase 2 — Ownership Map | Complete |
+| OWN-02 | Phase 2 — Ownership Map | Complete |
 | OWN-03 | Phase 2 — Ownership Map | Pending |
 | OWN-04 | Phase 2 — Ownership Map | Pending |
 | PREP-01 | Phase 3 — Per-Source Normalization | Pending |

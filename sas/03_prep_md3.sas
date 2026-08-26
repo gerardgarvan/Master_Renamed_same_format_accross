@@ -187,5 +187,5 @@ quit;
   %else %put NOTE: OK -- &src row count &actual matches expected &expected;
 %mend assert_row_count;
 %assert_row_count(actual=&n_prep, expected=&expected_nobs, src=md3);
-%put NOTE: md3 is the merge spine (PCM-F-02); &n_prep rows will drive the Phase 4 base.;
+%put NOTE: md3 is the merge spine (PCM-F-02) -- &n_prep rows will drive the Phase 4 base.;
 %put NOTE: ==== Phase 3 prep md3 complete ====;

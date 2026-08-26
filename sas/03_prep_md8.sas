@@ -1,4 +1,4 @@
-/*==========================================================================
+﻿/*==========================================================================
   Program    : 03_prep_md8.sas
   Phase      : Phase 3 -- Per-Source Normalization
   Purpose    : md8 NULL sentinel clear + forced-char-to-numeric conversion.
@@ -28,9 +28,9 @@ options mprint nofmterr;
 ==========================================================================*/
 
 %let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\PeCAN_work\data;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
+%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\qc;
+%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\logs;
+%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 %let expected_nobs = 22473;   /* md8 frozen source count, qc/src_counts.txt */

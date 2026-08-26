@@ -1,4 +1,4 @@
-/* Program: 03_prep_md3.sas | Phase 3 | Requirements: PREP-01,PREP-02,PREP-05,PREP-06
+﻿/* Program: 03_prep_md3.sas | Phase 3 | Requirements: PREP-01,PREP-02,PREP-05,PREP-06
    Purpose: Structural prep for master_data_3 -- the merge spine (41,150 rows).
             Pre-step exception scan, LENGTH-before-SET copy to g.prep_md3,
             zero-conversion log, and HARD row-count assertion (spine gate).
@@ -20,9 +20,9 @@ options mprint nofmterr;
    SECTION 0: Paths and libnames
    ========================================================================= */
 %let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\PeCAN_work\data;   /* OUTSIDE the repo tree -- RESEARCH Pitfall 9 */
+%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\qc;
+%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\logs;
+%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree -- RESEARCH Pitfall 9 */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

@@ -1,4 +1,4 @@
-/*==========================================================================
+﻿/*==========================================================================
   Program : 03_prep_setup.sas
   Phase   : Phase 3 -- Per-Source Normalization
   Purpose : Wave 0 setup and variable inventory.
@@ -21,9 +21,9 @@ options mprint nofmterr;
    SECTION 0 -- Paths (canonical values reused verbatim by Plans 02-05)
    ========================================================================= */
 %let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\PeCAN_work\data;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
+%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\qc;
+%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\logs;
+%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 
@@ -51,7 +51,7 @@ libname g   "&g_path";
 /* Gate on src libref -- confirms P: drive is mapped */
 %check_libname(lib=src);
 
-/* Gate on g libref -- confirms C:\PeCAN_work\data\ exists (Task 1 of Plan 01) */
+/* Gate on g libref -- confirms P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\ exists (Task 1 of Plan 01) */
 %check_libname(lib=g);
 
 /* Confirm output directories */

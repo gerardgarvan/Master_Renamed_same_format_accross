@@ -1,4 +1,4 @@
-/*==========================================================================
+﻿/*==========================================================================
   Program : 03_prep_md5.sas
   Phase   : Phase 3 -- Per-Source Normalization
   Purpose : Structural prep for master_data_5.
@@ -30,9 +30,9 @@ options mprint nofmterr;
 ==========================================================================*/
 
 %let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\PeCAN_work\data;   /* OUTSIDE the repo tree */
+%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\qc;
+%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\logs;
+%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

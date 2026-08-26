@@ -85,7 +85,29 @@ quit;
 %mend check_merged;
 %check_merged;
 
-/* 1d: Open the report and write a header.
+/* 1d: qclib.ownership_map exists (gitignored .sas7bdat; must be present from Phase 2 run).
+   Fails here with a clear message rather than silently at the PROC SQL in Section 4,
+   which would produce a confusing "table not found" error mid-QC. */
+libname qclib "&qc_path";
+
+proc sql noprint;
+  select count(*) into :n_owmap trimmed
+  from dictionary.tables
+  where libname='QCLIB' and upcase(memname)='OWNERSHIP_MAP';
+quit;
+
+%macro check_owmap;
+  %if &n_owmap ne 1 %then %do;
+    %put ERROR: QC PRECONDITION -- qclib.ownership_map not found at &qc_path..;
+    %put ERROR- This dataset is a Phase 2 artifact (.sas7bdat) excluded from git (PCM-C-03).;
+    %put ERROR- It must be present on the machine that ran Phase 2. Section 4 cannot run.;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PRECONDITION OK -- qclib.ownership_map present.;
+%mend check_owmap;
+%check_owmap;
+
+/* 1f: Open the report and write a header.
    This is the FIRST write -- use FILE (not MOD) to start fresh (RESEARCH Pitfall 6).
    After this, every subsequent write uses FILE ... MOD. */
 filename qcrep "&qc_path.\05_qc_merge_report.txt";
@@ -261,9 +283,8 @@ run;
    map owner-column mismatch.
 
    in_md8 = 1 rows = 22,473 (from qc/04_merge_provenance.txt committed).
+   qclib assigned in Section 1 preconditions (ownership_map presence already verified).
    ========================================================================= */
-libname qclib "&qc_path";
-
 proc sql noprint;
   select name into :md8_only separated by ' '
   from dictionary.columns

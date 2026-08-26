@@ -30,3 +30,17 @@ Plans:
 - [x] 03-03-PLAN.md — md1/md2/md3 structural prep (md3 spine 41,150 asserted) (PREP-01, PREP-02, PREP-05, PREP-06)
 - [x] 03-04-PLAN.md — md4/md5/md6 structural prep; drop PRECEDE_Study_ID_1 from md6 (PREP-01, PREP-02, PREP-04, PREP-05, PREP-06)
 - [x] 03-05-PLAN.md — md7 structural prep + 03_prep_all.sas driver and consolidated summary (PREP-01, PREP-02, PREP-05, PREP-06)
+
+### Phase 4: Merge
+**Goal**: Produce `g.master_data_merged` with exactly 41,150 rows and 41,150 distinct IDs by merging all eight normalized prep outputs on md3 as the spine, with provenance flags for each source and no silent last-wins overwrites
+**Depends on**: Phase 3
+**Requirements**: MRG-01, MRG-02, MRG-03, MRG-04
+**Success Criteria** (what must be TRUE):
+  1. `04_merge.sas` runs and produces `g.master_data_merged` with exactly 41,150 rows
+  2. Zero blank `PRECEDE_STUDY_ID` values in the merged output
+  3. Provenance flags `in_md1`–`in_md8` and `n_sources` are present and match source row counts
+  4. md3 is listed first in the `merge` statement (spine); ownership map governs all variable assignments (no last-wins)
+**Plans**: 2 plans
+Plans:
+- [ ] 04-01-PLAN.md — Write sas/04_merge.sas: preconditions, sort, DATA step merge with full LENGTH block, RENAME= ownership block for all 135 CONFLICT variables, provenance flags, five-part assertions, log output (MRG-01, MRG-04)
+- [ ] 04-02-PLAN.md — Static validation + human-verify SAS run: confirm all 12 assertions pass, commit qc/04_merge_provenance.txt (MRG-02, MRG-03)

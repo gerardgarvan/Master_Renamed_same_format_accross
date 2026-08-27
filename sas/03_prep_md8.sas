@@ -34,6 +34,10 @@ options mprint nofmterr;
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 %let expected_nobs = 22473;   /* md8 frozen source count, qc/src_counts.txt */
+%let mdnum        = 8;        /* PREP-09 uses &mdnum to build dictionary.columns lookups
+                                 and the logs/03_negtime_mdN.txt filename. Present in
+                                 md1-md7; was MISSING here, which left &mdnum unresolved
+                                 and PREP-09 silently non-functional for md8.            */
 
 
 /*==========================================================================

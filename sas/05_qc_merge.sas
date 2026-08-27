@@ -3,10 +3,11 @@
    Purpose : Post-merge QC sentinel over g.master_data_merged (produced by Phase 4).
              Independent second-program assertions: QC-01 row count, QC-02 character
              variable widths, QC-03 NULL string scan, QC-04 md8-only block scoping,
-             QC-05 clinical ranges for type-converted numerics.
+             QC-05 clinical ranges for type-converted numerics, QC-06 operative
+             sub-interval containment, QC-07 removal of the inert ceilings.
              Aborts loudly on any failure; writes qc/05_qc_merge_report.txt progressively
              so partial output survives an abort.
-   Requirements: QC-01, QC-02, QC-03, QC-04, QC-05
+   Requirements: QC-01, QC-02, QC-03, QC-04, QC-05, QC-06, QC-07
    Author  : Executor (Phase 5 Plan 01)
    Created : 2026-08-26
    PCM violations avoided:
@@ -485,15 +486,21 @@ proc sql noprint;
   select count(*) into :n_frail_range trimmed from g.master_data_merged
     where Frailty_Score is not missing and (Frailty_Score < 0 or Frailty_Score > 5);
 
-  /* Operative time variables */
-  select count(*) into :n_rt1_range   trimmed from g.master_data_merged
-    where rt_INCISE_to_DRESS_mins is not missing and (rt_INCISE_to_DRESS_mins < 0 or rt_INCISE_to_DRESS_mins > 2000);
+  /* QC-07 (PCM-D-09, resolved 2026-08-27): the three operative-interval CEILINGS
+     -- rt_INCISE_to_DRESS_mins 2000, rt_RM_START_to_INCISION_mins 500,
+     rt_RM_START_to_RM_END_mins 2000 -- were REMOVED from QC-05.
 
-  select count(*) into :n_rt2_range   trimmed from g.master_data_merged
-    where rt_RM_START_to_INCISION_mins is not missing and (rt_RM_START_to_INCISION_mins < 0 or rt_RM_START_to_INCISION_mins > 500);
+     They never fired on any of 41,150 rows, and every QC-05 time failure was a
+     NEGATIVE value, never an excess. A bound that has never fired and has no
+     mechanism to fire is not a check; leaving it in invites someone to widen it
+     later to make a run green.
 
-  select count(*) into :n_rt3_range   trimmed from g.master_data_merged
-    where rt_RM_START_to_RM_END_mins is not missing and (rt_RM_START_to_RM_END_mins < 0 or rt_RM_START_to_RM_END_mins > 2000);
+     What replaced them:
+       floors      -> PREP-08 nulls negatives at source (Phase 3, all eight preps)
+       containment -> QC-06 SECTION 5b, which catches the impossible combinations
+                      a per-variable range check structurally cannot see
+     The distribution that justified this is still reported in SECTION 5c.
+     Do NOT re-add ceilings without a measured reason.                            */
 quit;
 
 %assert_eq(actual=&n_bmi_range,   expected=0, label=QC-05 Admit_BMI out of range 10-100);
@@ -501,32 +508,133 @@ quit;
 %assert_eq(actual=&n_age_range,   expected=0, label=QC-05 Age_at_Encounter out of range 18-120);
 %assert_eq(actual=&n_cog_range,   expected=0, label=QC-05 Cognitive_Score out of range 0-3);
 %assert_eq(actual=&n_frail_range, expected=0, label=QC-05 Frailty_Score out of range 0-5);
-%assert_eq(actual=&n_rt1_range,   expected=0, label=QC-05 rt_INCISE_to_DRESS_mins out of range 0-2000);
-%assert_eq(actual=&n_rt2_range,   expected=0, label=QC-05 rt_RM_START_to_INCISION_mins out of range 0-500);
-%assert_eq(actual=&n_rt3_range,   expected=0, label=QC-05 rt_RM_START_to_RM_END_mins out of range 0-2000);
 
 data _null_;
   file "&qc_path.\05_qc_merge_report.txt" mod;
-  put "QC-05 clinical range checks (IS NOT MISSING guard applied to each):";
+  put "QC-05 clinical range checks -- 5 assertions (IS NOT MISSING guard applied to each):";
   put "  Admit_BMI (10-100):                    &n_bmi_range out-of-range rows (expected 0)";
   put "  ASA__Anesth_Record_ (1-6):             &n_asa_range out-of-range rows (expected 0)";
   put "  Age_at_Encounter (18-120):             &n_age_range out-of-range rows (expected 0)";
   put "    [PCM-D-07 PENDING: floor 18 provisional; observed min is 64]";
   put "  Cognitive_Score (0-3, NOT MMSE):       &n_cog_range out-of-range rows (expected 0)";
   put "  Frailty_Score (0-5, Fried phenotype):  &n_frail_range out-of-range rows (expected 0)";
-  put "  rt_INCISE_to_DRESS_mins (0-2000):      &n_rt1_range out-of-range rows (expected 0)";
-  put "  rt_RM_START_to_INCISION_mins (0-500):  &n_rt2_range out-of-range rows (expected 0)";
-  put "  rt_RM_START_to_RM_END_mins (0-2000):   &n_rt3_range out-of-range rows (expected 0)";
+  put " ";
+  put "  QC-07: the three operative-interval CEILINGS were removed (PCM-D-09). They never";
+  put "  fired on 41,150 rows and every time failure was a negative. Floors are handled at";
+  put "  source by PREP-08; impossible combinations by QC-06 below.";
 run;
+
+/* =========================================================================
+   SECTION 5b: QC-06 -- operative sub-interval containment
+   A range check tests one variable against a constant. It cannot see that
+   rt_INCISE_to_DRESS_mins (positive, inside the old 0-2000 bound) is LONGER
+   than the room occupancy that contains it. 9 such rows exist (5 + 4).
+
+   PCM-D-08 resolved 2026-08-27: FLAG, DON'T NULL. Each timestamp in a violating
+   row is individually plausible; only the combination is impossible, and nothing
+   identifies which of the three is wrong. 04_merge.sas derives rt_envelope_flag
+   (MRG-05); this section asserts that NO violation ESCAPED the flag.
+
+   Asserting zero VIOLATIONS would leave the pipeline permanently red or force the
+   check to be deleted later. Asserting zero UNFLAGGED violations passes now AND
+   fires again if a future re-extract introduces one the flag logic misses. The
+   flagged count is reported so the 9 never disappear quietly.
+
+   IS NOT MISSING on BOTH sides (PCM-T-11): `a > b` is TRUE when b is missing.
+   ========================================================================= */
+proc sql noprint;
+  /* violations the flag did NOT catch -- must be zero */
+  select count(*) into :n_unflagged trimmed
+  from g.master_data_merged
+  where rt_envelope_flag ne 1
+    and rt_RM_START_to_RM_END_mins is not missing
+    and ( (rt_INCISE_to_DRESS_mins is not missing
+           and rt_INCISE_to_DRESS_mins > rt_RM_START_to_RM_END_mins)
+       or (rt_RM_START_to_INCISION_mins is not missing
+           and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins) );
+
+  /* how many the flag DID catch -- reported, never asserted */
+  select sum(rt_envelope_flag) into :n_flagged trimmed
+  from g.master_data_merged;
+
+  /* per-variable split for the report, so a change in composition stays visible */
+  select count(*) into :n_env_rt1 trimmed
+  from g.master_data_merged
+  where rt_RM_START_to_RM_END_mins is not missing
+    and rt_INCISE_to_DRESS_mins    is not missing
+    and rt_INCISE_to_DRESS_mins > rt_RM_START_to_RM_END_mins;
+
+  select count(*) into :n_env_rt2 trimmed
+  from g.master_data_merged
+  where rt_RM_START_to_RM_END_mins   is not missing
+    and rt_RM_START_to_INCISION_mins is not missing
+    and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins;
+quit;
+
+/* Report BEFORE asserting, so the numbers survive an abort (Pitfall 6) */
+data _null_;
+  file "&qc_path.\05_qc_merge_report.txt" mod;
+  put "QC-06 operative sub-interval containment (both sides IS NOT MISSING guarded):";
+  put "  rows flagged by rt_envelope_flag:        &n_flagged (expected 9)";
+  put "    of which rt_INCISE_to_DRESS_mins:      &n_env_rt1 (expected 5)";
+  put "    of which rt_RM_START_to_INCISION_mins: &n_env_rt2 (expected 4)";
+  put "  UNFLAGGED violations (asserted zero):    &n_unflagged";
+  put "  A sub-interval cannot exceed the room occupancy containing it. Values are";
+  put "  RETAINED and flagged, not nulled (PCM-D-08): each timestamp is individually";
+  put "  plausible and nothing identifies which of the three is wrong.";
+  put "  A flagged count other than 9 is not a failure, but it is a change worth reading.";
+run;
+
+%assert_eq(actual=&n_unflagged, expected=0, label=QC-06 unflagged envelope violations);
+%put NOTE: QC-06 -- &n_flagged rows carry rt_envelope_flag=1 (expected 9, PCM-D-08).;
+
+
+/* =========================================================================
+   SECTION 5c: operative-interval distribution -- REPORT ONLY (PCM-D-09 record)
+   Retained as the evidence that justified dropping the three ceilings in QC-07.
+   NO ASSERTION HERE -- do not add one. If a future re-extract pushes these maxima
+   close to the old 2000/500 bounds, that is the signal to revisit QC-07.
+   ========================================================================= */
+proc sql noprint;
+  select count(*), min(rt_INCISE_to_DRESS_mins), max(rt_INCISE_to_DRESS_mins),
+         mean(rt_INCISE_to_DRESS_mins)
+    into :d1_n trimmed, :d1_min trimmed, :d1_max trimmed, :d1_mean trimmed
+  from g.master_data_merged where rt_INCISE_to_DRESS_mins is not missing;
+
+  select count(*), min(rt_RM_START_to_INCISION_mins), max(rt_RM_START_to_INCISION_mins),
+         mean(rt_RM_START_to_INCISION_mins)
+    into :d2_n trimmed, :d2_min trimmed, :d2_max trimmed, :d2_mean trimmed
+  from g.master_data_merged where rt_RM_START_to_INCISION_mins is not missing;
+
+  select count(*), min(rt_RM_START_to_RM_END_mins), max(rt_RM_START_to_RM_END_mins),
+         mean(rt_RM_START_to_RM_END_mins)
+    into :d3_n trimmed, :d3_min trimmed, :d3_max trimmed, :d3_mean trimmed
+  from g.master_data_merged where rt_RM_START_to_RM_END_mins is not missing;
+quit;
+
+data _null_;
+  file "&qc_path.\05_qc_merge_report.txt" mod;
+  put "Operative-interval distribution (report only -- PCM-D-09 record):";
+  put @1 "Variable" @36 "N" @44 "Min" @54 "Max" @66 "Mean" @78 "Former ceiling";
+  put @1 "------------------------------------------------------------------------------------------";
+  put @1 "rt_INCISE_to_DRESS_mins"      @36 "&d1_n" @44 "&d1_min" @54 "&d1_max" @66 "&d1_mean" @78 "2000 (removed)";
+  put @1 "rt_RM_START_to_INCISION_mins" @36 "&d2_n" @44 "&d2_min" @54 "&d2_max" @66 "&d2_mean" @78 "500 (removed)";
+  put @1 "rt_RM_START_to_RM_END_mins"   @36 "&d3_n" @44 "&d3_min" @54 "&d3_max" @66 "&d3_mean" @78 "2000 (removed)";
+  put " ";
+  put "Min must be >= 0 on all three -- PREP-08 nulled every negative at source.";
+  put "If a Max ever approaches its former ceiling, revisit QC-07.";
+run;
+%put NOTE: PCM-D-09 -- operative-interval distribution written to the QC report (no assertion).;
+
 
 /* =========================================================================
    SECTION 6: Close-out
    ========================================================================= */
-%put NOTE: ==== Phase 5 QC complete -- all checks passed ====;
+%put NOTE: ==== Phase 5 QC complete -- all checks passed (QC-01 through QC-07) ====;
 data _null_;
   file "&qc_path.\05_qc_merge_report.txt" mod;
   put "=============================================================";
-  put "ALL QC CHECKS PASSED (QC-01 through QC-05)";
+  put "ALL QC CHECKS PASSED (QC-01 through QC-07)";
 run;
 
 /* qclib is assigned by THIS program for the Section 4 ownership lookup, so this program

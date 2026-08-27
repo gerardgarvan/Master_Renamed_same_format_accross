@@ -325,6 +325,7 @@ data g.master_data_merged;
     /* Provenance flags -- numeric length 3 */
     in_md1 3 in_md2 3 in_md3 3 in_md4 3
     in_md5 3 in_md6 3 in_md7 3 in_md8 3 n_sources 3
+    rt_envelope_flag 3                     /* MRG-05 -- derived below, see PCM-D-08 */
     ;
 
   merge
@@ -343,9 +344,47 @@ data g.master_data_merged;
   in_md1 = in1; in_md2 = in2; in_md3 = in3; in_md4 = in4;
   in_md5 = in5; in_md6 = in6; in_md7 = in7; in_md8 = in8;
   n_sources = in_md1+in_md2+in_md3+in_md4+in_md5+in_md6+in_md7+in_md8;
+
+  /* ---- MRG-05 / PCM-D-08 (resolved 2026-08-27): operative envelope flag ----
+     9 rows have an operative sub-interval LONGER than the room-occupancy interval
+     that contains it (5 on rt_INCISE_to_DRESS_mins, 4 on rt_RM_START_to_INCISION_mins).
+     A patient cannot be under the knife longer than they were in the room.
+
+     FLAG, DO NOT NULL. Each of the three timestamps is individually plausible; only
+     the combination is impossible, and nothing identifies which one is wrong. Nulling
+     would destroy two good values to punish an unidentifiable third. The flag preserves
+     all three and moves the judgment to the analyst.
+
+     These are NOT the same rows PREP-08 nulled. PREP-08 handled 67 NEGATIVE values;
+     these 9 are POSITIVE and were inside the old QC-05 bounds -- a per-variable range
+     check structurally cannot see a relationship between two variables.
+
+     Derived HERE and not in Phase 3 prep: the ownership map is built in Phase 2 from
+     the SOURCE files, so a variable invented during prep is not in it, and the MRG-04
+     reconciliation below asserts zero unmapped columns. A prep-created flag would fail
+     that assertion. Derived at merge time, it joins the exclusion list instead.
+
+     Both sides guarded (PCM-T-11): `a > b` is TRUE when b is missing, because missing
+     sorts below every number. Without the envelope guard this would flag every row
+     with no room interval recorded.                                                  */
+  rt_envelope_flag =
+     ( rt_RM_START_to_RM_END_mins is not missing
+       and ( (rt_INCISE_to_DRESS_mins is not missing
+              and rt_INCISE_to_DRESS_mins > rt_RM_START_to_RM_END_mins)
+          or (rt_RM_START_to_INCISION_mins is not missing
+              and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins) ) );
+  label rt_envelope_flag = 'Operative sub-interval exceeds room interval (1=yes)';
 run;
 
 %put NOTE: DATA step merge complete. Proceeding to SECTION 4 log.;
+
+/* MRG-05: report the flag count. Informational -- NOT asserted here. QC-06 in
+   05_qc_merge.sas asserts that no violation ESCAPED the flag, which is the check
+   that stays meaningful if a future re-extract introduces a new one.            */
+proc sql noprint;
+  select sum(rt_envelope_flag) into :n_env_flag trimmed from g.master_data_merged;
+quit;
+%put NOTE: MRG-05 -- &n_env_flag rows carry rt_envelope_flag=1 (expected 9, PCM-D-08).;
 
 /* =========================================================================
    SECTION 4: Merge summary log written to logs/04_merge_log.txt
@@ -543,7 +582,11 @@ proc sql noprint;
   where libname='G' and memname='MASTER_DATA_MERGED'
     and upcase(name) not in (select upcase(varname) from work.ownership_resolved)
     and upcase(name) not in ('PRECEDE_STUDY_ID','IN_MD1','IN_MD2','IN_MD3','IN_MD4',
-                             'IN_MD5','IN_MD6','IN_MD7','IN_MD8','N_SOURCES');
+                             'IN_MD5','IN_MD6','IN_MD7','IN_MD8','N_SOURCES',
+                             'RT_ENVELOPE_FLAG');
+    /* RT_ENVELOPE_FLAG is derived in SECTION 3 (MRG-05), not read from a source, so it
+       is legitimately absent from the ownership map. Omitting it here would make MRG-04
+       fail on the merge's own derived column.                                         */
 
   select count(*) into :n_absent trimmed
   from work.ownership_resolved

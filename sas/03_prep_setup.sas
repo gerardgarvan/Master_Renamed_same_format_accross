@@ -1,4 +1,4 @@
-﻿/*==========================================================================
+/*==========================================================================
   Program : 03_prep_setup.sas
   Phase   : Phase 3 -- Per-Source Normalization
   Purpose : Wave 0 setup and variable inventory.
@@ -20,10 +20,7 @@ options mprint nofmterr;
 /* =========================================================================
    SECTION 0 -- Paths (canonical values reused verbatim by Plans 02-05)
    ========================================================================= */
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

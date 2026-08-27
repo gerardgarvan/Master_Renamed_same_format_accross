@@ -1,4 +1,4 @@
-﻿/*==========================================================================
+/*==========================================================================
   Program : 03_prep_all.sas
   Phase   : Phase 3 -- Per-Source Normalization (Driver)
   Purpose : Run setup + all eight structural prep programs in one command,
@@ -27,11 +27,7 @@ options mprint nofmterr;
   debugging). Each included prep program also declares its own paths.
 ==========================================================================*/
 
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\Master_Renamed_same_format_accross;
-%let sas_path    = C:\Master_Renamed_same_format_accross\sas;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 /* sas_path corrected 2026-08-27. It previously pointed at
    C:\Master_Renamed_same_format_accross\sas, which does not exist -- so all nine
    %include statements below resolved to nothing. The driver ran, included no

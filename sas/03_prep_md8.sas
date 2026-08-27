@@ -1,4 +1,4 @@
-﻿/*==========================================================================
+/*==========================================================================
   Program    : 03_prep_md8.sas
   Phase      : Phase 3 -- Per-Source Normalization
   Purpose    : md8 NULL sentinel clear + forced-char-to-numeric conversion.
@@ -27,10 +27,7 @@ options mprint nofmterr;
   all other Phase 3 prep programs and 99_run_all.sas.
 ==========================================================================*/
 
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 %let expected_nobs = 22473;   /* md8 frozen source count, qc/src_counts.txt */

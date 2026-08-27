@@ -1,4 +1,4 @@
-﻿/*==========================================================================
+/*==========================================================================
   Program : 01_verify_sources.sas
   Phase   : Phase 1 -- Source Verification & Freeze
   Purpose : Preconditions (libname + XCMD + qc path), SRC-06 key verification
@@ -26,8 +26,7 @@
 options mprint;   /* macro-generated code visible in the log for audit */
 
 /* ---- Paths ---- */
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname src "&source_path" access=readonly;
 
 

@@ -1,4 +1,4 @@
-﻿/*==========================================================================
+/*==========================================================================
   Program : 03_prep_md7.sas
   Phase   : Phase 3 -- Per-Source Normalization
   Purpose : Structural prep for master_data_7.
@@ -33,10 +33,7 @@ options mprint nofmterr;
   g library MUST be outside the repo tree (RESEARCH Pitfall 9 / PCM-C-04).
 ==========================================================================*/
 
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree */
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

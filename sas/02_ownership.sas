@@ -1,4 +1,4 @@
-﻿/*==========================================================================
+/*==========================================================================
   Program : 02_ownership.sas
   Phase   : Phase 2 -- Ownership Map
   Purpose : Preconditions, cross-source variable enumeration via PROC
@@ -23,9 +23,7 @@ options mprint;   /* macro-generated code visible in the log for audit */
   SECTION 0: Paths and libnames
 ==========================================================================*/
 
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let docs_path   = C:\Master_Renamed_same_format_accross\docs;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname src "&source_path" access=readonly;
 
 

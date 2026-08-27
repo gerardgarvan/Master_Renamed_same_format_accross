@@ -1,4 +1,4 @@
-﻿/* Program: 07_cohort.sas
+/* Program: 07_cohort.sas
    Phase   : 7 -- Cohort & Missingness
    Purpose : Reads g.master_data_merged (never written). Measures Patient_Type
              distribution, builds and validates a candidate cohort in WORK,
@@ -45,9 +45,7 @@
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
 
-%let g_path    = C:\Master_Renamed_same_format_accross;
-%let logs_path = C:\Master_Renamed_same_format_accross\logs;
-%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 
 /* g is WRITABLE -- SECTION 5 promotes the validated cohort into it */
 libname g "&g_path";

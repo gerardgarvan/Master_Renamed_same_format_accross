@@ -1,4 +1,4 @@
-﻿/* Program: 03_prep_md2.sas | Phase 3 | Requirements: PREP-01,PREP-02,PREP-05,PREP-06
+/* Program: 03_prep_md2.sas | Phase 3 | Requirements: PREP-01,PREP-02,PREP-05,PREP-06
    Purpose: Structural prep for master_data_2 (14,778 rows).
             Pre-step exception scan, LENGTH-before-SET copy to g.prep_md2,
             zero-conversion log, and row-count assertion.
@@ -16,10 +16,7 @@ options mprint nofmterr;
 /* =========================================================================
    SECTION 0: Paths and libnames
    ========================================================================= */
-%let source_path = C:\Master_Renamed_same_format_accross;
-%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
-%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
-%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree -- RESEARCH Pitfall 9 */
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

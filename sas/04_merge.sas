@@ -1,4 +1,4 @@
-﻿/* Program: 04_merge.sas | Phase 4 | Requirements: MRG-01, MRG-04
+/* Program: 04_merge.sas | Phase 4 | Requirements: MRG-01, MRG-04
    Purpose: Ownership-map-governed DATA step merge producing g.master_data_merged
             (41,150 rows). md3 is the spine (PCM-F-02, MRG-04). Ownership for every
             variable is resolved at run time from qclib.ownership_map; keep lists are
@@ -28,9 +28,7 @@
    that 99_run_all.sas can chain phases without re-assigning the library.
    ========================================================================= */
 options nodate nonumber ps=max ls=200 mprint nofmterr;
-%let g_path    = C:\Master_Renamed_same_format_accross;
-%let logs_path = C:\Master_Renamed_same_format_accross\logs;
-%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname g "&g_path";
 
 %put NOTE: ==== Phase 4 merge starting ====;

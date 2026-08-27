@@ -1,4 +1,4 @@
-﻿/* Program: 05_qc_merge.sas
+/* Program: 05_qc_merge.sas
    Phase   : 5 -- Merge QC
    Purpose : Post-merge QC sentinel over g.master_data_merged (produced by Phase 4).
              Independent second-program assertions: QC-01 row count, QC-02 character
@@ -33,9 +33,7 @@
    &qc_path (see the 1d precondition).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
-%let g_path    = C:\Master_Renamed_same_format_accross;
-%let logs_path = C:\Master_Renamed_same_format_accross\logs;
-%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname g "&g_path";
 
 /* PCM-R-05: %abort cancel must live inside a named macro definition. Copied verbatim from

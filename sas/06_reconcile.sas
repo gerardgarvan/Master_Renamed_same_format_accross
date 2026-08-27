@@ -1,4 +1,4 @@
-﻿/* Program: 06_reconcile.sas
+/* Program: 06_reconcile.sas
    Phase   : 6 -- Variable Reconciliation
    Purpose : Read-only QC program over g.master_data_merged. Confirms the 16 deliberately-
              separate columns are present (D-01, D-02, D-03), counts the Emergent
@@ -79,9 +79,7 @@
    with all prior phases (copied from sas/05_qc_merge.sas SECTION 0).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
-%let g_path    = C:\Master_Renamed_same_format_accross;
-%let logs_path = C:\Master_Renamed_same_format_accross\logs;
-%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 libname g "&g_path";
 
 %put NOTE: ==== Phase 6 Variable Reconciliation starting -- read-only QC over g.master_data_merged ====;

@@ -10,8 +10,9 @@
             PREP-02 (consolidated existence check)
             PREP-05 (each included program gates LENGTH-before-SET)
             PREP-06 (all 16 per-source artifacts confirmed downstream)
-  Usage   : sas -sysin "C:\Master_Renamed_same_format_accross\sas\03_prep_all.sas"
-                 -log "C:\Master_Renamed_same_format_accross\logs\03_prep_all.log"
+  Usage   : sas -sysin "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\sas\03_prep_all.sas"
+                 -log "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs\03_prep_all.log"
+            (or open in SAS Display Manager and submit; close SAS between phases)
   Author  : Executor (Phase 3 Plan 05)
   Created : 2026-08-26
 ==========================================================================*/
@@ -30,7 +31,13 @@ options mprint nofmterr;
 %let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
 %let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
 %let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
-%let sas_path    = C:\Master_Renamed_same_format_accross\sas;
+%let sas_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\sas;
+/* sas_path corrected 2026-08-27. It previously pointed at
+   C:\Master_Renamed_same_format_accross\sas, which does not exist -- so all nine
+   %include statements below resolved to nothing. The driver ran, included no
+   programs, and produced no PREP-08 nulling and no PREP-09 reports, with no error
+   obvious enough to notice. If a future run produces no logs/03_negtime_mdN.txt
+   files, check this line first.                                                   */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

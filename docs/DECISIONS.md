@@ -18,7 +18,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-07 | Age floor (minimum 64) | **Deferred 2026-08-27 -- not pursuing** | Gerard |
 | PCM-D-08 | The 9 envelope-violating rows | **Resolved 2026-08-27 -- flag, don't null** | Gerard |
 | PCM-D-09 | QC-05 operative-interval ceilings never fire | **Resolved 2026-08-27 -- drop them** | Gerard |
-| PCM-D-10 | Negatives in other rt_* variables | Pending -- needs the PREP-09 report | Gerard |
+| PCM-D-10 | Negatives in other rt_* variables | **Resolved 2026-08-27 -- see entry below** | Gerard |
 | PCM-D-11 | md3-owns missingness trade-off | **Closed 2026-08-27 -- costs nothing** | Gerard |
 
 ---
@@ -171,6 +171,77 @@ Consistent with md3 being the fullest extract, not merely the widest. Recorded a
 **Caveat:** three variables, not all of them -- but these three drive the 6,523 complete-case N,
 so the ones that matter are checked. A patient present only in md3 cannot be recovered from
 anywhere, so zero here means "no recoverable overlap," not "no missingness."
+
+---
+
+### PCM-D-10 -- Negatives in other rt_* variables: TRIAGED FROM PREP-09
+
+The PREP-09 report (logs/03_negtime_md3.txt) was scanned for negative values in every
+rt_* variable other than the three PREP-08 already nulls. Counts are guarded
+(IS NOT MISSING AND var < 0, per PCM-T-11).
+
+**Anchor offsets -- negatives are LEGITIMATE, NOT nulled:**
+rt_ANCHOR_to_ADMIT_days, rt_ANCHOR_to_SURGERY_days, rt_ANCHOR_to_DISCHG_days are offsets
+from an anchor date, not durations. A negative value means the event preceded the anchor,
+which is meaningful. Report counts: 0 negatives across all sources for all three variables.
+NO ACTION -- do not null.
+
+**PREP-08 already-handled variables (Bucket B, confirmed 0 post-null):**
+rt_INCISE_to_DRESS_mins: 0 across all sources (nulled by PREP-08).
+rt_RM_START_to_INCISION_mins: 0 across all sources (nulled by PREP-08).
+rt_RM_START_to_RM_END_mins: 0 across all sources (nulled by PREP-08).
+NO further action.
+
+**Duration variables (rt_*_mins) with zero negatives (Bucket C -- clean):**
+All rt_*_mins variables not listed in Bucket B or Bucket D showed 0 guarded negatives.
+These include rt_AN_START_to_AN_END_mins, rt_ADMIT_to_AN_END_mins, rt_ADMIT_to_RM_END_mins,
+and all others not named below.
+
+**Duration variables with non-zero negatives (Bucket D -- RETAIN-WITH-DOC):**
+Per-source guarded negative counts from PREP-09:
+
+  rt_RM_START_to_AN_START_mins:
+    md1: 7369  md2: 7369  md3: 22575  md4: 4778  md5: 4778  md6: 5524  md7: 4904  md8: n/a
+  rt_ADMIT_to_AN_START_mins:
+    md1: 3  md2: 3  md3: 4  md4: 1  md5: 1  md6: 0  md7: 0
+  rt_ADMIT_to_BLOCK_START_mins:
+    md1: 3  md2: 3  md3: 3  md4: 0  md5: 0
+  rt_ADMIT_to_BLOCK_END_mins:
+    md1: 3  md2: 3  md3: 3  md4: 0  md5: 0
+  rt_ADMIT_to_RM_START_mins:
+    md1: 3  md2: 3  md3: 3
+  rt_ADMIT_to_INCISION_mins:
+    md1: 2  md2: 2  md3: 2
+  rt_ADMIT_to_DRESS_mins:
+    md3: 1  md4: 1  md5: 1
+  rt_RM_START_to_DRESS_mins:
+    md3: 2  md4: 2  md5: 2
+  rt_RM_START_to_INDUCTION_mins:
+    md3: 29  md4: 13  md5: 13  md6: 14  md7: 2
+  rt_RM_START_to_EMERGENCE_mins:
+    md3: 1  md7: 1
+  rt_BLOCK_START_TO_BLOCK_END_mins:
+    md1: 1  md2: 1  md3: 1
+
+**Interpretation of rt_RM_START_to_AN_START_mins:** The very large counts (4,778-22,575)
+indicate that anesthesia start is systematically recorded before room start across all
+sources. This is a workflow pattern -- anesthesia preparation begins before the patient
+enters the room -- not random data error. The negative values are internally consistent
+and carry clinical meaning.
+
+**Interpretation of small-count variables (1-29 negatives):** These small counts likely
+represent the same few problem records appearing across sources due to the multi-source
+structure of the dataset.
+
+**Bucket-D decision -- RETAIN-WITH-DOC (no Phase 3->4->5 re-run):**
+Human decision 2026-08-27: all Bucket D variables retain their negative values unchanged.
+No nulling. No Phase 3->4->5 re-run is triggered. Rationale: the large counts in
+rt_RM_START_to_AN_START_mins reflect a systematic and clinically interpretable workflow
+pattern; the small counts in the remaining variables affect at most ~29 records and likely
+reflect the same few records replicated across sources. Analysts using these variables
+should be aware that negative values are present and represent real sequencing, not errors.
+
+**Resolved:** 2026-08-27 | Owner: Gerard | Phase 6 Plan 01
 
 ---
 

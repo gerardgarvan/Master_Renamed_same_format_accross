@@ -1,0 +1,185 @@
+PeCAN Master Dataset -- Data Dictionary Notes (Phase 6 stub)
+ASCII only. Source: docs/DECISIONS.md. Consumed by: Phase 8 08_dictionary.sas.
+Phase 6 made NO schema changes -- these notes document deliberate decisions.
+Generated: 2026-08-27 | Owner: Gerard
+
+===========================================================================
+SECTION 1 -- Deliberate multi-column concepts (PCM-D-01, PCM-D-02, PCM-D-03)
+===========================================================================
+
+The following concepts appear as multiple columns in g.master_data_merged BY DECISION,
+not by oversight. See docs/DECISIONS.md "Resolutions -- 2026-08-27" for full rationale.
+
+--- CONCEPT: Mortality flag (PCM-D-01, keep separate) ---
+
+Columns in the merged file:
+  Death_Date_Y_N     -- sources md1, md2, md3, md4, md5
+  IsDead_Y_N         -- source md6
+  Death              -- source md7
+
+These are three source-specific column names for what may or may not be the same
+underlying concept. They are NOT collapsed into one column because nobody has verified
+they measure the same thing. Collapsing would assert equivalence that has not been proven.
+
+Additional columns that are SEPARATE MEASURES (never merge candidates):
+  _30_DAY_MORTALITY          -- sources md1, md2
+  Death_Days_After_Surgery   -- sources md3, md4, md5, md6, md7
+
+These are distinct constructs and must not be treated as variants of Death_Date_Y_N.
+
+Analyst guidance: use in_md1 through in_md8 provenance flags to determine which
+mortality column applies to a given patient's source record.
+
+--- CONCEPT: Frailty components (PCM-D-02, keep separate) ---
+
+Five frailty items exist in two encodings across sources:
+
+  Character Y/N columns (sources md6, md7 -- $1 or $3):
+    Feels_Exausted
+    Low_Physical_Activity
+    Slow_Walking_Speed
+    Unintended_Weight_Loss
+    Week_Grip_Strength
+
+  Numeric _Value columns (sources md3, md5):
+    Feels_Exausted_Value
+    Low_Physical_Activity_Value
+    Slow_Walking_Speed_Value
+    Unintended_Weight_Loss_Value
+    Week_Grip_Strength_Value
+
+Total: ten columns for five concepts. All ten are retained in the merged file.
+
+The width difference ($3 in md7 vs $1 in md6) is itself evidence that the two encodings
+are not interchangeable -- reconciling them without knowing why they differ would be
+guessing. The md7 width signal triggered the explicit ownership override at merge time.
+
+--- CONCEPT: ISO_SEV exposure (PCM-D-03, keep separate) ---
+
+Columns in the merged file:
+  ISO_SEV_Exp_IntraOp_MAC_Average   -- sources md1, md2, md3
+  ISO_SEV_IntraOp_MAC_Average       -- source md4
+  ISO_SEV_MAC_TOTAL_Exp             -- source md8
+
+CRITICAL: ISO_SEV_MAC_TOTAL_Exp (md8) is a TOTAL, not an average. It was never a naming
+variant of the other two columns and must remain separate on that basis alone. The md4
+name may be a variant of the md1-md3 name, but that is unverified.
+
+===========================================================================
+SECTION 2 -- Emergent caveat (PCM-D-04, retained despite rarity)
+===========================================================================
+
+Emergent (PCM-D-04, retained): values are Y / N / blank. The merged value is md3-owned;
+see qc/06_reconcile_summary.txt for the observed distribution. At source, md1 and md8
+showed 0.05% and 0.09% Y with blank shares matching to within a tenth of a percent --
+consistent across two independent exports, and consistent with a field clinicians rarely
+complete rather than a true emergency rate. Patient_Type and Admit_Source are likely
+better urgency proxies. Do not model on Emergent without checking the observed rate.
+
+Note on source counts: the positive-Y counts from PCM-F-06 are SOURCE-LEVEL figures
+describing md1 and md8 individually. They do NOT describe the merged Emergent column,
+which is md3-owned. The merged distribution is in qc/06_reconcile_summary.txt.
+
+===========================================================================
+SECTION 3 -- rt_envelope_flag (PCM-D-08 / MRG-05)
+===========================================================================
+
+Column: rt_envelope_flag
+Type: numeric flag (0 / 1)
+Source: derived in Phase 4 merge DATA step (not in the ownership map; excluded from
+        the MRG-04 reconciliation per MRG-05 design)
+
+rt_envelope_flag = 1 marks rows where an operative sub-interval exceeds the room-occupancy
+interval (rt_RM_START_to_RM_END_mins) that contains it -- an impossible combination. At
+least one of the three contributing timestamps must be wrong, but nothing in the data
+identifies which one.
+
+Resolution (PCM-D-08): VALUES ARE RETAINED, NOT NULLED. Nulling would destroy two good
+values to punish one unidentifiable bad one. The flag moves the judgment to the analyst.
+
+The flagged count (9 rows at the 2026-08-27 run) is an observation, not a fixed invariant.
+Future re-extracts from the source system may produce a different count.
+
+QC-06 asserts zero UNFLAGGED envelope violations (not zero violations overall). This
+assertion will fire if a future re-extract introduces a violation the flag logic misses.
+
+Analyst guidance: decide how to handle rt_envelope_flag = 1 rows before using operative
+interval variables. Options include exclusion, sensitivity analysis, or retention with note.
+
+Upstream note (logged for reporting): the source system emits impossible operative
+timestamp combinations. The flag makes the pipeline honest; it does not fix the extract.
+
+===========================================================================
+SECTION 4 -- Deferred and closed decisions
+===========================================================================
+
+--- Age floor (PCM-D-07, DEFERRED to Phase 7) ---
+
+The observed minimum Age_at_Encounter in g.master_data_merged is 64. This was noted
+but not investigated in Phase 6.
+
+The QC-05 floor of 18 is a TYPE-SANITY GUARD only -- it exists to catch a numeric
+conversion failure, not to define the analytic cohort. It cannot fire given the observed
+minimum of 64.
+
+DO NOT tighten the QC-05 floor to 64. That would convert an unexamined question into
+a pipeline abort and embed an analytic decision in the QC layer.
+
+Phase 7 (Cohort and Missingness) inherits this question when defining the analytic cohort.
+See ROADMAP Phase 7 -- the cohort inclusion criterion discussion (PCM-D-05) is the
+appropriate place to address the age floor.
+
+--- Operative-interval ceilings (PCM-D-09, DROPPED) ---
+
+The three QC-05 upper-bound assertions:
+  rt_INCISE_to_DRESS_mins       ceiling 2000
+  rt_RM_START_to_INCISION_mins  ceiling 500
+  rt_RM_START_to_RM_END_mins    ceiling 2000
+
+...never fired on any of 41,150 rows and were removed (QC-07). QC-05 now carries five
+assertions (floors only for the operative intervals). Floors are handled at source by
+PREP-08 (negatives set to missing); containment is enforced by QC-06 (envelope check).
+A bound that has never fired is not a check. The distribution report is retained as the
+record justifying this removal.
+
+--- md3-owns missingness (PCM-D-11, CLOSED) ---
+
+Variables owned by md3 inherit md3's missingness pattern in the merged file. Where md3
+carries a blank on a variable it owns, no other source has a non-missing value for that
+patient (PCM-F-17). This was verified for:
+
+  Admit_BMI       -- md3 vs all seven other sources: 0 recoverable values
+  Cognitive_Score -- md3 vs md5, md3 vs md6: 0 recoverable values
+  Frailty_Score   -- md3 vs md5, md3 vs md6: 0 recoverable values
+
+These three variables drive the 6,523 complete-case N for the primary analysis.
+
+Caveat: "zero recoverable" means no other source has a value for the same patient where
+md3 is blank. It does not mean the patient has no missingness -- it means the missingness
+cannot be reduced by drawing from another source in this extract.
+
+Analyst guidance: if imputation or supplemental data are later authorized, check the
+per-source prep datasets (g.prep_mdN) directly.
+
+===========================================================================
+SECTION 5 -- PCM-D-10 pointer (rt_ANCHOR_to_*_days negatives)
+===========================================================================
+
+The following columns legitimately carry negative values and were NOT nulled:
+
+  rt_ANCHOR_to_ADMIT_days
+  rt_ANCHOR_to_SURGERY_days
+  rt_ANCHOR_to_DISCHG_days
+
+These are offsets from an anchor date, not durations. A negative value means the event
+preceded the anchor, which is clinically meaningful. Zero negative values were observed
+in the PREP-09 scan (PCM-D-10, resolved 2026-08-27), so no action was taken, but the
+design permits negatives by definition.
+
+Do not apply a floor of zero to these variables. See docs/DECISIONS.md PCM-D-10 for the
+full triage, including the Bucket-D variables that retain negatives for different reasons.
+
+===========================================================================
+END OF DATA DICTIONARY NOTES
+Phase 6 plan 03 | docs/data_dictionary_notes.txt | 2026-08-27
+===========================================================================

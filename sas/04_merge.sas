@@ -251,6 +251,13 @@ data work.md8_donors;
                                   ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6));
 run;
 
+/* Explicit sort. work.sort_prep_md8 is already sorted by PRECEDE_STUDY_ID and a
+   simple SET normally propagates the sort indicator, but MERGE ... BY fails hard
+   if it does not. 22,473 rows is a trivial cost for removing that dependency.  */
+proc sort data=work.md8_donors;
+  by PRECEDE_STUDY_ID;
+run;
+
 data g.master_data_merged;
   length
     /* Key */

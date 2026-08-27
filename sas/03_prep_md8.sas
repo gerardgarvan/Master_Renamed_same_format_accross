@@ -34,10 +34,6 @@ options mprint nofmterr;
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 %let expected_nobs = 22473;   /* md8 frozen source count, qc/src_counts.txt */
-%let mdnum        = 8;        /* PREP-09 uses &mdnum to build dictionary.columns lookups
-                                 and the logs/03_negtime_mdN.txt filename. Present in
-                                 md1-md7; was MISSING here, which left &mdnum unresolved
-                                 and PREP-09 silently non-functional for md8.            */
 
 
 /*==========================================================================
@@ -310,11 +306,11 @@ data g.prep_md8;
      ORDERING NOTE (md8 only): this block MUST follow the input() conversions above.
      Before this point the three variables are still character (rt1_c..rt3_c) and the
      numeric comparison is meaningless. After INPUT() they are numeric in the PDV.     */
-  if rt_INCISE_to_DRESS_mins is not missing
+  if not missing(rt_INCISE_to_DRESS_mins)
      and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
-  if rt_RM_START_to_INCISION_mins is not missing
+  if not missing(rt_RM_START_to_INCISION_mins)
      and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
-  if rt_RM_START_to_RM_END_mins is not missing
+  if not missing(rt_RM_START_to_RM_END_mins)
      and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
 run;
 

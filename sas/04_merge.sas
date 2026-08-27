@@ -99,26 +99,34 @@ quit;
    =========================================================================
    Pattern: PROC SORT with NODUPKEY writes to work.sort_prep_mdN (not in-place).
    PCM-T-02: never sort in place over the source dataset.
-   The %sort_and_check macro uses %macro _sort_assert_&dsn inside itself so
-   every %abort cancel is inside a named macro (PCM-R-05).
+   %sort_and_check calls %assert_sorted, which is defined once at the outer level
+   and takes parameters, so every %abort cancel is inside a named macro (PCM-R-05)
+   without building a macro name from a macro variable (which does not compile).
    Expected NODUPKEY counts are the Phase 1 SRC-01 verified row totals
    (qc/src_counts.txt): md3=41150, md8=22473, md1=md2=14778, md6=9462,
    md7=9215, md4=md5=7695.
    ========================================================================= */
+/* The assertion macro is defined ONCE, at the outer level, and takes parameters.
+   An earlier version defined `%macro _sort_assert_&dsn;` INSIDE sort_and_check.
+   A macro NAME cannot be constructed from a macro variable in the %MACRO statement:
+   SAS reported "Expected semicolon not found. The macro will not be compiled." and
+   compiled a dummy, so all eight NODUPKEY assertions silently never ran.
+   %abort cancel stays inside a named macro definition (PCM-R-05).                  */
+%macro assert_sorted(actual=, expected=, dsn=);
+  %if &actual ne &expected %then %do;
+    %put ERROR: MRG PRECONDITION -- &dsn has duplicate PRECEDE_STUDY_ID keys.;
+    %put ERROR- Expected &expected unique rows -- NODUPKEY kept &actual;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PRECONDITION OK -- &dsn has &actual unique keys.;
+%mend assert_sorted;
+
 %macro sort_and_check(dsn=, expected_nobs=);
   proc sort data=g.&dsn out=work.sort_&dsn nodupkey; by PRECEDE_STUDY_ID; run;
   proc sql noprint;
     select count(*) into :n_sorted trimmed from work.sort_&dsn;
   quit;
-  %macro _sort_assert_&dsn;
-    %if &n_sorted ne &expected_nobs %then %do;
-      %put ERROR: MRG PRECONDITION -- &dsn has duplicate PRECEDE_STUDY_ID keys.;
-      %put ERROR- Expected &expected_nobs unique rows%str(;) NODUPKEY kept &n_sorted.;
-      %abort cancel;
-    %end;
-    %else %put NOTE: PRECONDITION OK -- &dsn has &n_sorted unique keys.;
-  %mend _sort_assert_&dsn;
-  %_sort_assert_&dsn;
+  %assert_sorted(actual=&n_sorted, expected=&expected_nobs, dsn=&dsn);
 %mend sort_and_check;
 
 %sort_and_check(dsn=prep_md1, expected_nobs=14778)
@@ -367,11 +375,13 @@ data g.master_data_merged;
      Both sides guarded (PCM-T-11): `a > b` is TRUE when b is missing, because missing
      sorts below every number. Without the envelope guard this would flag every row
      with no room interval recorded.                                                  */
+  /* SYNTAX NOTE: DATA step, so guards are `not missing(x)`. The `x IS NOT MISSING`
+     operator is PROC SQL / WHERE-clause syntax and is a syntax error here.        */
   rt_envelope_flag =
-     ( rt_RM_START_to_RM_END_mins is not missing
-       and ( (rt_INCISE_to_DRESS_mins is not missing
+     ( not missing(rt_RM_START_to_RM_END_mins)
+       and ( (not missing(rt_INCISE_to_DRESS_mins)
               and rt_INCISE_to_DRESS_mins > rt_RM_START_to_RM_END_mins)
-          or (rt_RM_START_to_INCISION_mins is not missing
+          or (not missing(rt_RM_START_to_INCISION_mins)
               and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins) ) );
   label rt_envelope_flag = 'Operative sub-interval exceeds room interval (1=yes)';
 run;

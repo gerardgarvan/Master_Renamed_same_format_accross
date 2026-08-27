@@ -150,11 +150,11 @@ data g.prep_md2;
      (EP/interventional cardiology, 46% neurosurgery) where there is no incision or
      dressing in the surgical sense. Missing is more honest there than a number.
      IS NOT MISSING guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.        */
-  if rt_INCISE_to_DRESS_mins is not missing
+  if not missing(rt_INCISE_to_DRESS_mins)
      and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
-  if rt_RM_START_to_INCISION_mins is not missing
+  if not missing(rt_RM_START_to_INCISION_mins)
      and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
-  if rt_RM_START_to_RM_END_mins is not missing
+  if not missing(rt_RM_START_to_RM_END_mins)
      and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
 run;
 

@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-08-27T01:21:42.666Z"
+last_updated: "2026-08-27T01:30:34.002Z"
 progress:
   total_phases: 8
   completed_phases: 3
@@ -22,14 +22,14 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 03 — per-source-normalization
+**Current Focus:** Phase 05 — merge-qc
 
 ---
 
 ## Current Position
 
-Phase: 03 (per-source-normalization) — EXECUTING
-Plan: 1 of 6
+Phase: 05 (merge-qc) — EXECUTING
+Plan: 1 of 3
 | Field | Value |
 |-------|-------|
 | Current Phase | 3 — Per-Source Normalization (REOPENED by AMENDMENT-01) |

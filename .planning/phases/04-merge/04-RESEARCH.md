@@ -5,6 +5,19 @@
 assignment, provenance flag construction, spine-first row-count guarantee
 **Confidence:** HIGH -- all patterns are native SAS 9.4 already established in Phases 1-3;
 merge inputs are fully specified by the Phase 3 contract
+**Revised:** 2026-08-26 (post-review)
+
+## Revision log -- 2026-08-26 post-review
+
+| Change | Reason |
+|---|---|
+| Ownership implementation changed from `RENAME=` to `KEEP=` | The `_d_varname_mdN` scheme overflows SAS's 32-character variable-name limit on a dozen-plus variables and will not compile. KEEP= also makes last-wins structurally impossible rather than suppressed |
+| KEEP= lists generated from `qclib.ownership_map` | Phase 2 built that dataset for this purpose and its Known Gaps named the Phase 4 assertion as required. Hand-transcribing 135 rows into a plan is 135 chances to mistype |
+| Ownership stated as a RULE, not a 135-row list | "md3 if present, else highest-N source, ties to lowest number" is auditable in one place |
+| LENGTH block uses the OWNER's width, not the max across sources | Only the owner's copy reaches the merge under KEEP= |
+| MRG-04 verification changed from a `grep -c "rename="` to a column-list reconciliation against the ownership map | A grep count cannot establish that every non-owner copy is covered |
+| Pattern 4 NULL assertion rescoped to md8-OWNED columns | The enumerated columns were all md3-owned, so the assertion passed vacuously |
+| Pitfall 7 resolved: keep the P: path, but move it out of the source folder | Both candidates satisfy the real constraint (not in the git tree); a subfolder of the source directory entangles `src._all_` scans |
 
 ---
 
@@ -262,13 +275,15 @@ does not assume sort order. Do not skip this step.
 /* The merge operation.
    CRITICAL structural rules (all locked decisions):
      1. md3 MUST be listed first -- it is the spine (PCM-F-02, MRG-04).
-     2. Every CONFLICT variable MUST have an explicit owner assignment below
-        the BY statement -- relying on last-observation-wins order is
-        prohibited (PCM-T-05, MRG-04).
+     2. Every dataset carries KEEP= listing only the variables it OWNS (plus
+        the key). A non-owner's copy never enters the PDV, so last-wins is
+        structurally impossible (PCM-T-05, MRG-04). Do NOT use RENAME= --
+        the _d_ scheme overflows the 32-character name limit.
      3. IN= variables (in1-in8) are automatic and dropped by default.
         Assign them immediately to persistent variables (in_md1--in_md8).
-     4. LENGTH block declares MAX width across all sources for every character
-        variable. Source of truth: qc/03_charvars_all.txt.                  */
+     4. LENGTH block declares the OWNER's width for every character variable
+        (not the max across sources -- only the owner's copy reaches the merge).
+        Source of truth: qc/03_charvars_all.txt, the owner's row.            */
 
 data g.master_data_merged;
   length
@@ -302,7 +317,8 @@ data g.master_data_merged;
     Marital_Status             $22
     Service                    $32
     Room_Type                  $22
-    Emergent                   $4    /* md8 has $4; others have $1 */
+    Emergent                   $1    /* md3 owns it; md3 is $1. md8's $4 copy
+                                        is not kept, so no max is needed.    */
     Base_Procedure_1           $199
     Base_Procedure_Code_1      $10
     CPT_1                      $8
@@ -313,8 +329,8 @@ data g.master_data_merged;
     ICD10_Principal_Diagnosis_Desc $60
     ICD10_Principal_Diagnosis  $7
     ICD10_Principal_Diagnosis_POA $6
-    Intraop_Ketamine           $4    /* md8 has $4; others $1 */
-    Preop_block                $4    /* md8 has $4; others $1 */
+    Intraop_Ketamine           $1    /* md3 owns; md3 is $1 */
+    Preop_block                $1    /* md3 owns; md3 is $1 */
     Admit_Source               $40
     Dischg_Disposition         $43
     Death_Date_Y_N             $1
@@ -353,14 +369,14 @@ data g.master_data_merged;
     ;
 
   merge
-    work.sort_prep_md3 (IN=in3)   /* SPINE -- listed FIRST (MRG-04, PCM-F-02) */
-    work.sort_prep_md1 (IN=in1)
-    work.sort_prep_md2 (IN=in2)
-    work.sort_prep_md4 (IN=in4)
-    work.sort_prep_md5 (IN=in5)
-    work.sort_prep_md6 (IN=in6)
-    work.sort_prep_md7 (IN=in7)
-    work.sort_prep_md8 (IN=in8)
+    work.sort_prep_md3 (IN=in3 KEEP=PRECEDE_STUDY_ID &keep3)  /* SPINE -- FIRST */
+    work.sort_prep_md1 (IN=in1 KEEP=PRECEDE_STUDY_ID &keep1)
+    work.sort_prep_md2 (IN=in2 KEEP=PRECEDE_STUDY_ID &keep2)
+    work.sort_prep_md4 (IN=in4 KEEP=PRECEDE_STUDY_ID &keep4)
+    work.sort_prep_md5 (IN=in5 KEEP=PRECEDE_STUDY_ID &keep5)
+    work.sort_prep_md6 (IN=in6 KEEP=PRECEDE_STUDY_ID &keep6)
+    work.sort_prep_md7 (IN=in7 KEEP=PRECEDE_STUDY_ID &keep7)
+    work.sort_prep_md8 (IN=in8 KEEP=PRECEDE_STUDY_ID &keep8)
     ;
   by PRECEDE_STUDY_ID;
 
@@ -397,47 +413,146 @@ data g.master_data_merged;
      names and DROP them at the end. The owner's copy keeps the canonical name.
      This is explicit, auditable, and does not rely on merge order.           */
 
-  /* Example for Admit_BMI -- owner: md3 (has 41,150 rows; most complete).
-     Non-owners: md1, md2, md4, md5, md6, md7 -- rename suppresses their copies.
-     md8 type is now NUMERIC (Phase 3 PREP-03) so no type conflict remains.   */
-  /* [Planner generates one rename-based suppression block per CONFLICT var]  */
+  /* No per-variable ownership code is needed in the DATA step body.
+     KEEP= in the MERGE statement is the entire ownership declaration, and it is
+     generated from qclib.ownership_map -- see "Generate the keep lists" below. */
 
 run;
 ```
 
-**CRITICAL NOTE on the ownership assignment implementation:**
+**CRITICAL: ownership is implemented with `KEEP=`, not `RENAME=`.**
 
-There are two valid implementation strategies for CONFLICT variable ownership. The planner
-must choose one and apply it consistently:
+An earlier draft of this document recommended renaming every non-owner copy to
+`_d_varname_mdN` and dropping `_d_:` at the end. **That approach does not compile.**
 
-**Strategy A: RENAME= on non-owner datasets (preferred)**
-In the MERGE statement, use `RENAME=(conflict_var=_drop_conflict_var)` on every non-owner
-dataset. At the end of the DATA step, DROP all `_drop_*` variables. The owner dataset's
-copy of the variable keeps its canonical name and is the only copy in the output. This is
-explicit, requires no IF-THEN logic in the DATA step body, and is auditable by reading the
-MERGE statement.
+### Why RENAME= fails: the 32-character name limit
+
+SAS variable names cap at 32 characters. `_d_` + varname + `_mdN` adds 7. Every one of these
+overflows:
+
+| Variable | Len | `_d_` name len | Result |
+|---|---|---|---|
+| `SEV_EXP_INTRAOP_MAC_MINUTES_TOTA` | 32 | 39 | ERROR |
+| `ISO_EXP_INTRAOP_MAC_MINUTES_TOTA` | 32 | 39 | ERROR |
+| `ORAL_MORPHINE_EQUIV_GIVEN__1_7_T` | 32 | 39 | ERROR |
+| `RT_BLOCK_START_TO_BLOCK_END_MINS` | 32 | 39 | ERROR |
+| `FENTANYL_SUBLIMAZE_MG_INTRAOP_TO` | 32 | 39 | ERROR |
+| `TOTAL_NOREPINEPHRINE_BITARTRATE_` | 32 | 39 | ERROR |
+| `ORAL_MORPHINE_EQUIV_MG_POD_DAY1` | 31 | 38 | ERROR |
+| `ICD10_PRINCIPAL_DIAGNOSIS_DESC` | 30 | 37 | ERROR |
+| `CHARLSON_COMORBIDITY_INDEX` | 26 | 33 | ERROR |
+
+Shortening the prefix only moves the ceiling; several source names are already 32 characters,
+so no suffix scheme can work for them.
+
+### The correct approach: KEEP= the owned variables
+
+Keep only what each dataset OWNS (plus the key). A non-owner's copy never enters the PDV, so
+last-observation-wins is **structurally impossible** rather than suppressed after the fact.
 
 ```sas
 merge
-  work.sort_prep_md3 (IN=in3)   /* owns: Admit_BMI, Age_at_Encounter, ... */
-  work.sort_prep_md1 (IN=in1
-    rename=(Admit_BMI=_d_Admit_BMI_md1
-            Age_at_Encounter=_d_Age_md1))
-  ...
+  work.sort_prep_md3 (in=in3 keep=PRECEDE_STUDY_ID &keep3)   /* SPINE -- first */
+  work.sort_prep_md1 (in=in1 keep=PRECEDE_STUDY_ID &keep1)
+  work.sort_prep_md2 (in=in2 keep=PRECEDE_STUDY_ID &keep2)
+  work.sort_prep_md4 (in=in4 keep=PRECEDE_STUDY_ID &keep4)
+  work.sort_prep_md5 (in=in5 keep=PRECEDE_STUDY_ID &keep5)
+  work.sort_prep_md6 (in=in6 keep=PRECEDE_STUDY_ID &keep6)
+  work.sort_prep_md7 (in=in7 keep=PRECEDE_STUDY_ID &keep7)
+  work.sort_prep_md8 (in=in8 keep=PRECEDE_STUDY_ID &keep8)
   ;
-drop _d_: ;   /* drop all suppressed non-owner copies */
+by PRECEDE_STUDY_ID;
 ```
 
-**Strategy B: Explicit IF-THEN after BY**
-Retain all copies with distinct names using RENAME=, then assign the canonical name
-from the declared owner in the DATA step body. More verbose but equally explicit.
+Four advantages over RENAME=:
 
-Strategy A is preferred for this pipeline because it keeps the ownership declaration in
-the MERGE statement (a single auditable location) and requires fewer lines in the DATA step
-body. The planner should generate the RENAME= block for all 135 CONFLICT variables.
+1. **No name-length overflow.** Nothing is renamed.
+2. **No `drop _d_:` needed.** Nothing to clean up, so nothing can be forgotten.
+3. **The LENGTH block uses the OWNER's width, not the MAX across sources.** Only the owner's
+   copy reaches the merge, so `Emergent $1` (md3 owns it), not `$4`. The MAX-width rule in the
+   earlier draft was a consequence of RENAME= keeping every copy in the PDV. Widths still come
+   from `qc/03_charvars_all.txt` -- just the owner's row, not the maximum.
+4. **The keep lists are GENERATED, not hand-written.** See below.
 
-**Confidence:** HIGH -- RENAME= dataset option and DROP statement are SAS 9.4 base; behavior
-is well-established.
+### Generate the keep lists from qclib.ownership_map
+
+Phase 2 wrote `qclib.ownership_map` as a SAS dataset for exactly this purpose. Its Known Gaps
+section states that the Phase 4 assertion against it "must be written there." Transcribing 135
+ownership rows by hand into a plan is 135 chances to mistype a variable name; reading the
+dataset is none.
+
+```sas
+/* Ownership map lives in the qc library written by Phase 2 */
+libname qclib "&qc_path";
+
+%macro build_keeplists;
+  %global keep1 keep2 keep3 keep4 keep5 keep6 keep7 keep8;
+  %local i;
+  %do i = 1 %to 8;
+    %global keep&i;
+    proc sql noprint;
+      select varname into :keep&i separated by ' '
+      from qclib.ownership_map
+      where upcase(owner) = "MD&i" and upcase(varname) ne 'PRECEDE_STUDY_ID';
+    quit;
+  %end;
+%mend build_keeplists;
+%build_keeplists;
+```
+
+If `qclib.ownership_map` carries `CONFLICT` in the owner column (Phase 2 deliberately did not
+choose owners), the resolution rule must be applied first and written back to the map as a
+resolved `owner` value -- see "Ownership resolution rule" below. The merge must read a map in
+which every variable has exactly one named owner; a `CONFLICT` value reaching the keep-list
+builder is an error, not a default.
+
+### Ownership resolution rule (mechanical, not 135 decisions)
+
+- If md3 carries the variable, **md3 owns it** (spine; 41,150 rows).
+- Otherwise, the contributing source with the **highest row count** owns it.
+- Ties broken by lowest source number (md1 before md2; md4 before md5).
+
+This is a rule, not a list, so it can be applied in code and audited in one place. It also
+matches what PCM-F-04 verified empirically: md1 and md3 agree exactly on the shared
+demographics across all 14,778 shared records.
+
+**Cost to record, not hide:** md3-owns means md3's *missingness* is inherited. For `Admit_BMI`
+that is provably free -- PCM-F-07 established that coalescing every other source recovers
+nothing, because all 28,424 missings are missing at source. For other variables it has NOT been
+checked. Phase 2's OWN-04 disagreement checks were built to inform this. Record the choice in
+`docs/DECISIONS.md` as a deliberate trade-off rather than letting it read as automatic.
+
+### Verifying ownership held (MRG-04)
+
+Under RENAME= this was unverifiable -- an earlier draft proposed `grep -c "rename="` returning
+"hits for all 135 CONFLICT variables," which a grep cannot establish. Under KEEP= it is a
+straightforward data assertion:
+
+```sas
+/* Every variable in the ownership map appears in the merged file, and the merged
+   file contains nothing the map does not account for (plus the key and the nine
+   provenance variables). */
+proc sql noprint;
+  select count(*) into :n_map trimmed from qclib.ownership_map;
+
+  select count(*) into :n_unmapped trimmed
+  from dictionary.columns
+  where libname='G' and memname='MASTER_DATA_MERGED'
+    and upcase(name) not in (select upcase(varname) from qclib.ownership_map)
+    and upcase(name) not in ('PRECEDE_STUDY_ID','IN_MD1','IN_MD2','IN_MD3','IN_MD4',
+                             'IN_MD5','IN_MD6','IN_MD7','IN_MD8','N_SOURCES');
+
+  select count(*) into :n_missing_var trimmed
+  from qclib.ownership_map
+  where upcase(varname) not in
+    (select upcase(name) from dictionary.columns
+     where libname='G' and memname='MASTER_DATA_MERGED');
+quit;
+%assert_eq(actual=&n_unmapped,    expected=0, label=unmapped columns in merged file);
+%assert_eq(actual=&n_missing_var, expected=0, label=mapped variables absent from merged file);
+```
+
+**Confidence:** HIGH -- KEEP= dataset option and PROC SQL INTO are SAS 9.4 base.
 
 ### Pattern 3: Post-merge assertions
 
@@ -490,20 +605,47 @@ quit;
 
 ### Pattern 4: No-surviving-NULL assertion (carried forward from PREP-03)
 
+**Scope this correctly or it passes vacuously.** Under KEEP= ownership, md3 owns `Race`,
+`Ethnicity`, `Sex`, `Marital_Status`, `EmployeeStatus` and the other shared character
+variables -- md8's copies are never kept, so scanning those columns tests md3's values for a
+sentinel md3 never had. An earlier draft enumerated exactly those columns and would have
+reported 0 regardless of the data.
+
+The only columns that can carry a surviving `NULL` are the ones **md8 owns**. Derive that list
+rather than hand-picking it:
+
 ```sas
-/* Phase 3 cleared all NULL sentinels from g.prep_md8.
-   Phase 4 must assert they did not propagate into g.master_data_merged.
-   Enumerate character variables explicitly -- do not use ARRAY _CHARACTER_
-   in PROC SQL (not supported there). Run in a DATA step with a flag.      */
+/* Character variables owned by md8 -- the only NULL-sentinel risk surface */
+proc sql noprint;
+  select c.name into :md8_charvars separated by ' '
+  from dictionary.columns c
+  where c.libname='G' and c.memname='MASTER_DATA_MERGED' and c.type='char'
+    and upcase(c.name) in
+      (select upcase(varname) from qclib.ownership_map where upcase(owner)='MD8');
+
+  select count(*) into :n_md8_char trimmed
+  from dictionary.columns c
+  where c.libname='G' and c.memname='MASTER_DATA_MERGED' and c.type='char'
+    and upcase(c.name) in
+      (select upcase(varname) from qclib.ownership_map where upcase(owner)='MD8');
+quit;
+```
+
+If `n_md8_char` is 0, say so in the log and record it -- md8 owns only the single-source
+hemodynamic block, which is entirely numeric, so the sentinel is unreachable by construction.
+That is a legitimate result and a stronger guarantee than a scan; do NOT fake a passing
+assertion over columns md8 does not own.
+
+If it is nonzero, scan exactly those columns:
+
+```sas
 data _null_;
   set g.master_data_merged end=eof;
   retain _n_null 0;
-  /* Enumerate every character variable that had NULL sentinel risk.
-     md8 character variables are the risk scope.                          */
-  if strip(upcase(PRECEDE_STUDY_ID))  = 'NULL' then _n_null + 1;
-  if strip(upcase(Race))              = 'NULL' then _n_null + 1;
-  if strip(upcase(Ethnicity))         = 'NULL' then _n_null + 1;
-  /* ... all character variables from the merged file ... */
+  array _m8 {*} &md8_charvars;
+  do _i = 1 to dim(_m8);
+    if strip(upcase(_m8{_i})) = 'NULL' then _n_null + 1;
+  end;
   if eof then call symputx('n_null_merged', _n_null, 'G');
 run;
 %assert_eq(actual=&n_null_merged, expected=0, label=surviving NULL sentinel strings);
@@ -515,9 +657,14 @@ run;
 
 - **Last-observation-wins in a multi-source DATA step merge:** When `MERGE` lists multiple
   datasets and the same variable appears in more than one, SAS assigns the value from the
-  LAST dataset that has a non-missing (or any) value for that variable. The order of datasets
-  in the MERGE statement determines whose value "wins" -- and that order is an accidental
-  dependency, not a declared ownership rule. PCM-T-05 prohibits this. Use RENAME= explicitly.
+  LAST dataset that has a value for that variable -- **including a missing value**. The order
+  of datasets determines whose value "wins," and that order is an accidental dependency, not a
+  declared ownership rule. PCM-T-05 prohibits this. Use `KEEP=` so non-owner copies never
+  enter the PDV.
+
+- **RENAME= to `_d_varname_mdN` for ownership suppression:** overflows the 32-character
+  variable-name limit on a dozen-plus variables in this dataset and will not compile. Use
+  `KEEP=`. No suffix scheme can work: several source names are already 32 characters.
 
 - **Listing md3 anywhere other than first in the MERGE statement:** md3 is the spine.
   Placing it anywhere else does not cause a SAS error (the merge still completes), but it
@@ -552,7 +699,7 @@ run;
 |---------|-------------|-------------|-----|
 | 1:1 key merge across 8 sorted datasets | Custom PROC SQL multi-table join or iterative DATA step stacking | `DATA step MERGE ... BY PRECEDE_STUDY_ID;` | DATA step MERGE is the SAS-standard tool for 1:1 horizontal merge on a key; produces exactly one output row per key value; predictable, auditable |
 | Provenance tracking | Separate lookup table built by post-merge PROC SQL | `IN=` dataset options on each MERGE source | `IN=` flags are produced at merge time with zero overhead; they are the correct tool for this purpose |
-| Ownership enforcement | Hand-coded IF-THEN checking which source contributed each variable | `RENAME=` on non-owner datasets in MERGE statement | RENAME= is a declarative, compile-time specification; it cannot accidentally be bypassed by data values |
+| Ownership enforcement | Hand-coded IF-THEN, or RENAME= of non-owner copies | `KEEP=` on each MERGE source, generated from `qclib.ownership_map` | KEEP= is declarative and compile-time; the non-owner copy never enters the PDV, so it cannot be bypassed. Generating the lists from the Phase 2 map removes 135 hand-transcription opportunities |
 | Row count validation | Manual PROC PRINT scan | `PROC SQL SELECT COUNT(*) INTO :n TRIMMED` + `%abort cancel` | Established Phase 1-3 pattern; machine-verifiable; hard stop on violation |
 
 ---
@@ -604,8 +751,9 @@ md3 in MERGE. For rows where md4 contributes (7,695 rows), the md4 value overwri
 md3 value -- silently. No error. No warning. Wrong data.
 **Why it happens:** SAS DATA step merge assigns each variable from the LAST dataset in the
 merge list that has a non-missing value for that observation.
-**How to avoid:** RENAME= every non-owner copy to `_d_varname_mdN` and DROP `_d_:` at the
-end. The owner dataset's copy keeps the canonical name and cannot be overwritten.
+**How to avoid:** `KEEP=` only the variables each dataset owns. The non-owner's copy never
+enters the PDV, so there is nothing to overwrite with. (Do NOT use the `_d_varname_mdN`
+RENAME= scheme -- it overflows the 32-character name limit; see Pattern 2.)
 **Warning signs:** `PROC MEANS` on a conflict variable shows unexpected distribution; values
 for rows that should come from md3 look like md4 values.
 
@@ -664,27 +812,38 @@ that `g.prep_md6` does NOT contain `PRECEDE_Study_ID_1`. This replicates the PRE
 assertion at Phase 4 entry.
 **Warning signs:** `g.master_data_merged` contains a column `PRECEDE_Study_ID_1`.
 
-### Pitfall 7: g library path inconsistency with Phase 3
-**What goes wrong:** Phase 4 defines `g_path = C:\PeCAN_work\data` (the planned path) but
-Phase 3 wrote its datasets to `P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge`.
-Phase 4 cannot find `g.prep_md3` and aborts with a dataset-not-found error.
-**Why it happens:** Phase 3 VERIFICATION noted that the actual g_path deviates from the
-planned value. Phase 4 must use the SAME path Phase 3 used.
-**How to avoid:** Use `%let g_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;`
-This is the value confirmed in all ten Phase 3 SAS programs. Do not use the plan-specified
-`C:\PeCAN_work\data` until that discrepancy is formally resolved.
-**Warning signs:** `ERROR: File G.PREP_MD3 does not exist.` at PROC SORT time.
+### Pitfall 7: g library path -- RESOLVED, but move it out of the source folder
+**Resolution:** Use the P: path that the Phase 3 programs actually wrote to. The Phase 3
+concern behind `C:\PeCAN_work\data` was that the g library must not sit inside the **git
+working tree** (where `git clean -xdf` deletes it and one `git add -f` commits PHI). A P: drive
+location satisfies that constraint just as well. Update the Phase 3 docs to match the code
+rather than leaving a standing "deviation."
 
-### Pitfall 8: Emergent width -- $1 in md1-md7 but $4 in md8
-**What goes wrong:** `Emergent` is $1 in md1-md7 but the `qc/03_charvars_all.txt` shows it
-as $4 in MASTER_DATA_8. After Phase 3 NULL sentinel clearing, `Emergent` in md8 may still
-be $4. If the merged LENGTH block declares `Emergent $1`, any md8 value wider than 1 byte
-is silently truncated.
-**Why it happens:** md8 sentinel clearing did not change the character column width.
-**How to avoid:** Declare `Emergent $4` in the merged LENGTH block (use the max). Phase 5
-QC (QC-02) will also check for truncation.
-**Warning signs:** PROC CONTENTS shows `Emergent` as $1 in `g.master_data_merged` but $4
-in `g.prep_md8`.
+**But relocate it out of the source directory.** The current value,
+`P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge`, is a subfolder of the
+read-only source folder that `libname src` points at. Phases 1, 2 and 3 all run
+`proc contents data=src._all_`, and that source tree now also holds nine prep/merge datasets.
+The eight-name `IN (...)` filter protects the existing scans, but it is an avoidable
+entanglement: any future `_all_` enumeration silently widens.
+
+**Recommended:** `P:\PeCAN Master Data\Gerard\_prep` -- a sibling of the source folder, outside
+both the git tree and the `src` libref. One `%let g_path` change in Section 0 propagates.
+**Whatever value is chosen must be identical in Phase 3 and Phase 4.**
+**Warning signs:** `ERROR: File G.PREP_MD3 does not exist.` at PROC SORT time means the two
+phases disagree.
+
+### Pitfall 8: Character width -- use the OWNER's width, not the max
+**What goes wrong:** Two opposite errors. Declaring narrower than the owner's width truncates.
+Declaring the max across all sources (as an earlier draft required) wastes bytes and, worse,
+signals that non-owner copies are expected in the output -- which under KEEP= they are not.
+**Why it happens:** The MAX-width rule was a consequence of the RENAME= approach, where every
+copy stayed in the PDV. With KEEP=, only the owner's copy arrives.
+**How to avoid:** For each variable, take the width from the OWNER's row in
+`qc/03_charvars_all.txt`. Examples: `Emergent` is owned by md3 at `$1` (md8's `$4` copy is not
+kept); `Feels_Exausted` is owned by md7 at `$3` (md6's `$1` copy is not kept);
+`ENCRYPTED_ENCOUNTER` is owned by md3 at `$49`.
+**Warning signs:** PROC CONTENTS on the merged file shows a width that matches no source's
+owner row.
 
 ### Pitfall 9: Numeric-type variables with CONFLICT across sources having a width issue
 **What goes wrong:** Not applicable for numeric variables -- SAS numeric variables are always
@@ -698,23 +857,17 @@ No truncation risk for numeric variables at merge time.
 
 ## Open Questions
 
-1. **Exact ownership assignment for all 135 CONFLICT variables**
-   - What we know: The ownership map lists them all; the recommended defaults above cover
-     the named/known conflicts. md3 is recommended as the default owner for any variable
-     it carries.
-   - What's unclear: Some CONFLICT variables do not appear in md3 (e.g., `SSDI_Death_Y_N`
-     appears in md4, md5, md6 but NOT md3). For these, the planner must pick one of the
-     contributing sources as owner.
-   - Recommendation: Run `qc/02_ownership_map.txt` through a filter to identify all CONFLICT
-     variables where md3 is NOT a contributing source. Assign to the highest-row-count
-     contributing source (md8 for 22,473-row scope; md1/md2 for 14,778-row scope).
+1. **Exact ownership assignment for all 135 CONFLICT variables** -- RESOLVED
+   - Resolution: a mechanical rule, not 135 decisions. md3 owns anything md3 carries; otherwise
+     the highest-row-count contributing source owns it; ties to the lowest source number.
+     Apply the rule in code against `qclib.ownership_map`, write the resolved `owner` back to
+     the map, and generate the KEEP= lists from it. No hand transcription.
+   - Residual: record in `docs/DECISIONS.md` that md3-owns inherits md3's missingness. Proven
+     free for `Admit_BMI` (PCM-F-07); unchecked for the rest.
 
-2. **Phase 3 g_path deviation: C:\PeCAN_work\data vs P: drive**
-   - What we know: All Phase 3 programs use the P: drive path. Phase 4 must match.
-   - What's unclear: Whether the discrepancy will be resolved before Phase 4 runs.
-   - Recommendation: Phase 4 uses the P: drive path as written in the Phase 3 programs.
-     If the user later standardizes on `C:\PeCAN_work\data`, a single `%let g_path = ...`
-     change in Section 0 propagates to all reads and writes.
+2. **Phase 3 g_path** -- RESOLVED: use the P: path Phase 3 wrote to, but relocate it out of the
+   source folder (see Pitfall 7). Update the Phase 3 documents to match. Both candidate paths
+   satisfy the real constraint, which is "not inside the git working tree."
 
 3. **Sorting in WORK vs g -- memory and disk implications**
    - What we know: PROC SORT with OUT= writes to WORK. The combined input data across 8
@@ -777,7 +930,7 @@ No truncation risk for numeric variables at merge time.
 | MRG-02 | Zero blank `PRECEDE_STUDY_ID` in merged output | embedded assertion | `%abort cancel` if `n_blank_key ne 0` | No -- Wave 0 |
 | MRG-03 | Provenance flags `in_md1`--`in_md8` and `n_sources` present and correct | embedded assertion | `%abort cancel` if any `n_in_mdN` deviates from source row count | No -- Wave 0 |
 | MRG-04 | md3 listed first in MERGE statement | code review | `grep -n "merge" sas/04_merge.sas` shows `prep_md3` as first dataset after `merge` keyword | No -- Wave 0 |
-| MRG-04 | No last-wins overwrites | code review | `grep -n "rename=" sas/04_merge.sas` returns hits for all 135 CONFLICT variables' non-owner copies | No -- Wave 0 |
+| MRG-04 | No last-wins overwrites | embedded assertion | Every MERGE source has `KEEP=`; merged column list reconciles exactly against `qclib.ownership_map` (0 unmapped columns, 0 mapped-but-absent variables) | No -- Wave 0 |
 
 ### Sampling Rate
 
@@ -802,7 +955,7 @@ No truncation risk for numeric variables at merge time.
 |---|---|---|---|
 | PROC SQL multi-table join for horizontal merge | DATA step MERGE with BY statement | PCM-T-01 established | PROC SQL UPDATE is prohibited; DATA step MERGE is the correct tool for 1:1 horizontal merges |
 | In-place sort of source datasets | PROC SORT with OUT=work.sort_* | PCM-T-02 established | Never sort g.prep_mdN in place; always sort to WORK |
-| Undeclared variable ownership (last-wins by merge order) | Explicit RENAME= suppression of non-owner copies | PCM-T-05 established | Every CONFLICT variable in the ownership map gets a RENAME= block |
+| Undeclared variable ownership (last-wins by merge order) | `KEEP=` of owned variables only, generated from `qclib.ownership_map` | PCM-T-05 established; RENAME= rejected 26AUG2026 (32-char name overflow) | Each MERGE source keeps only what it owns; no renames, no drops, no hand-written per-variable blocks |
 | Numeric type conflicts at merge time | Phase 3 PREP-03/PREP-07 resolved all type conflicts | Phase 3 complete | md8 numerics are now NUMERIC; Base_Procedure_Code_1 is CHAR $10 in all 8 sources |
 
 **Deprecated/outdated:**

@@ -234,6 +234,36 @@ quit;
    No RENAME= blocks (the prefix-suppress scheme overflows the 32-char name limit -- PCM violation).
    Provenance flags in_md1..in_md8 and n_sources assigned immediately after BY.
    ========================================================================= */
+/* ---- MRG-06 / PCM-D-11 (REOPENED 2026-08-27): build the md8 donor set ------
+   These five are the variables where md3 OWNS the column but md8 holds values for
+   patients md3 has blanks for. Measured across all seven donors (578 owner/donor/
+   variable combinations tested); md8 is the only source that contributes anything:
+
+       Cognitive_Score                  8,412 recoverable, 0 disagreements
+       Cognitive_Category               8,445 recoverable, 0 disagreements
+       Frailty_Score                    9,268 recoverable, 0 disagreements
+       Frailty_Category                 1,789 recoverable, 0 disagreements
+       ORAL_MORPHINE_EQUIV_mg_POD_DAY6  7,695 recoverable, 0 disagreements
+
+   Zero disagreements everywhere both sources hold a value, so the coalesce in the
+   merge below is a pure gap-fill and not a choice between conflicting data.
+
+   Renamed to _d8_* so they cannot collide with md3's owned copies. The KEEP=
+   ownership rule still governs the canonical names; these are working storage and
+   are dropped before the merged dataset is written, so MRG-04's unmapped-column
+   reconciliation is unaffected.                                                 */
+data work.md8_donors;
+  set work.sort_prep_md8 (keep=PRECEDE_STUDY_ID
+                               Cognitive_Score Cognitive_Category
+                               Frailty_Score Frailty_Category
+                               ORAL_MORPHINE_EQUIV_mg_POD_DAY6
+                          rename=(Cognitive_Score    = _d8_cog_score
+                                  Cognitive_Category = _d8_cog_cat
+                                  Frailty_Score      = _d8_frl_score
+                                  Frailty_Category   = _d8_frl_cat
+                                  ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6));
+run;
+
 data g.master_data_merged;
   length
     /* Key */
@@ -344,31 +374,12 @@ data g.master_data_merged;
     work.sort_prep_md7 (in=in7 keep=PRECEDE_STUDY_ID &keep7)
     work.sort_prep_md8 (in=in8 keep=PRECEDE_STUDY_ID &keep8)
 
-    /* ---- MRG-06 / PCM-D-11 (REOPENED 2026-08-27): md8 gap-fill donors ----
-       md8 is read a SECOND time, supplying only five columns under _d8_ names.
-       These are the variables where md3 owns the column but md8 holds values for
-       patients md3 has blanks for -- measured across all seven donors:
-           Cognitive_Score                  8,412
-           Cognitive_Category               8,445
-           Frailty_Score                    9,268
-           Frailty_Category                 1,789
-           ORAL_MORPHINE_EQUIV_mg_POD_DAY6  7,695
-       Zero disagreements on all five where both sources have a value, so the
-       coalesce below is a pure gap-fill, not a choice between conflicting data.
-
-       Renamed on the way in so they cannot collide with md3's owned copies --
-       the KEEP= ownership rule still holds for the canonical names. The _d8_
-       columns are dropped before the dataset is written, so MRG-04's
-       unmapped-column reconciliation is unaffected.                            */
-    work.sort_prep_md8 (keep=PRECEDE_STUDY_ID
-                             Cognitive_Score Cognitive_Category
-                             Frailty_Score Frailty_Category
-                             ORAL_MORPHINE_EQUIV_mg_POD_DAY6
-                        rename=(Cognitive_Score    = _d8_cog_score
-                                Cognitive_Category = _d8_cog_cat
-                                Frailty_Score      = _d8_frl_score
-                                Frailty_Category   = _d8_frl_cat
-                                ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6))
+    /* MRG-06 / PCM-D-11: md8 gap-fill donors, prebuilt as work.md8_donors above.
+       Built as its own dataset rather than reading work.sort_prep_md8 twice in
+       one MERGE -- a double read of the same dataset is legal, but there is no
+       reason to depend on how SAS sequences the second instance under BY-group
+       processing when a separate dataset is equivalent and obviously correct.  */
+    work.md8_donors
     ;
   by PRECEDE_STUDY_ID;
 
@@ -630,6 +641,12 @@ proc sql noprint;
 quit;
 
 %macro null_scan;
+  /* %GLOBAL is required. The two branches below set this variable by different
+     mechanisms: the zero branch uses %let (LOCAL by default, so it would vanish
+     at %mend and leave the %assert_eq below reading an undefined variable), and
+     the scan branch uses call symputx(...,'G') (global). Declaring it here makes
+     both paths global and the behaviour consistent.                            */
+  %global n_null_merged;
   %if &n_md8_char = 0 %then %do;
     %put NOTE: MRG -- md8 owns no character variables in the merged file.;
     %put NOTE- The NULL sentinel is unreachable by construction. md8's owned columns;
@@ -642,7 +659,10 @@ quit;
     data _null_;
       set g.master_data_merged end=eof;
       retain _n_null 0;
-      array _m8 {*} &md8_charvars;
+      /* Explicit $ -- these are character variables. SAS would usually infer the
+         type from the SET, but this array only exists on the branch where md8
+         owns character columns, so being explicit costs nothing.               */
+      array _m8 {*} $ &md8_charvars;
       do _i = 1 to dim(_m8);
         if strip(upcase(_m8{_i})) = 'NULL' then _n_null + 1;
       end;

@@ -174,28 +174,14 @@ libname qclib "&qc_path";
 data work.ownership_resolved;
   set qclib.ownership_map;
   length owner_resolved $4;
-  /* sources_present is the pipe-delimited list built in Phase 2, e.g. 'md3|md6|md7' */
-  if      index(sources_present,'md3') then owner_resolved = 'md3';
-  else if index(sources_present,'md8') then owner_resolved = 'md8';
-  else if index(sources_present,'md1') then owner_resolved = 'md1';
-  else if index(sources_present,'md2') then owner_resolved = 'md2';
-  else if index(sources_present,'md6') then owner_resolved = 'md6';
-  else if index(sources_present,'md7') then owner_resolved = 'md7';
-  else if index(sources_present,'md4') then owner_resolved = 'md4';
-  else if index(sources_present,'md5') then owner_resolved = 'md5';
-
-  /* PCM-D-02 override: these five are $3 in md7 and $1 in md6. md6 wins on
-     row count (9,462 > 9,215) but cannot hold md7's 3-character values. Width
-     mismatch means the encodings differ -- take md7. Awaiting Erin sign-off
-     in Phase 6 to reconcile the char Y/N vs numeric variants.               */
-  if upcase(varname) in ('FEELS_EXAUSTED','LOW_PHYSICAL_ACTIVITY','SLOW_WALKING_SPEED',
-                         'UNINTENDED_WEIGHT_LOSS','WEEK_GRIP_STRENGTH')
-     then owner_resolved = 'md7';
-
-  /* Dropped in Phase 3 PREP-04 -- must never reach a keep list */
-  if upcase(varname) = 'PRECEDE_STUDY_ID_1' then delete;
-  /* Key variable -- kept explicitly on all 8 inputs; not in any per-source keep list */
-  if upcase(varname) = 'PRECEDE_STUDY_ID'   then delete;
+  /* THE ownership rule lives in 00_ownership_rule.sas and is included here, not
+     duplicated. 08_dictionary.sas includes the same file to fill the data
+     dictionary's source column. Two copies would let the dictionary describe an
+     ownership the merge never applied, and that divergence would stay invisible
+     until someone traced a value back to its source.
+     The include expects: set qclib.ownership_map + length owner_resolved $4
+     already done above, and contributes only assignment statements.           */
+  %include "&sas_path.\00_ownership_rule.sas";
 run;
 
 /* Guard: every remaining variable must have exactly one resolved owner */
@@ -234,36 +220,6 @@ quit;
    No RENAME= blocks (the prefix-suppress scheme overflows the 32-char name limit -- PCM violation).
    Provenance flags in_md1..in_md8 and n_sources assigned immediately after BY.
    ========================================================================= */
-/* ---- MRG-06 / PCM-D-11 (REOPENED 2026-08-27): build the md8 donor set ------
-   These five are the variables where md3 OWNS the column but md8 holds values for
-   patients md3 has blanks for. Measured across all seven donors (578 owner/donor/
-   variable combinations tested); md8 is the only source that contributes anything:
-
-       Cognitive_Score                  8,412 recoverable, 0 disagreements
-       Cognitive_Category               8,445 recoverable, 0 disagreements
-       Frailty_Score                    9,268 recoverable, 0 disagreements
-       Frailty_Category                 1,789 recoverable, 0 disagreements
-       ORAL_MORPHINE_EQUIV_mg_POD_DAY6  7,695 recoverable, 0 disagreements
-
-   Zero disagreements everywhere both sources hold a value, so the coalesce in the
-   merge below is a pure gap-fill and not a choice between conflicting data.
-
-   Renamed to _d8_* so they cannot collide with md3's owned copies. The KEEP=
-   ownership rule still governs the canonical names; these are working storage and
-   are dropped before the merged dataset is written, so MRG-04's unmapped-column
-   reconciliation is unaffected.                                                 */
-data work.md8_donors;
-  set work.sort_prep_md8 (keep=PRECEDE_STUDY_ID
-                               Cognitive_Score Cognitive_Category
-                               Frailty_Score Frailty_Category
-                               ORAL_MORPHINE_EQUIV_mg_POD_DAY6
-                          rename=(Cognitive_Score    = _d8_cog_score
-                                  Cognitive_Category = _d8_cog_cat
-                                  Frailty_Score      = _d8_frl_score
-                                  Frailty_Category   = _d8_frl_cat
-                                  ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6));
-run;
-
 data g.master_data_merged;
   length
     /* Key */
@@ -373,13 +329,6 @@ data g.master_data_merged;
     work.sort_prep_md6 (in=in6 keep=PRECEDE_STUDY_ID &keep6)
     work.sort_prep_md7 (in=in7 keep=PRECEDE_STUDY_ID &keep7)
     work.sort_prep_md8 (in=in8 keep=PRECEDE_STUDY_ID &keep8)
-
-    /* MRG-06 / PCM-D-11: md8 gap-fill donors, prebuilt as work.md8_donors above.
-       Built as its own dataset rather than reading work.sort_prep_md8 twice in
-       one MERGE -- a double read of the same dataset is legal, but there is no
-       reason to depend on how SAS sequences the second instance under BY-group
-       processing when a separate dataset is equivalent and obviously correct.  */
-    work.md8_donors
     ;
   by PRECEDE_STUDY_ID;
 
@@ -419,33 +368,6 @@ data g.master_data_merged;
           or (not missing(rt_RM_START_to_INCISION_mins)
               and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins) ) );
   label rt_envelope_flag = 'Operative sub-interval exceeds room interval (1=yes)';
-
-  /* ---- MRG-06 / PCM-D-11: fill md3's blanks from md8 ----------------------
-     Direction is one-way and explicit: md3's value is NEVER overwritten. Only a
-     MISSING md3 value is filled, and only from md8, and only for these five.
-
-     Why this is needed: the KEEP= ownership rule gives md3 first claim, so md8's
-     copy is normally never kept -- correct for preventing last-wins overwrites,
-     but it also discards values for patients md3 simply has no data on. PCM-D-11
-     was originally closed as "costs nothing" on a check that tested md5 and md6
-     and OMITTED md8. That was wrong: md5 and md6 hold only duplicates, md8 holds
-     8-9k real values per score variable.
-
-     Arithmetic check on the result:
-       Cognitive_Score  12,128 + 8,412 = 20,540  (Phase 7 expected N)
-       Frailty_Score    14,043 + 9,268 = 23,311  (Phase 7 expected N)
-
-     DATA step, so the guard is `missing(x)` -- `x IS MISSING` is PROC SQL syntax. */
-  if missing(Cognitive_Score)    then Cognitive_Score    = _d8_cog_score;
-  if missing(Cognitive_Category) then Cognitive_Category = _d8_cog_cat;
-  if missing(Frailty_Score)      then Frailty_Score      = _d8_frl_score;
-  if missing(Frailty_Category)   then Frailty_Category   = _d8_frl_cat;
-  if missing(ORAL_MORPHINE_EQUIV_mg_POD_DAY6)
-                                 then ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6;
-
-  /* Donor columns are working storage only -- dropped so the merged column list
-     still reconciles against the ownership map (MRG-04).                       */
-  drop _d8_:;
 run;
 
 %put NOTE: DATA step merge complete. Proceeding to SECTION 4 log.;
@@ -457,25 +379,6 @@ proc sql noprint;
   select sum(rt_envelope_flag) into :n_env_flag trimmed from g.master_data_merged;
 quit;
 %put NOTE: MRG-05 -- &n_env_flag rows carry rt_envelope_flag=1 (expected 9, PCM-D-08).;
-
-/* MRG-06: report post-coalesce coverage. Reported, not asserted here -- Phase 7
-   asserts the two score Ns, which is where the expectation is established.     */
-proc sql noprint;
-  select sum(Cognitive_Score is not missing),
-         sum(Frailty_Score   is not missing),
-         sum(Cognitive_Category is not missing),
-         sum(Frailty_Category   is not missing),
-         sum(ORAL_MORPHINE_EQUIV_mg_POD_DAY6 is not missing)
-    into :n_cog trimmed, :n_frl trimmed, :n_cogc trimmed,
-         :n_frlc trimmed, :n_ome trimmed
-  from g.master_data_merged;
-quit;
-%put NOTE: MRG-06 -- post-coalesce coverage (md3 owned, md8 gap-filled):;
-%put NOTE-   Cognitive_Score    = &n_cog  (expect 20540);
-%put NOTE-   Frailty_Score      = &n_frl  (expect 23311);
-%put NOTE-   Cognitive_Category = &n_cogc;
-%put NOTE-   Frailty_Category   = &n_frlc;
-%put NOTE-   ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = &n_ome;
 
 /* =========================================================================
    SECTION 4: Merge summary log written to logs/04_merge_log.txt
@@ -641,12 +544,6 @@ proc sql noprint;
 quit;
 
 %macro null_scan;
-  /* %GLOBAL is required. The two branches below set this variable by different
-     mechanisms: the zero branch uses %let (LOCAL by default, so it would vanish
-     at %mend and leave the %assert_eq below reading an undefined variable), and
-     the scan branch uses call symputx(...,'G') (global). Declaring it here makes
-     both paths global and the behaviour consistent.                            */
-  %global n_null_merged;
   %if &n_md8_char = 0 %then %do;
     %put NOTE: MRG -- md8 owns no character variables in the merged file.;
     %put NOTE- The NULL sentinel is unreachable by construction. md8's owned columns;
@@ -659,10 +556,7 @@ quit;
     data _null_;
       set g.master_data_merged end=eof;
       retain _n_null 0;
-      /* Explicit $ -- these are character variables. SAS would usually infer the
-         type from the SET, but this array only exists on the branch where md8
-         owns character columns, so being explicit costs nothing.               */
-      array _m8 {*} $ &md8_charvars;
+      array _m8 {*} &md8_charvars;
       do _i = 1 to dim(_m8);
         if strip(upcase(_m8{_i})) = 'NULL' then _n_null + 1;
       end;

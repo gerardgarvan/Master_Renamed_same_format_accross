@@ -24,6 +24,12 @@
 options nodate nonumber ps=max ls=200;
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 
+/* Default the pipeline flag before anything reads it. 00_config.sas defines it,
+   so standalone runs normally resolve fine -- but if the include ever fails or the
+   program is submitted piecemeal, `%if &in_pipeline = 0` errors on an unresolved
+   reference instead of behaving. One line removes that failure mode.            */
+%if not %symexist(in_pipeline) %then %let in_pipeline = 0;
+
 %macro restore_log;
   %if &in_pipeline = 0 %then %do;
     proc printto; run;
@@ -46,7 +52,22 @@ options nodate nonumber ps=max ls=200;
 %end;
 
 libname g      "&g_path";
-libname qclib  "&g_path.\qclib";
+/* qclib is &qc_path, NOT a "qclib" subfolder of the merge tree. ownership_map
+   lives beside the other QC artifacts, and every other program in this pipeline
+   assigns it this way. The earlier "&g_path.\qclib" pointed at a folder that does
+   not exist, so the libname failed and the precondition below reported the wrong
+   cause.                                                                        */
+libname qclib  "&qc_path";
+
+/* Precondition: the ODS EXCEL output directory must exist. Checked HERE, not at
+   SECTION 7 -- a missing docs\ would otherwise fail after all 173 coverage
+   queries have run.                                                             */
+%macro check_docs_dir;
+  %if %sysfunc(fileexist(&docs_path)) = 0 %then
+    %fail_out(msg=docs directory not found: &docs_path);
+  %put NOTE: [08_dictionary] docs directory found.;
+%mend check_docs_dir;
+%check_docs_dir;
 
 /* Precondition: g.master_data_merged must exist and be non-empty */
 proc sql noprint;
@@ -79,7 +100,12 @@ proc sql noprint;
   where  upcase(libname)  = "G"
     and  upcase(memname)  = "MASTER_DATA_MERGED"
   order by varname;
-  %let n_dict_meta = &sqlobs;
+
+  /* Explicit count, never &SQLOBS. Banned project-wide since Phase 1: its value
+     after CREATE TABLE is version/context dependent. Worse here -- a %let inside
+     the PROC SQL block resolves during tokenization, BEFORE the CREATE TABLE
+     runs, so it would read whatever the previous statement left behind.        */
+  select count(*) into :n_dict_meta trimmed from work.dict_meta;
 quit;
 
 %if &n_dict_meta = 0 %then
@@ -109,6 +135,11 @@ quit;
 
 %macro coverage_all;
   %local i v n;
+  /* Guard the denominator. If n_total were 0 the %sysevalf below divides by zero
+     inside a values() clause, producing a malformed INSERT rather than a clean
+     failure.                                                                    */
+  %if %superq(n_total) = or &n_total = 0 %then
+    %fail_out(msg=n_total is zero or unset -- cannot compute coverage percentages);
   %do i = 1 %to &n_vars;
     proc sql noprint;
       select varname into :v trimmed from work.dict_meta (firstobs=&i obs=&i);
@@ -233,8 +264,11 @@ proc sql noprint;
          d.type,
          d.length,
          d.source,
+         /* CATX, not CATS. CATS strips leading AND trailing blanks from every
+            argument, so cats(d.source, " owner (...)") yields "md3owner (...)"
+            with no space. CATX inserts the delimiter between the parts.        */
          coalesce(dm.derivation,
-                  cats(d.source, " owner (ownership_map)")) as derivation length=200,
+                  catx(" ", d.source, "owner (ownership_map)")) as derivation length=200,
          d.label
   from   work.dict_with_owner as d
   left join work.derivation_map as dm
@@ -300,7 +334,7 @@ data work.key_legend;
   Column="length";       Meaning="Stored byte length (SAS LENGTH statement value)"; output;
   Column="source";       Meaning="Owner source (md1..md8) or derived"; output;
   Column="derivation";   Meaning="Derivation rule or decision reference"; output;
-  Column="coverage_pct"; Meaning="Percent non-missing rows (N / 41150 * 100); 41150 = QC-01 row count"; output;
+  Column="coverage_pct"; Meaning="Percent non-missing rows (N / &n_total * 100); &n_total is the merged row count, asserted by QC-01"; output;
   Column="label";        Meaning="SAS variable label if set; blank if no label assigned"; output;
 run;
 
@@ -332,6 +366,6 @@ ods listing;
    ========================================================================= */
 %put NOTE: [08_dictionary] DATA_DICTIONARY.xlsx written to &docs_path.;
 %put NOTE: [08_dictionary] Variable count: &n_final;
-%put NOTE: [08_dictionary] Coverage based on 41150 rows (QC-01);
+%put NOTE: [08_dictionary] Coverage based on &n_total rows (QC-01 asserts 41150);
 
 %restore_log;

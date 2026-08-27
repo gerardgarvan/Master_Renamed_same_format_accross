@@ -139,7 +139,7 @@ Plans:
  5. `%abort cancel` OS return-code behavior settled (PCM-D-12) -- required if `99_run_all.sas` is ever scheduled
 **Plans**: 3 plans
 Plans:
-- [ ] 08-01-PLAN.md -- Write sas/08_dictionary.sas: metadata join (dictionary.columns), coverage (PROC MEANS), ownership join (qclib.ownership_map), derivation overlay, ODS EXCEL output with KEY sheet first and UF colors (DOC-01)
+- [x] 08-01-PLAN.md -- Write sas/08_dictionary.sas: metadata join (dictionary.columns), coverage (PROC MEANS), ownership join (qclib.ownership_map), derivation overlay, ODS EXCEL output with KEY sheet first and UF colors (DOC-01)
 - [ ] 08-02-PLAN.md -- Add Phase 8 block to 99_run_all.sas; verify PCM-D-05 resolution; add PCM-D-12 (%abort cancel return code) to DECISIONS.md (DOC-02, DOC-03)
 - [ ] 08-03-PLAN.md -- Human-verify full pipeline run and DATA_DICTIONARY.xlsx; confirm git history completeness (DOC-01, DOC-04)
 

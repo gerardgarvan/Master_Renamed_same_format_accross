@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-08-27T16:48:44.078Z"
+last_updated: "2026-08-27T19:44:08.775Z"
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 20
-  completed_plans: 18
-  percent: 90
+  total_plans: 23
+  completed_plans: 19
+  percent: 83
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27T16:48:44.073Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27T19:44:08.770Z
 
 ---
 
@@ -22,14 +22,14 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 07 — cohort-missingness
+**Current Focus:** Phase 08 — documentation-handoff
 
 ---
 
 ## Current Position
 
-Phase: 07 (cohort-missingness) — EXECUTING
-Plan: 2 of 2
+Phase: 08 (documentation-handoff) — EXECUTING
+Plan: 2 of 3
 | Field | Value |
 |-------|-------|
 | Current Phase | 5 — Merge QC (COMPLETE) |
@@ -37,7 +37,7 @@ Plan: 2 of 2
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [█████████░] 90%
+**Progress:** [████████░░] 83%
 
 **Phase status at a glance:**
 
@@ -94,6 +94,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 ---
 | Phase 06 P01 | 15 | 2 tasks | 1 files |
 | Phase 07 P01 | 30 | 1 tasks | 1 files |
+| Phase 08 P01 | 30 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 - **PCM-F-17 WITHDRAWN 2026-08-27 — it was false.** It claimed md3-owns costs nothing, on a
   check that tested md3<-md5 and md3<-md6 and OMITTED md8, the largest non-spine source.
   md5 and md6 hold only duplicates, so the zeros were real but irrelevant. See PCM-F-18.
+
 - **PCM-F-18** — md3-owns DID discard data, from md8 only. A sweep of all 578 owner/donor/
   variable combinations found exactly five variables losing values, all donated by md8,
   all with ZERO disagreements where both sources hold a value:
@@ -164,6 +166,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
     Frailty_Category 1,789 | ORAL_MORPHINE_EQUIV_mg_POD_DAY6 7,695
   Arithmetic confirms: 12,128 + 8,412 = 20,540 and 14,043 + 9,268 = 23,311, matching the
   Phase 7 expectations that had been failing.
+
 - **PCM-T-12 (method)** — spot checks produced the wrong answer twice on this question. The
   variables at risk were not the ones anyone would have guessed: Cognitive_Category and
   Frailty_Category were found only by sweeping every shared variable. Sweep, do not sample.
@@ -201,6 +204,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   admitted cohort, 91.6% coverage there and zero outside. So a cognitive/frailty analysis
   may not want the admitted restriction at all, while anything using BMI has no choice.
   This is a question for Erin, not a settled default.
+
 - **PCM-D-10** — Negatives in other `rt_*` variables: needs the PREP-09 report from 03-06.
   `rt_ANCHOR_to_*_days` CAN legitimately be negative — offsets, not durations
 

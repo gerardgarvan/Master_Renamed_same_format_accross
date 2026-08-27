@@ -65,7 +65,7 @@
 
 ### Documentation & Handoff
 
-- [ ] **DOC-01** — User can run `08_dictionary.sas` to produce `docs/DATA_DICTIONARY.xlsx` with every variable: source, type, length, coverage, derivation rule
+- [x] **DOC-01** — User can run `08_dictionary.sas` to produce `docs/DATA_DICTIONARY.xlsx` with every variable: source, type, length, coverage, derivation rule
 - [ ] **DOC-02** — User can open `docs/DECISIONS.md` and see PCM-D-01 through D-07 resolved and attributed
 - [ ] **DOC-03** — User can run `99_run_all.sas` in a clean SAS session against read-only sources and have all programs complete without manual steps
 - [ ] **DOC-04** — User can verify git history shows each phase as a reviewable commit
@@ -128,7 +128,7 @@
 | COH-02 | Phase 7 — Cohort & Missingness | Pending |
 | COH-03 | Phase 7 — Cohort & Missingness | Pending |
 | COH-04 | Phase 7 — Cohort & Missingness | Pending |
-| DOC-01 | Phase 8 — Documentation & Handoff | Pending |
+| DOC-01 | Phase 8 — Documentation & Handoff | Complete |
 | DOC-02 | Phase 8 — Documentation & Handoff | Pending |
 | DOC-03 | Phase 8 — Documentation & Handoff | Pending |
 | DOC-04 | Phase 8 — Documentation & Handoff | Pending |

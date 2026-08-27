@@ -28,7 +28,18 @@ options nodate nonumber ps=max ls=200;
    so standalone runs normally resolve fine -- but if the include ever fails or the
    program is submitted piecemeal, `%if &in_pipeline = 0` errors on an unresolved
    reference instead of behaving. One line removes that failure mode.            */
-%if not %symexist(in_pipeline) %then %let in_pipeline = 0;
+/* Wrapped in a macro on purpose. In OPEN CODE, %IF/%THEN requires a %DO block --
+   a bare statement after %THEN makes SAS report "Expected %DO not found" and then
+   skip forward hunting for a %END, swallowing the rest of the file. Inside a macro
+   definition the bare form is fine. This bit once: an open-code version here made
+   99_run_all.sas execute nothing at all.                                        */
+%macro _set_pipeline_default;
+  %if not %symexist(in_pipeline) %then %do;
+    %global in_pipeline;
+    %let in_pipeline = 0;
+  %end;
+%mend _set_pipeline_default;
+%_set_pipeline_default;
 
 %macro restore_log;
   %if &in_pipeline = 0 %then %do;
@@ -73,15 +84,23 @@ libname qclib  "&qc_path";
 proc sql noprint;
   select count(*) into :n_merged trimmed from g.master_data_merged;
 quit;
-%if &n_merged = 0 %then
-  %fail_out(msg=g.master_data_merged is empty or missing -- re-run Phase 4);
+%macro _gate1;
+  %if &n_merged = 0 %then %do;
+    %fail_out(msg=g.master_data_merged is empty or missing -- re-run Phase 4);
+  %end;
+%mend _gate1;
+%_gate1;
 
 /* Precondition: qclib.ownership_map must exist and be non-empty */
 proc sql noprint;
   select count(*) into :n_own trimmed from qclib.ownership_map;
 quit;
-%if &n_own = 0 %then
-  %fail_out(msg=qclib.ownership_map is empty or missing -- re-run Phase 2);
+%macro _gate2;
+  %if &n_own = 0 %then %do;
+    %fail_out(msg=qclib.ownership_map is empty or missing -- re-run Phase 2);
+  %end;
+%mend _gate2;
+%_gate2;
 
 %put NOTE: [08_dictionary] Preconditions OK -- &n_merged rows in g.master_data_merged; &n_own rows in ownership_map.;
 
@@ -108,8 +127,12 @@ proc sql noprint;
   select count(*) into :n_dict_meta trimmed from work.dict_meta;
 quit;
 
-%if &n_dict_meta = 0 %then
-  %fail_out(msg=dictionary.columns returned 0 rows for G.MASTER_DATA_MERGED -- check libname assignment);
+%macro _gate3;
+  %if &n_dict_meta = 0 %then %do;
+    %fail_out(msg=dictionary.columns returned 0 rows for G.MASTER_DATA_MERGED -- check libname assignment);
+  %end;
+%mend _gate3;
+%_gate3;
 
 %put NOTE: [08_dictionary] SECTION 1 OK -- &n_dict_meta variables found in dictionary.columns.;
 
@@ -181,8 +204,12 @@ proc sql noprint;
   select count(*) into :n_conflict trimmed
   from work.dict_with_owner where upcase(source) = 'CONFLICT';
 quit;
-%if &n_conflict > 0 %then
-  %fail_out(msg=&n_conflict dictionary rows have source=CONFLICT -- the resolution rule did not apply);
+%macro _gate4;
+  %if &n_conflict > 0 %then %do;
+    %fail_out(msg=&n_conflict dictionary rows have source=CONFLICT -- the resolution rule did not apply);
+  %end;
+%mend _gate4;
+%_gate4;
 
 %put NOTE: [08_dictionary] SECTION 3 OK -- ownership resolved; 0 CONFLICT rows.;
 
@@ -300,16 +327,24 @@ run;
 proc sql noprint;
   select count(*) into :n_final trimmed from work.dict_final;
 quit;
-%if &n_final ne &n_dict_meta %then
-  %fail_out(msg=dict_final row count &n_final does not match dict_meta count &n_dict_meta);
+%macro _gate5;
+  %if &n_final ne &n_dict_meta %then %do;
+    %fail_out(msg=dict_final row count &n_final does not match dict_meta count &n_dict_meta);
+  %end;
+%mend _gate5;
+%_gate5;
 
 proc sql noprint;
   select count(*) into :n_nosrc trimmed
   from work.dict_final
   where source is missing or source = "";
 quit;
-%if &n_nosrc > 0 %then
-  %fail_out(msg=&n_nosrc variables have a missing source in dict_final);
+%macro _gate6;
+  %if &n_nosrc > 0 %then %do;
+    %fail_out(msg=&n_nosrc variables have a missing source in dict_final);
+  %end;
+%mend _gate6;
+%_gate6;
 
 %put NOTE: [08_dictionary] SECTION 6 OK -- &n_final rows in dict_final; 0 missing sources.;
 

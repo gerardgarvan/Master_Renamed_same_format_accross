@@ -30,7 +30,18 @@
    unconditional %let would reset the flag to 0 on every phase, so each program
    would redirect the log to its own file and the master log would have a hole
    exactly where a failure needs investigating.                              */
-%if not %symexist(in_pipeline) %then %let in_pipeline = 0;
+/* Wrapped in a macro on purpose. In OPEN CODE, %IF/%THEN requires a %DO block --
+   a bare statement after %THEN makes SAS report "Expected %DO not found" and then
+   skip forward hunting for a %END, swallowing the rest of the file. Inside a macro
+   definition the bare form is fine. This bit once: an open-code version here made
+   99_run_all.sas execute nothing at all.                                        */
+%macro _set_pipeline_default;
+  %if not %symexist(in_pipeline) %then %do;
+    %global in_pipeline;
+    %let in_pipeline = 0;
+  %end;
+%mend _set_pipeline_default;
+%_set_pipeline_default;
 
 %put NOTE: [00_config] sas_path    = &sas_path;
 %put NOTE: [00_config] docs_path   = &docs_path;

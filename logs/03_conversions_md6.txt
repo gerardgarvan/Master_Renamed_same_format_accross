@@ -1,0 +1,6 @@
+md6 Conversion Count Log -- Run:   27AUG2026:11:33:23
+Total rows in g.prep_md6: 9462
+Base_Procedure_Code_1 NUM->CHAR $10 (PREP-07) -- non-missing converted: 8695
+PRECEDE_Study_ID_1 dropped (PREP-04 / PCM-D-06): proven identical before drop
+NULL sentinels found (asserted zero pre-copy): 0
+Encoding-damaged rows flagged (no abort, PCM-C-01): 1

@@ -1,0 +1,30 @@
+PREP-08 / PREP-09 negative-time report -- md4 -- Run:   27AUG2026:11:33:16
+ 
+PREP-08 nulled: rt_INCISE_to_DRESS_mins, rt_RM_START_to_INCISION_mins,
+                rt_RM_START_to_RM_END_mins  (must read 0 below)
+PREP-09 report-only: every other rt_* numeric variable. NOT modified.
+  NOTE: negatives in rt_ANCHOR_to_*_days are EXPECTED and legitimate --
+  those are offsets from an anchor date, not durations. See PCM-D-10.
+ 
+Variable                               N_Negative
+--------------------------------------------------
+rt_RM_START_to_INDUCTION_mins          13
+rt_RM_START_to_EMERGENCE_mins          0
+rt_ANCHOR_to_ADMIT_days                0
+rt_ANCHOR_to_SURGERY_days              0
+rt_ANCHOR_to_DISCHG_days               0
+rt_ADMIT_to_AN_START_mins              1
+rt_ADMIT_to_AN_END_mins                0
+rt_ADMIT_to_BLOCK_START_mins           0
+rt_ADMIT_to_BLOCK_END_mins             0
+rt_ADMIT_to_RM_START_mins              0
+rt_ADMIT_to_RM_END_mins                0
+rt_ADMIT_to_INCISION_mins              0
+rt_ADMIT_to_DRESS_mins                 1
+rt_INCISE_to_DRESS_mins                0
+rt_RM_START_to_RM_END_mins             0
+rt_RM_START_to_DRESS_mins              2
+rt_RM_START_to_AN_START_mins           4778
+rt_RM_START_to_INCISION_mins           0
+rt_AN_START_to_AN_END_mins             0
+rt_BLOCK_START_TO_BLOCK_END_mins       0

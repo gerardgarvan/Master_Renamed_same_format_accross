@@ -1,0 +1,5 @@
+md2 Conversion Count Log -- Run:   27AUG2026:11:32:53
+Total rows: 14778
+Type conversions performed: 0 (md2 has no forced-char numerics)
+NULL sentinels found (asserted zero pre-copy): 0
+Encoding-damaged rows flagged: 3

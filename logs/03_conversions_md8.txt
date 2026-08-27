@@ -1,0 +1,10 @@
+md8 Conversion Count Log -- Run:   27AUG2026:11:33:35
+Total rows: 22473
+Admit_BMI                    -- converted non-missing: 7891   | NULL sentinel cleared: 14582
+ASA__Anesth_Record_          -- converted non-missing: 19603   | NULL sentinel cleared: 2870
+Age_at_Encounter             -- converted non-missing: 20680   | NULL sentinel cleared: 1793
+Cognitive_Score              -- converted non-missing: 12065   | NULL sentinel cleared: 10408
+Frailty_Score                -- converted non-missing: 13455 | NULL sentinel cleared: 9018
+rt_INCISE_to_DRESS_mins      -- converted non-missing: 15804   | NULL sentinel cleared: 6624
+rt_RM_START_to_INCISION_mins -- converted non-missing: 19736   | NULL sentinel cleared: 2727
+rt_RM_START_to_RM_END_mins   -- converted non-missing: 20222   | NULL sentinel cleared: 2251

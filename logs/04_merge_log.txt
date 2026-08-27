@@ -1,0 +1,23 @@
+=== Phase 4 Merge Log ===
+Timestamp:   26AUG2026:22:01:28
+Total rows in g.master_data_merged : 41150
+Distinct PRECEDE_STUDY_ID           : 41150
+--- Provenance flag totals ---
+in_md1  : 14778  (expected 14778)
+in_md2  : 14778  (expected 14778)
+in_md3  : 41150  (expected 41150)
+in_md4  : 7695  (expected 7695)
+in_md5  : 7695  (expected 7695)
+in_md6  : 9462  (expected 9462)
+in_md7  : 9215  (expected 9215)
+in_md8  : 22473  (expected 22473)
+--- n_sources distribution ---
+n_sources=1: 0
+n_sources=2: 18677
+n_sources=3: 0
+n_sources=4: 22473
+n_sources=5: 0
+n_sources=6: 0
+n_sources=7: 0
+n_sources=8: 0
+=== END ===

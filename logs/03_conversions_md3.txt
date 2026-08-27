@@ -1,0 +1,5 @@
+md3 Conversion Count Log -- Run:   27AUG2026:11:33:06
+Total rows: 41150
+Type conversions performed: 0 (md3 has no forced-char numerics)
+NULL sentinels found (asserted zero pre-copy): 0
+Encoding-damaged rows flagged: 9

@@ -1,0 +1,5 @@
+md5 Conversion Count Log -- Run:   27AUG2026:11:33:19
+Total rows in g.prep_md5: 7695
+Base_Procedure_Code_1 NUM->CHAR $10 (PREP-07) -- non-missing converted: 7070
+NULL sentinels found (asserted zero pre-copy): 0
+Encoding-damaged rows flagged (no abort, PCM-C-01): 3

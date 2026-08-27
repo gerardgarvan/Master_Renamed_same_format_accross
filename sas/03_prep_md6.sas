@@ -175,7 +175,13 @@ quit;
     %put ERROR- It is NOT a duplicate. Dropping it would destroy data. Re-open PCM-D-06.;
     %abort cancel;
   %end;
-  %else %put NOTE: PREP-04 OK -- PRECEDE_Study_ID_1 identical to PRECEDE_STUDY_ID in all rows; safe to drop.;
+  %else %do;
+    /* Two %put statements, not one. A %PUT ends at its FIRST semicolon, so an
+       embedded ';' left "safe to drop.;" as an orphan statement and logged
+       ERROR 180-322 on every run. NOTE- continues the previous NOTE block.   */
+    %put NOTE: PREP-04 OK -- PRECEDE_Study_ID_1 identical to PRECEDE_STUDY_ID in all rows.;
+    %put NOTE- Safe to drop.;
+  %end;
 %mend assert_dup_identical;
 %assert_dup_identical;
 
@@ -247,11 +253,11 @@ data g.prep_md6;
      (EP/interventional cardiology, 46% neurosurgery) where there is no incision or
      dressing in the surgical sense. Missing is more honest there than a number.
      IS NOT MISSING guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.        */
-  if not missing(rt_INCISE_to_DRESS_mins)
+  if rt_INCISE_to_DRESS_mins is not missing
      and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
-  if not missing(rt_RM_START_to_INCISION_mins)
+  if rt_RM_START_to_INCISION_mins is not missing
      and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
-  if not missing(rt_RM_START_to_RM_END_mins)
+  if rt_RM_START_to_RM_END_mins is not missing
      and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
 run;
 

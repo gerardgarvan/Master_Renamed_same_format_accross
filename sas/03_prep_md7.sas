@@ -70,7 +70,11 @@ libname g   "&g_path";
 /* Key-lineage note: md7 was originally NUM8, destroyed by PCM-T-01, and
    rebuilt from the source system. PRECEDE_STUDY_ID is Char 12 (already
    gated in Phase 1 SRC-06; re-noted here for phase-3 traceability).    */
-%put NOTE: md7 lineage -- originally NUM8, destroyed by PCM-T-01, rebuilt; PRECEDE_STUDY_ID is Char 12 (gated in Phase 1 SRC-06).;
+/* Split into two %put statements: a %PUT ends at its FIRST semicolon, so the
+   embedded ';' after "rebuilt" left the remainder as an orphan statement and
+   logged ERROR 180-322 on every run.                                          */
+%put NOTE: md7 lineage -- originally NUM8, destroyed by PCM-T-01, rebuilt.;
+%put NOTE- PRECEDE_STUDY_ID is Char 12 (gated in Phase 1 SRC-06).;
 
 
 /*==========================================================================
@@ -218,11 +222,11 @@ data g.prep_md7;
      (EP/interventional cardiology, 46% neurosurgery) where there is no incision or
      dressing in the surgical sense. Missing is more honest there than a number.
      IS NOT MISSING guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.        */
-  if not missing(rt_INCISE_to_DRESS_mins)
+  if rt_INCISE_to_DRESS_mins is not missing
      and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
-  if not missing(rt_RM_START_to_INCISION_mins)
+  if rt_RM_START_to_INCISION_mins is not missing
      and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
-  if not missing(rt_RM_START_to_RM_END_mins)
+  if rt_RM_START_to_RM_END_mins is not missing
      and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
 run;
 

@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-08-27T16:19:18.847Z"
+last_updated: "2026-08-27T16:48:44.078Z"
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 18
-  completed_plans: 17
-  percent: 94
+  total_plans: 20
+  completed_plans: 18
+  percent: 90
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27T16:09:25.077Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27T16:48:44.073Z
 
 ---
 
@@ -22,14 +22,14 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 06 — variable-reconciliation
+**Current Focus:** Phase 07 — cohort-missingness
 
 ---
 
 ## Current Position
 
-Phase: 7
-Plan: Not started
+Phase: 07 (cohort-missingness) — EXECUTING
+Plan: 2 of 2
 | Field | Value |
 |-------|-------|
 | Current Phase | 5 — Merge QC (COMPLETE) |
@@ -37,7 +37,7 @@ Plan: Not started
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [█████████░] 94%
+**Progress:** [█████████░] 90%
 
 **Phase status at a glance:**
 
@@ -88,6 +88,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 
 ---
 | Phase 06 P01 | 15 | 2 tasks | 1 files |
+| Phase 07 P01 | 30 | 1 tasks | 1 files |
 
 ## Accumulated Context
 

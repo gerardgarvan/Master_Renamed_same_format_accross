@@ -121,7 +121,10 @@ Plans:
  2. Missingness profile documented per analysis variable
  3. Complete-case Ns stated, including the ~53% gap within the admitted population
  4. The md3-owns missingness trade-off recorded — free for `Admit_BMI` (PCM-F-07), unchecked elsewhere
-**Plans**: not yet planned
+**Plans**: 2 plans
+Plans:
+- [x] 07-01-PLAN.md — Write sas/07_cohort.sas: measure Patient_Type distribution, derive g.analytic_cohort, assert four complete-case Ns, write qc/07_cohort_missingness.txt (PCM-D-05, PCM-F-11, PCM-F-12)
+- [ ] 07-02-PLAN.md — Update docs/DECISIONS.md with PCM-D-05 resolution (rationale, admitted N, PCM-D-07 disposition); human-verify SAS run and QC output (PCM-D-05, PCM-F-11, PCM-F-12)
 
 ### Phase 8: Documentation & Handoff
 **Goal**: `99_run_all.sas` runs start-to-finish in a clean session with no manual steps, and the pipeline is documented well enough for someone else to run and trust it

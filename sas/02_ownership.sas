@@ -35,7 +35,7 @@ libname src "&source_path" access=readonly;
 /* ---- Precondition 1: libname src must resolve ---- */
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib could not be assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
+    %put ERROR: LIBNAME &lib could not be assigned. Check &source_path is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;

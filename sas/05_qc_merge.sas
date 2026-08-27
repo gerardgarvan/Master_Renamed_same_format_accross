@@ -22,7 +22,8 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, %assert_eq macro
    =========================================================================
-   g_path, logs_path and qc_path all live under C:\Master_Renamed_same_format_accross. Everything this
+   g_path, logs_path and qc_path all live under the P: merge tree (see 00_config.sas).
+   Code and docs are on C: in git; data, QC output and logs are on P: outside it. Everything this
    pipeline reads or writes is on C:; nothing is written to the local repo.
 
    CONSEQUENCE, stated so it is a choice and not an accident: qc/05_qc_merge_report.txt

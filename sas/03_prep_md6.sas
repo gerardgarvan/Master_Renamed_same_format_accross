@@ -49,7 +49,7 @@ libname g   "&g_path";
 
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib not assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
+    %put ERROR: LIBNAME &lib not assigned. Check the path in 00_config.sas is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;

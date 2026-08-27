@@ -22,7 +22,10 @@
 
   Usage (batch)
     sas -sysin "C:\Master_Renamed_same_format_accross\sas\99_run_all.sas" ^
-        -log   "C:\Master_Renamed_same_format_accross\logs\99_run_all.log"
+        -log   "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs\99_run_all.log"
+
+    Code is on C: (in git); logs and data are on P: (outside git). The -sysin path
+    is the only hardcoded path outside 00_config.sas.
 
   Usage (Display Manager)
     Open, select all, Submit. Close and reopen SAS between full runs to
@@ -35,6 +38,10 @@ options mprint nofmterr nodate nonumber ps=max ls=200;
 
 /* ---- Single path config; all macros (&sas_path etc.) resolve from here ---- */
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
+
+/* This driver owns the master log. Suppress each program's own PROC PRINTTO
+   redirection so the -log file is a complete record of the whole run.        */
+%let in_pipeline = 1;
 
 %put NOTE: ============================================================;
 %put NOTE: 99_run_all.sas -- pipeline start;
@@ -49,7 +56,7 @@ options mprint nofmterr nodate nonumber ps=max ls=200;
 /* =========================================================================
    PHASE 1 -- Source Verification & Freeze
    Assigns libname src (read-only). Checks keys, checksums, row counts.
-   Leaves src open; Phase 2 reuses it.
+   Clears src at the end; Phase 2 reassigns it from &source_path.
    ========================================================================= */
 %put NOTE: ---- Phase 1: Source Verification ---------------------------;
 %include "&sas_path.\01_verify_sources.sas";

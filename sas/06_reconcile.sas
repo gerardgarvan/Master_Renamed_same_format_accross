@@ -75,7 +75,7 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, preconditions
    =========================================================================
-   g_path, logs_path and qc_path all live under C:\Master_Renamed_same_format_accross, consistent
+   g_path, logs_path and qc_path all live under the P: merge tree (see 00_config.sas), consistent
    with all prior phases (copied from sas/05_qc_merge.sas SECTION 0).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
@@ -108,8 +108,26 @@ libname g "&g_path";
 /* 0b2: R7 -- route the log to the documented grep target. Previously
    logs_path was defined but never used, so logs/06_reconcile.log existed only
    if an external wrapper happened to create it. */
-proc printto log="&logs_path.\06_reconcile.log" new;
-run;
+/* Log routing. Standalone: redirect to this program's own log file.
+   Under 99_run_all (in_pipeline=1): leave the master log alone, or the driver's
+   log gets a hole exactly where a failure would need investigating.          */
+%macro route_log(name=);
+  %if &in_pipeline = 0 %then %do;
+    proc printto log="&logs_path.\&name..log" new;
+    run;
+    %put NOTE: log routed to &logs_path.\&name..log;
+  %end;
+  %else %put NOTE: running under 99_run_all -- log stays in the master log.;
+%mend route_log;
+
+%macro restore_log;
+  %if &in_pipeline = 0 %then %do;
+    proc printto;
+    run;
+  %end;
+%mend restore_log;
+
+%route_log(name=06_reconcile);
 
 %put NOTE: ==== Log routed to &logs_path.\06_reconcile.log ====;
 
@@ -566,5 +584,4 @@ run;
 %put NOTE: ==== Populated-check status: &pop_status ====;
 
 /* Restore the log destination so an enclosing driver is not left writing here */
-proc printto;
-run;
+%restore_log;

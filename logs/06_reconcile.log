@@ -1,0 +1,732 @@
+NOTE: PROCEDURE PRINTTO used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+115  
+116  %put NOTE: ==== Log routed to &logs_path.\06_reconcile.log ====;
+NOTE: ==== Log routed to P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs\06_reconcile.log ====
+117  
+118  /* 0c: g.master_data_merged exists */
+119  proc sql noprint;
+120    select count(*) into :n_tab trimmed
+121    from dictionary.tables
+122    where libname='G' and upcase(memname)='MASTER_DATA_MERGED';
+123  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.31 seconds
+      cpu time            0.01 seconds
+      
+
+124  
+125  %macro check_merged;
+126    %if &n_tab ne 1 %then %do;
+127      %put ERROR: PRECONDITION -- g.master_data_merged not found. Run Phase 4 and Phase 5 first.;
+128      %abort cancel;
+129    %end;
+130    %else %put NOTE: PRECONDITION OK -- g.master_data_merged present.;
+131  %mend check_merged;
+132  %check_merged;
+NOTE: PRECONDITION OK -- g.master_data_merged present.
+133  
+134  /* 0c2: R5 -- capture the row count once. Every count below is reported
+135     against this denominator. */
+136  proc sql noprint;
+137    select count(*) into :n_total trimmed from g.master_data_merged;
+138  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+139  
+140  %macro check_nonempty;
+141    %if &n_total = 0 %then %do;
+142      %put ERROR: PRECONDITION -- g.master_data_merged has zero observations.;
+143      %put ERROR: Every distribution below would be vacuous. Investigate Phase 4/5.;
+144      %abort cancel;
+145    %end;
+146    %else %put NOTE: PRECONDITION OK -- g.master_data_merged has &n_total observations.;
+147  %mend check_nonempty;
+148  %check_nonempty;
+NOTE: PRECONDITION OK -- g.master_data_merged has 41150 observations.
+149  
+150  /* 0d: Open the QC summary and write a header (FILE, not MOD -- starts fresh) */
+151  filename outref "&qc_path.\06_reconcile_summary.txt";
+152  data _null_;
+153    file outref;
+154    put "06_reconcile_summary -- Run: %sysfunc(datetime(), datetime20.)";
+155    put "Phase 6 Variable Reconciliation -- read-only QC over g.master_data_merged";
+156    put "===========================================================================";
+157    put " ";
+158    put "Dataset: g.master_data_merged";
+159    put "Observations: &n_total";
+160    put "(Every count below is against this denominator.)";
+161  run;
+
+NOTE: The file OUTREF is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=27Aug2026:12:06:14,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 7 records were written to the file OUTREF.
+      The minimum record length was 1.
+      The maximum record length was 75.
+NOTE: DATA statement used (Total process time):
+      real time           0.13 seconds
+      cpu time            0.01 seconds
+      
+
+162  filename outref clear;
+NOTE: Fileref OUTREF has been deassigned.
+163  
+164  
+165  /* =========================================================================
+166     SECTION 1: Column presence and type checks (D-01, D-02, D-03, D-04, MRG-05)
+167     Uses dictionary.columns with libname='G' and upcase(memname)='MASTER_DATA_MERGED'.
+168     %macro assert_col aborts loudly on absence -- that is a real finding, not a defect.
+169     Each %put on success contains "PASS" so `grep -c "PASS" logs/06_reconcile.log`
+170     returns at least 18.
+171  
+172     R2: assert_col now optionally checks type. Pass type=num or type=char to
+173     assert; omit to check presence only. dictionary.columns.type holds 'num' or
+174     'char'. Catching a type surprise here, with a clear message, beats a PROC SQL
+175     data-type error three sections downstream.
+176     ========================================================================= */
+177  
+178  %macro assert_col(lib=, dsn=, col=, label=, type=);
+179    %local n actual;
+180    proc sql noprint;
+181      select count(*) into :n trimmed
+182      from dictionary.columns
+183      where libname = upcase("&lib")
+184        and upcase(memname) = upcase("&dsn")
+185        and upcase(name) = upcase("&col");
+186    quit;
+187    %if &n = 0 %then %do;
+188      %put ERROR: &label -- &col absent from &lib..&dsn -- PRESENCE CHECK FAILED;
+189      %abort cancel;
+190    %end;
+191  
+192    %if %superq(type) ne %then %do;
+193      proc sql noprint;
+194        select type into :actual trimmed
+195        from dictionary.columns
+196        where libname = upcase("&lib")
+197          and upcase(memname) = upcase("&dsn")
+198          and upcase(name) = upcase("&col");
+199      quit;
+200      %if %upcase(&actual) ne %upcase(&type) %then %do;
+201        %put ERROR: &label -- &col is type &actual but &type was expected -- TYPE CHECK FAILED;
+202        %put ERROR: Downstream comparisons assume &type.. Fix the expectation or the column.;
+203        %abort cancel;
+204      %end;
+205      %put NOTE: &label PASS -- &col present in &lib..&dsn (type &actual);
+206    %end;
+207    %else %put NOTE: &label PASS -- &col present in &lib..&dsn;
+208  %mend assert_col;
+209  
+210  /* D-01: Mortality columns (PCM-D-01 -- keep separate) */
+211  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Death_Date_Y_N, label=REC-01/D-01);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-01/D-01 PASS -- Death_Date_Y_N present in G.MASTER_DATA_MERGED
+212  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=IsDead_Y_N,     label=REC-01/D-01);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+      
+
+NOTE: REC-01/D-01 PASS -- IsDead_Y_N present in G.MASTER_DATA_MERGED
+213  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Death,          label=REC-01/D-01);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-01/D-01 PASS -- Death present in G.MASTER_DATA_MERGED
+214  
+215  /* D-02: Frailty char columns (md7-owned, PCM-D-02 -- keep separate) */
+216  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Feels_Exausted,          label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Feels_Exausted present in G.MASTER_DATA_MERGED
+217  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Low_Physical_Activity,   label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Low_Physical_Activity present in G.MASTER_DATA_MERGED
+218  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Slow_Walking_Speed,      label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Slow_Walking_Speed present in G.MASTER_DATA_MERGED
+219  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Unintended_Weight_Loss,  label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Unintended_Weight_Loss present in G.MASTER_DATA_MERGED
+220  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Week_Grip_Strength,      label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Week_Grip_Strength present in G.MASTER_DATA_MERGED
+221  
+222  /* D-02: Frailty numeric columns (md3/md5-owned, PCM-D-02 -- keep separate) */
+223  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Feels_Exausted_Value,         label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Feels_Exausted_Value present in G.MASTER_DATA_MERGED
+224  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Low_Physical_Activity_Value,  label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Low_Physical_Activity_Value present in G.MASTER_DATA_MERGED
+225  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Slow_Walking_Speed_Value,     label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Slow_Walking_Speed_Value present in G.MASTER_DATA_MERGED
+226  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Unintended_Weight_Loss_Value, label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Unintended_Weight_Loss_Value present in G.MASTER_DATA_MERGED
+227  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Week_Grip_Strength_Value,     label=REC-02/D-02);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-02/D-02 PASS -- Week_Grip_Strength_Value present in G.MASTER_DATA_MERGED
+228  
+229  /* D-03: ISO_SEV columns (PCM-D-03 -- keep separate; md8's is a TOTAL not an average) */
+230  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=ISO_SEV_Exp_IntraOp_MAC_Average, label=REC-03/D-03);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-03/D-03 PASS -- ISO_SEV_Exp_IntraOp_MAC_Average present in G.MASTER_DATA_MERGED
+231  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=ISO_SEV_IntraOp_MAC_Average,     label=REC-03/D-03);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-03/D-03 PASS -- ISO_SEV_IntraOp_MAC_Average present in G.MASTER_DATA_MERGED
+232  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=ISO_SEV_MAC_TOTAL_Exp,           label=REC-03/D-03);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-03/D-03 PASS -- ISO_SEV_MAC_TOTAL_Exp present in G.MASTER_DATA_MERGED
+233  
+234  /* D-04: Emergent (retained despite rarity, PCM-D-04).
+235     Type asserted: PCM-F-06 established this is CHARACTER $1 holding Y/N/blank.
+236     If it ever arrives numeric, SECTION 2 would silently count zero of everything. */
+237  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Emergent, label=REC-04/D-04, type=char);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: REC-04/D-04 PASS -- Emergent present in G.MASTER_DATA_MERGED (type char)
+238  
+239  /* MRG-05: rt_envelope_flag (derived flag for envelope-violating rows, PCM-D-08).
+240     Type NOT asserted -- SECTION 3 handles either type via PUT(). The type is
+241     reported in the log by assert_col so a change is visible without being fatal. */
+242  %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=rt_envelope_flag, label=MRG-05);
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: MRG-05 PASS -- rt_envelope_flag present in G.MASTER_DATA_MERGED
+243  
+244  /* Capture rt_envelope_flag's actual type for the summary narrative */
+245  proc sql noprint;
+246    select type into :flag_type trimmed
+247    from dictionary.columns
+248    where libname='G' and upcase(memname)='MASTER_DATA_MERGED'
+249      and upcase(name)='RT_ENVELOPE_FLAG';
+250  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+251  
+252  %put NOTE: SECTION 1 complete -- all 18 column presence checks passed.;
+NOTE: SECTION 1 complete -- all 18 column presence checks passed.
+253  %put NOTE: rt_envelope_flag is type &flag_type..;
+NOTE: rt_envelope_flag is type num.
+254  
+255  /* Write SECTION 1 result to summary */
+256  data _null_;
+257    file "&qc_path.\06_reconcile_summary.txt" mod;
+258    put " ";
+259    put "SECTION 1 -- Column presence and type (18 checks)";
+260    put "--------------------------------------------------";
+261    put "Column presence: 16 deliberate columns + Emergent + rt_envelope_flag all PASS";
+262    put "  D-01 (mortality, 3 cols):     Death_Date_Y_N  IsDead_Y_N  Death";
+263    put "  D-02 (frailty char, 5 cols):  Feels_Exausted  Low_Physical_Activity";
+264    put "                                Slow_Walking_Speed  Unintended_Weight_Loss";
+265    put "                                Week_Grip_Strength";
+266    put "  D-02 (frailty num, 5 cols):   Feels_Exausted_Value  Low_Physical_Activity_Value";
+267    put "                                Slow_Walking_Speed_Value  Unintended_Weight_Loss_Value";
+268    put "                                Week_Grip_Strength_Value";
+269    put "  D-03 (ISO_SEV, 3 cols):       ISO_SEV_Exp_IntraOp_MAC_Average";
+270    put "                                ISO_SEV_IntraOp_MAC_Average";
+271    put "                                ISO_SEV_MAC_TOTAL_Exp  (md8 col is a TOTAL not an average)";
+272    put "  D-04 (Emergent):              Emergent   [type asserted CHARACTER, per PCM-F-06]";
+273    put "  MRG-05 (derived flag):        rt_envelope_flag   [observed type: &flag_type]";
+274    put " ";
+275    put "Note on spelling: Feels_Exausted and Week_Grip_Strength reproduce the upstream";
+276    put "md7 schema exactly. They are not typos in this program. A wrong column name";
+277    put "aborts at %nrstr(%assert_col), so this error class cannot pass silently.";
+278  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=308,
+      Last Modified=27Aug2026:12:06:14,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 20 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt".
+      The minimum record length was 1.
+      The maximum record length was 90.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+279  
+280  
+281  /* =========================================================================
+282     SECTION 2: Emergent distribution (D-04 / REC-04)
+283     Emergent is CHARACTER $1 (md3-owned; Phase 4 LENGTH block). Values are Y/N/blank.
+284     NOT 1/0 -- using '1'/'0' returns 0 for both counts (PCM-F-06 established this).
+285     Guard applied: IS NOT MISSING before comparison (PCM-T-11).
+286     Report counts only; assert NOTHING about the Y/N split (no expected value for
+287     the merged md3-owned column).
+288  
+289     R4: an "other" bucket now catches any value that is neither Y, N, nor blank.
+290         Previously such a value fell into no category and the three counts
+291         silently failed to sum to N while being presented as exhaustive.
+292     R6: coalesce(sum(...), 0) so an empty result reports 0, not ".".
+293     ========================================================================= */
+294  proc sql noprint;
+295    select coalesce(sum(Emergent is not missing and upcase(strip(Emergent)) = 'Y'), 0),
+296           coalesce(sum(Emergent is not missing and upcase(strip(Emergent)) = 'N'), 0),
+297           coalesce(sum(missing(Emergent)), 0),
+298           coalesce(sum(Emergent is not missing
+299                        and upcase(strip(Emergent)) not in ('Y','N')), 0)
+300      into :n_emergent_y    trimmed,
+301           :n_emergent_n    trimmed,
+302           :n_emergent_miss trimmed,
+303           :n_emergent_oth  trimmed
+304    from g.master_data_merged;
+305  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           7.02 seconds
+      cpu time            0.01 seconds
+      
+
+306  
+307  %put NOTE: REC-04/D-04 -- Emergent: &n_emergent_y Y, &n_emergent_n N, &n_emergent_miss missing, &n_emergent_oth other (of &n_total);
+NOTE: REC-04/D-04 -- Emergent: 48 Y, 38707 N, 2395 missing, 0 other (of 41150)
+308  
+309  /* R4: the categories must reconcile to the row count. If they do not, the
+310     distribution is not describing the column and the report would mislead. */
+311  %macro check_emergent_sum;
+312    %local s;
+313    %let s = %eval(&n_emergent_y + &n_emergent_n + &n_emergent_miss + &n_emergent_oth);
+314    %if &s ne &n_total %then %do;
+315      %put ERROR: Emergent categories sum to &s but the table has &n_total rows.;
+316      %put ERROR: The reported distribution does not describe the column. Investigate.;
+317      %abort cancel;
+318    %end;
+319    %else %put NOTE: Emergent distribution reconciles to &n_total rows -- PASS;
+320  %mend check_emergent_sum;
+321  %check_emergent_sum;
+NOTE: Emergent distribution reconciles to 41150 rows -- PASS
+322  
+323  %macro emergent_other_note;
+324    %if &n_emergent_oth > 0 %then %do;
+325      %put WARNING: Emergent holds &n_emergent_oth value(s) outside Y/N/blank.;
+326      %put WARNING: PCM-F-06 assumed Y/N/blank only. Inspect before using this column.;
+327    %end;
+328  %mend emergent_other_note;
+329  %emergent_other_note;
+330  
+331  data _null_;
+332    file "&qc_path.\06_reconcile_summary.txt" mod;
+333    put " ";
+334    put "SECTION 2 -- Emergent distribution (D-04 / REC-04)";
+335    put "----------------------------------------------------";
+336    put "  Y       : &n_emergent_y";
+337    put "  N       : &n_emergent_n";
+338    put "  missing : &n_emergent_miss";
+339    put "  other   : &n_emergent_oth   (values outside Y/N/blank)";
+340    put "  -------------------------";
+341    put "  total   : &n_total   (categories reconcile to the row count -- asserted)";
+342    put " ";
+343    put "(Values are Y/N/blank -- NOT 1/0. Using '1'/'0' returns zero for both, PCM-F-06.)";
+344    put "No assertion on the Y/N split: the merged Emergent is md3-owned; its distribution";
+345    put "has not been separately measured. The 0.05% and 0.09% figures from DECISIONS.md";
+346    put "(PCM-D-04) are md1 and md8 SOURCE rates and do not describe this column.";
+347  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=1589,
+      Last Modified=27Aug2026:12:06:14,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 14 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt".
+      The minimum record length was 1.
+      The maximum record length was 81.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+348  
+349  
+350  /* =========================================================================
+351     SECTION 3: rt_envelope_flag distribution (MRG-05 / PCM-D-08)
+352     Report 0, 1, missing, and other. Do NOT assert n_flag1 = 9 -- this is a
+353     pipeline observation, not an invariant.
+354     (RESEARCH Pitfall 4; QC-06 already asserts zero UNFLAGGED violations.)
+355  
+356     R2: comparison goes through PUT() so it is correct whether the column is
+357         numeric or character. The previous `rt_envelope_flag = 0` assumed numeric;
+358         PROC SQL raises a data-type error on a character column rather than
+359         converting, which would have killed the step.
+360     R3: the WHERE ... IS NOT MISSING is gone. It removed missing rows from the
+361         denominator without reporting them, so a flag populated only on violating
+362         rows would have printed "0 at 0, 9 at 1" with no sign that the rest of the
+363         table was excluded.
+364     ========================================================================= */
+365  proc sql noprint;
+366    select coalesce(sum(rt_envelope_flag is not missing
+367                        and strip(put(rt_envelope_flag, best.)) = '0'), 0),
+368           coalesce(sum(rt_envelope_flag is not missing
+369                        and strip(put(rt_envelope_flag, best.)) = '1'), 0),
+370           coalesce(sum(missing(rt_envelope_flag)), 0),
+371           coalesce(sum(rt_envelope_flag is not missing
+372                        and strip(put(rt_envelope_flag, best.)) not in ('0','1')), 0)
+373      into :n_flag0     trimmed,
+374           :n_flag1     trimmed,
+375           :n_flag_miss trimmed,
+376           :n_flag_oth  trimmed
+377    from g.master_data_merged;
+378  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+379  /* flagged count is an observation, not an invariant -- see PCM-D-08 */
+380  
+381  %put NOTE: MRG-05 -- rt_envelope_flag: &n_flag0 at 0, &n_flag1 at 1, &n_flag_miss missing, &n_flag_oth other (of &n_total);
+NOTE: MRG-05 -- rt_envelope_flag: 41141 at 0, 9 at 1, 0 missing, 0 other (of 41150)
+382  
+383  %macro check_flag_sum;
+384    %local s;
+385    %let s = %eval(&n_flag0 + &n_flag1 + &n_flag_miss + &n_flag_oth);
+386    %if &s ne &n_total %then %do;
+387      %put ERROR: rt_envelope_flag categories sum to &s but the table has &n_total rows.;
+388      %put ERROR: The reported distribution does not describe the column. Investigate.;
+389      %abort cancel;
+390    %end;
+391    %else %put NOTE: rt_envelope_flag distribution reconciles to &n_total rows -- PASS;
+392  %mend check_flag_sum;
+393  %check_flag_sum;
+NOTE: rt_envelope_flag distribution reconciles to 41150 rows -- PASS
+394  
+395  %macro flag_shape_notes;
+396    %if &n_flag_oth > 0 %then %do;
+397      %put WARNING: rt_envelope_flag holds &n_flag_oth value(s) outside 0/1.;
+398      %put WARNING: PCM-D-08 describes a binary flag. Inspect before using this column.;
+399    %end;
+400    %if &n_flag_miss > 0 %then %do;
+401      %put WARNING: rt_envelope_flag is missing on &n_flag_miss of &n_total rows.;
+402      %put WARNING: A flag populated only on violating rows would look like this. If the;
+403      %put WARNING: intent was 0 for non-violating rows, the derivation is incomplete.;
+404    %end;
+405  %mend flag_shape_notes;
+406  %flag_shape_notes;
+407  
+408  data _null_;
+409    file "&qc_path.\06_reconcile_summary.txt" mod;
+410    put " ";
+411    put "SECTION 3 -- rt_envelope_flag distribution (MRG-05 / PCM-D-08)";
+412    put "----------------------------------------------------------------";
+413    put "  0       : &n_flag0";
+414    put "  1       : &n_flag1   (flagged count is an observation, not asserted)";
+415    put "  missing : &n_flag_miss";
+416    put "  other   : &n_flag_oth   (values outside 0/1)";
+417    put "  -------------------------";
+418    put "  total   : &n_total   (categories reconcile to the row count -- asserted)";
+419    put " ";
+420    put "Column type as read from dictionary.columns: &flag_type";
+421    put "Counting is type-agnostic (via PUT), so a type change reports rather than fails.";
+422    put " ";
+423    put "The rows flagged in Phase 5 QC-06 carry operative sub-interval > room occupancy.";
+424    put "Each timestamp is individually plausible; only the combination is impossible.";
+425    put "PCM-D-08: flag, do not null. QC-06 asserts zero UNFLAGGED violations (passes).";
+426    put "A different flagged count is not a pipeline failure -- it is a data change worth reading.";
+427    put "A large missing count IS worth reading: it would mean the flag was never set to 0";
+428    put "on non-violating rows, which changes what the flagged count is a fraction of.";
+429  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=2221,
+      Last Modified=27Aug2026:12:06:21,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 19 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt".
+      The minimum record length was 1.
+      The maximum record length was 89.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+430  
+431  
+432  /* =========================================================================
+433     SECTION 3b: Populated check for six deliberate columns
+434     Presence confirms a column EXISTS; it does not confirm that anything landed
+435     in it. A broken keep list or stale merge produces a column that is present
+436     and entirely missing. SECTION 1 cannot see this.
+437  
+438     R1: this section previously promised to "flag loudly" and then only printed
+439         counts -- a zero looked identical to 41,150. %flag_if_zero now emits
+440         WARNING lines, sets &pop_status, and the summary carries the verdict.
+441         Still not an %abort: an empty column is a real finding to report, not a
+442         reason to withhold the rest of the QC output.
+443     R5: every count is reported against &n_total.
+444     ========================================================================= */
+445  proc sql noprint;
+446    select coalesce(sum(Death_Date_Y_N        is not missing), 0),
+447           coalesce(sum(IsDead_Y_N            is not missing), 0),
+448           coalesce(sum(Death                 is not missing), 0),
+449           coalesce(sum(Feels_Exausted        is not missing), 0),
+450           coalesce(sum(Feels_Exausted_Value  is not missing), 0),
+451           coalesce(sum(ISO_SEV_MAC_TOTAL_Exp is not missing), 0)
+452      into :n_pop_dd  trimmed,
+453           :n_pop_id  trimmed,
+454           :n_pop_dt  trimmed,
+455           :n_pop_fe  trimmed,
+456           :n_pop_fev trimmed,
+457           :n_pop_iso trimmed
+458    from g.master_data_merged;
+459  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+460  
+461  %let pop_status = PASS;
+462  
+463  %macro flag_if_zero(n=, col=, owner=);
+464    %if &n = 0 %then %do;
+465      %put WARNING: POPULATED CHECK FAILED -- &col is present but entirely missing.;
+466      %put WARNING: The keep-separate resolution did not take for &col (&owner).;
+467      %put WARNING: Check the Phase 4 keep list and the merge that should have populated it.;
+468      %let pop_status = FAIL;
+469    %end;
+470    %else %put NOTE: POPULATED CHECK PASS -- &col has &n non-missing of &n_total (&owner);
+471  %mend flag_if_zero;
+472  
+473  %flag_if_zero(n=&n_pop_dd,  col=Death_Date_Y_N,        owner=md3-owned);
+NOTE: POPULATED CHECK PASS -- Death_Date_Y_N has 22917 non-missing of 41150 (md3-owned)
+474  %flag_if_zero(n=&n_pop_id,  col=IsDead_Y_N,            owner=md6-owned);
+NOTE: POPULATED CHECK PASS -- IsDead_Y_N has 8730 non-missing of 41150 (md6-owned)
+475  %flag_if_zero(n=&n_pop_dt,  col=Death,                 owner=md7-owned);
+NOTE: POPULATED CHECK PASS -- Death has 495 non-missing of 41150 (md7-owned)
+476  %flag_if_zero(n=&n_pop_fe,  col=Feels_Exausted,        owner=md7-owned char);
+NOTE: POPULATED CHECK PASS -- Feels_Exausted has 4852 non-missing of 41150 (md7-owned char)
+477  %flag_if_zero(n=&n_pop_fev, col=Feels_Exausted_Value,  owner=md3-owned num);
+NOTE: POPULATED CHECK PASS -- Feels_Exausted_Value has 14181 non-missing of 41150 (md3-owned num)
+478  %flag_if_zero(n=&n_pop_iso, col=ISO_SEV_MAC_TOTAL_Exp, owner=md8-owned);
+NOTE: POPULATED CHECK PASS -- ISO_SEV_MAC_TOTAL_Exp has 10788 non-missing of 41150 (md8-owned)
+479  
+480  %put NOTE: Populated-check overall status: &pop_status;
+NOTE: Populated-check overall status: PASS
+481  
+482  %macro pop_status_banner;
+483    %if &pop_status = FAIL %then %do;
+484      %put WARNING: ==================================================================;
+485      %put WARNING: ONE OR MORE DELIBERATE COLUMNS LANDED EMPTY. See WARNINGs above.;
+486      %put WARNING: The merge completed but did not deliver what Phase 6 is verifying.;
+487      %put WARNING: ==================================================================;
+488    %end;
+489  %mend pop_status_banner;
+490  %pop_status_banner;
+491  
+492  data _null_;
+493    file "&qc_path.\06_reconcile_summary.txt" mod;
+494    put " ";
+495    put "SECTION 3b -- Populated counts for spot-checked deliberate columns";
+496    put "-------------------------------------------------------------------";
+497    put "STATUS: &pop_status";
+498    put " ";
+499    put "A count of 0 means the column landed empty -- the keep-separate resolution";
+500    put "did not take. Presence alone (SECTION 1) cannot detect this. A zero here is";
+501    put "a real finding and raises a WARNING in the log.";
+502    put " ";
+503    put "  Death_Date_Y_N        non-missing: &n_pop_dd  of &n_total  (rough expectation: ~41150, md3-owned)";
+504    put "  IsDead_Y_N            non-missing: &n_pop_id  of &n_total  (rough expectation: ~9462,  md6-owned)";
+505    put "  Death                 non-missing: &n_pop_dt  of &n_total  (rough expectation: ~9215,  md7-owned)";
+506    put "  Feels_Exausted        non-missing: &n_pop_fe  of &n_total  (rough expectation: ~9215,  md7-owned char)";
+507    put "  Feels_Exausted_Value  non-missing: &n_pop_fev of &n_total  (rough expectation: ~41150, md3-owned num)";
+508    put "  ISO_SEV_MAC_TOTAL_Exp non-missing: &n_pop_iso of &n_total  (rough expectation: ~22473, md8-owned)";
+509    put " ";
+510    put "Expectations are approximate and not asserted -- they describe source-file row";
+511    put "counts, and the merged column may legitimately differ. Only a count of exactly";
+512    put "zero is treated as a failure.";
+513  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=3225,
+      Last Modified=27Aug2026:12:06:21,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 19 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt".
+      The minimum record length was 1.
+      The maximum record length was 96.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+514  
+515  
+516  /* =========================================================================
+517     SECTION 4: PCM-D-10 confirmation note (read-only)
+518     Anchor-offset variables (rt_ANCHOR_to_ADMIT_days, rt_ANCHOR_to_SURGERY_days,
+519     rt_ANCHOR_to_DISCHG_days) legitimately carry negative values. A negative offset
+520     means the event preceded the anchor date -- this is meaningful, not an error.
+521     These variables were NOT nulled by PREP-08. DO NOT add them to PREP-08.
+522     Resolved: docs/DECISIONS.md PCM-D-10. No data modification in this section.
+523     ========================================================================= */
+524  %put NOTE: PCM-D-10 -- rt_ANCHOR_to_*_days negatives are legitimate offsets, not nulled.;
+NOTE: PCM-D-10 -- rt_ANCHOR_to_*_days negatives are legitimate offsets, not nulled.
+525  
+526  data _null_;
+527    file "&qc_path.\06_reconcile_summary.txt" mod;
+528    put " ";
+529    put "SECTION 4 -- PCM-D-10: anchor-offset variables (read-only note)";
+530    put "----------------------------------------------------------------";
+531    put "PCM-D-10: anchor-offset rt_ANCHOR_to_*_days negatives are legitimate, not nulled.";
+532    put "  rt_ANCHOR_to_ADMIT_days, rt_ANCHOR_to_SURGERY_days, rt_ANCHOR_to_DISCHG_days";
+533    put "  are date offsets from an anchor date, not durations. A negative value means the";
+534    put "  event preceded the anchor, which is clinically meaningful.";
+535    put "  PREP-08 does NOT null these variables. Do not add them to PREP-08.";
+536    put "  Cross-reference: docs/DECISIONS.md PCM-D-10.";
+537  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=4348,
+      Last Modified=27Aug2026:12:06:21,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 9 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt".
+      The minimum record length was 1.
+      The maximum record length was 81.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+      
+
+538  
+539  
+540  /* =========================================================================
+541     SECTION 5: Emergent caveat and close-out
+542     ========================================================================= */
+543  data _null_;
+544    file "&qc_path.\06_reconcile_summary.txt" mod;
+545    put " ";
+546    put "SECTION 5 -- Emergent caveat and close-out";
+547    put "------------------------------------------";
+548    put "Emergent caveat (PCM-D-04): the merged value is md3-owned. At source, md1 and md8";
+549    put "showed 0.05% and 0.09% Y with matching blank shares -- consistent with a field";
+550    put "clinicians rarely complete rather than a true emergency rate. Patient_Type and";
+551    put "Admit_Source are likely better urgency proxies. Do not model on Emergent without";
+552    put "checking the observed rate in SECTION 2 first.";
+553    put " ";
+554    put "===========================================================================";
+555    put "Phase 6 Variable Reconciliation QC complete.";
+556    put "  Observations examined: &n_total";
+557    put "  16 deliberate columns + Emergent + rt_envelope_flag: all presence checks PASSED.";
+558    put "  Emergent type asserted CHARACTER: PASSED.";
+559    put "  Emergent distribution reconciles to row count: PASSED. See SECTION 2.";
+560    put "  rt_envelope_flag distribution reconciles to row count: PASSED. See SECTION 3.";
+561    put "  Populated-column check: &pop_status. See SECTION 3b.";
+562    put "  PCM-D-10 anchor-offset note: see SECTION 4.";
+563    put "  No dataset was modified by this program.";
+564    put "===========================================================================";
+565  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt,
+      RECFM=V,LRECL=32767,File Size (bytes)=4908,
+      Last Modified=27Aug2026:12:06:21,
+      Create Time=27Aug2026:12:06:14
+
+NOTE: 20 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\06_reconcile_summary.txt".
+      The minimum record length was 1.
+      The maximum record length was 82.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+      
+
+566  
+567  %put NOTE: ==== Phase 6 Variable Reconciliation QC complete -- 06_reconcile_summary.txt written ====;
+NOTE: ==== Phase 6 Variable Reconciliation QC complete -- 06_reconcile_summary.txt written ====
+568  %put NOTE: ==== Populated-check status: &pop_status ====;
+NOTE: ==== Populated-check status: PASS ====
+569  
+570  /* Restore the log destination so an enclosing driver is not left writing here */
+571  proc printto;
+572  run;
+

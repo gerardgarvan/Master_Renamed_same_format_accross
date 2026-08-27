@@ -1,0 +1,108 @@
+06_reconcile_summary -- Run:   27AUG2026:12:06:14
+Phase 6 Variable Reconciliation -- read-only QC over g.master_data_merged
+===========================================================================
+ 
+Dataset: g.master_data_merged
+Observations: 41150
+(Every count below is against this denominator.)
+ 
+SECTION 1 -- Column presence and type (18 checks)
+--------------------------------------------------
+Column presence: 16 deliberate columns + Emergent + rt_envelope_flag all PASS
+  D-01 (mortality, 3 cols):     Death_Date_Y_N  IsDead_Y_N  Death
+  D-02 (frailty char, 5 cols):  Feels_Exausted  Low_Physical_Activity
+                                Slow_Walking_Speed  Unintended_Weight_Loss
+                                Week_Grip_Strength
+  D-02 (frailty num, 5 cols):   Feels_Exausted_Value  Low_Physical_Activity_Value
+                                Slow_Walking_Speed_Value  Unintended_Weight_Loss_Value
+                                Week_Grip_Strength_Value
+  D-03 (ISO_SEV, 3 cols):       ISO_SEV_Exp_IntraOp_MAC_Average
+                                ISO_SEV_IntraOp_MAC_Average
+                                ISO_SEV_MAC_TOTAL_Exp  (md8 col is a TOTAL not an average)
+  D-04 (Emergent):              Emergent   [type asserted CHARACTER, per PCM-F-06]
+  MRG-05 (derived flag):        rt_envelope_flag   [observed type: num]
+ 
+Note on spelling: Feels_Exausted and Week_Grip_Strength reproduce the upstream
+md7 schema exactly. They are not typos in this program. A wrong column name
+aborts at %assert_col, so this error class cannot pass silently.
+ 
+SECTION 2 -- Emergent distribution (D-04 / REC-04)
+----------------------------------------------------
+  Y       : 48
+  N       : 38707
+  missing : 2395
+  other   : 0   (values outside Y/N/blank)
+  -------------------------
+  total   : 41150   (categories reconcile to the row count -- asserted)
+ 
+(Values are Y/N/blank -- NOT 1/0. Using '1'/'0' returns zero for both, PCM-F-06.)
+No assertion on the Y/N split: the merged Emergent is md3-owned; its distribution
+has not been separately measured. The 0.05% and 0.09% figures from DECISIONS.md
+(PCM-D-04) are md1 and md8 SOURCE rates and do not describe this column.
+ 
+SECTION 3 -- rt_envelope_flag distribution (MRG-05 / PCM-D-08)
+----------------------------------------------------------------
+  0       : 41141
+  1       : 9   (flagged count is an observation, not asserted)
+  missing : 0
+  other   : 0   (values outside 0/1)
+  -------------------------
+  total   : 41150   (categories reconcile to the row count -- asserted)
+ 
+Column type as read from dictionary.columns: num
+Counting is type-agnostic (via PUT), so a type change reports rather than fails.
+ 
+The rows flagged in Phase 5 QC-06 carry operative sub-interval > room occupancy.
+Each timestamp is individually plausible; only the combination is impossible.
+PCM-D-08: flag, do not null. QC-06 asserts zero UNFLAGGED violations (passes).
+A different flagged count is not a pipeline failure -- it is a data change worth reading.
+A large missing count IS worth reading: it would mean the flag was never set to 0
+on non-violating rows, which changes what the flagged count is a fraction of.
+ 
+SECTION 3b -- Populated counts for spot-checked deliberate columns
+-------------------------------------------------------------------
+STATUS: PASS
+ 
+A count of 0 means the column landed empty -- the keep-separate resolution
+did not take. Presence alone (SECTION 1) cannot detect this. A zero here is
+a real finding and raises a WARNING in the log.
+ 
+  Death_Date_Y_N        non-missing: 22917  of 41150  (rough expectation: ~41150, md3-owned)
+  IsDead_Y_N            non-missing: 8730  of 41150  (rough expectation: ~9462,  md6-owned)
+  Death                 non-missing: 495  of 41150  (rough expectation: ~9215,  md7-owned)
+  Feels_Exausted        non-missing: 4852  of 41150  (rough expectation: ~9215,  md7-owned char)
+  Feels_Exausted_Value  non-missing: 14181 of 41150  (rough expectation: ~41150, md3-owned num)
+  ISO_SEV_MAC_TOTAL_Exp non-missing: 10788 of 41150  (rough expectation: ~22473, md8-owned)
+ 
+Expectations are approximate and not asserted -- they describe source-file row
+counts, and the merged column may legitimately differ. Only a count of exactly
+zero is treated as a failure.
+ 
+SECTION 4 -- PCM-D-10: anchor-offset variables (read-only note)
+----------------------------------------------------------------
+PCM-D-10: anchor-offset rt_ANCHOR_to_*_days negatives are legitimate, not nulled.
+  rt_ANCHOR_to_ADMIT_days, rt_ANCHOR_to_SURGERY_days, rt_ANCHOR_to_DISCHG_days
+  are date offsets from an anchor date, not durations. A negative value means the
+  event preceded the anchor, which is clinically meaningful.
+  PREP-08 does NOT null these variables. Do not add them to PREP-08.
+  Cross-reference: docs/DECISIONS.md PCM-D-10.
+ 
+SECTION 5 -- Emergent caveat and close-out
+------------------------------------------
+Emergent caveat (PCM-D-04): the merged value is md3-owned. At source, md1 and md8
+showed 0.05% and 0.09% Y with matching blank shares -- consistent with a field
+clinicians rarely complete rather than a true emergency rate. Patient_Type and
+Admit_Source are likely better urgency proxies. Do not model on Emergent without
+checking the observed rate in SECTION 2 first.
+ 
+===========================================================================
+Phase 6 Variable Reconciliation QC complete.
+  Observations examined: 41150
+  16 deliberate columns + Emergent + rt_envelope_flag: all presence checks PASSED.
+  Emergent type asserted CHARACTER: PASSED.
+  Emergent distribution reconciles to row count: PASSED. See SECTION 2.
+  rt_envelope_flag distribution reconciles to row count: PASSED. See SECTION 3.
+  Populated-column check: PASS See SECTION 3b.
+  PCM-D-10 anchor-offset note: see SECTION 4.
+  No dataset was modified by this program.
+===========================================================================

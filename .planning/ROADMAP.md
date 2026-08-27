@@ -63,7 +63,7 @@ Plans:
 ### Phase 4: Merge
 **Goal**: Produce `g.master_data_merged` with exactly 41,150 rows and 41,150 distinct IDs by merging all eight normalized prep outputs on md3 as the spine, with provenance flags for each source and no silent last-wins overwrites
 **Depends on**: Phase 3
-**Requirements**: MRG-01, MRG-02, MRG-03, MRG-04, MRG-05
+**Requirements**: MRG-01, MRG-02, MRG-03, MRG-04, MRG-05, MRG-06
 **Success Criteria** (what must be TRUE):
  1. `04_merge.sas` runs and produces `g.master_data_merged` with exactly 41,150 rows
  2. Zero blank `PRECEDE_STUDY_ID` values in the merged output
@@ -74,6 +74,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 04-01-PLAN.md — Write sas/04_merge.sas: preconditions, ownership resolution from qclib.ownership_map, sort, DATA step merge with generated KEEP= lists and owner-width LENGTH block, provenance flags, rt_envelope_flag, 14 assertions, log output (MRG-01, MRG-04, MRG-05) — *amended 2026-08-27: MRG-05 added, requires re-run*
+  *Amended 2026-08-27: MRG-06 added — `work.md8_donors` fills md3 blanks from md8 for five variables (PCM-D-11 / PCM-F-18). Requires a Phase 4 re-run.*
 - [x] 04-02-PLAN.md — Static validation + human-verify SAS run: confirm all 14 assertions pass, commit qc/04_merge_provenance.txt (MRG-02, MRG-03)
 
 *Note: Phase 4 output is STALE pending the 03-06 re-run. PREP-08 changes `g.prep_mdN`, so `g.master_data_merged` must be regenerated before Phase 5 results mean anything.*
@@ -115,9 +116,9 @@ Plans:
 ### Phase 7: Cohort & Missingness
 **Goal**: The analytic cohort is defined on a pre-specifiable criterion rather than on data availability, and the missingness profile is documented with complete-case Ns stated
 **Depends on**: Phase 6
-**Requirements**: PCM-D-05, PCM-F-11, PCM-F-12
+**Requirements**: PCM-D-05, PCM-F-11, PCM-F-19 (supersedes PCM-F-12)
 **Success Criteria** (what must be TRUE):
- 1. Cohort inclusion criterion defined and justified — the INPATIENT/OBSERVATION restriction is defensible because ambulatory patients were never eligible for the geriatric assessments (PCM-F-12)
+ 1. Cohort inclusion criterion defined and justified. **The original justification is void** — PCM-F-12 said ambulatory patients were never eligible for the geriatric assessments, but after MRG-06 most cognitive and frailty scores belong to patients OUTSIDE the admitted cohort (PCM-F-19). `Admit_BMI` is what actually forces the restriction: all 12,726 values are inside the admitted cohort, zero outside. Re-decide PCM-D-05 on that basis, with Erin
  2. Missingness profile documented per analysis variable
  3. Complete-case Ns stated, including the ~53% gap within the admitted population
  4. The md3-owns missingness trade-off recorded — free for `Admit_BMI` (PCM-F-07), unchecked elsewhere

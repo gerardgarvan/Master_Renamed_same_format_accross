@@ -36,6 +36,8 @@
 - [x] **MRG-02** — User can verify zero blank `PRECEDE_STUDY_ID` values in the merged output
 - [x] **MRG-03** — User can verify provenance flags `in_md1`–`in_md8` and `n_sources` are present and match source row counts
 - [x] **MRG-04** — User can verify md3 is listed first (spine); no last-wins overwrite is possible for any variable
+- [x] **MRG-05** — User can verify `rt_envelope_flag` marks the rows where an operative sub-interval exceeds the room interval containing it, values retained rather than nulled (PCM-D-08)
+- [x] **MRG-06** — User can verify md3's blanks are filled from md8 for the five variables where ownership was discarding data, one-way only (an md3 value is never overwritten), with the donor columns dropped so the column list still reconciles against the ownership map (PCM-D-11, PCM-F-18)
 
 ### Merge QC
 
@@ -109,6 +111,8 @@
 | MRG-02 | Phase 4 — Merge | Complete |
 | MRG-03 | Phase 4 — Merge | Complete |
 | MRG-04 | Phase 4 — Merge | Complete |
+| MRG-05 | Phase 4 — Merge | Complete |
+| MRG-06 | Phase 4 — Merge | Complete |
 | QC-01 | Phase 5 — Merge QC | Complete |
 | QC-02 | Phase 5 — Merge QC | Complete |
 | QC-03 | Phase 5 — Merge QC | Complete |

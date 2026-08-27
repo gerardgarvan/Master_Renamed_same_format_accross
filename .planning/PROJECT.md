@@ -50,9 +50,9 @@ a 1:1 merge onto the md3 spine, not a stack.
 - [ ] Variable ownership map produced, reviewed, and committed; conflicts named in DECISIONS.md
 - [ ] Eight prep programs with clean exception reports; NULL sentinel cleared; conversion counts logged
 - [ ] `g.master_data_merged` — 41,150 rows, 41,150 distinct IDs, provenance flags present, no truncation
-- [ ] Merge QC: no surviving NULL strings; md8-only block populated for exactly 22,473; type-converted vars in range
+- [ ] Merge QC: no surviving NULL strings; md8-OWNED variables non-missing only within md8 rows (QC-04 — the old "exactly 22,473" target was wrong, within-md8 population varies from ~16% to 100% by design); type-converted vars in range
 - [ ] Death and frailty naming resolved with Erin's sign-off (PCM-D-01, PCM-D-02)
-- [ ] Analytic cohort defined; missingness profile documented; complete-case Ns stated (PCM-F-11, PCM-D-05)
+- [ ] Analytic cohort defined; missingness profile documented; complete-case Ns stated (PCM-F-11, PCM-D-05). NOTE: the original rationale for restricting to INPATIENT/OBSERVATION no longer holds — see PCM-F-19
 - [ ] Data dictionary, DECISIONS.md complete, `99_run_all.sas` verified from clean session
 
 ### Out of Scope
@@ -90,6 +90,39 @@ a 1:1 merge onto the md3 spine, not a stack.
 - Delivery: UF colors (#0021A5, #FA4616) on visual deliverables; KEY sheet leftmost in workbooks
 
 ---
+
+## Findings added 2026-08-27
+
+- **PCM-F-17 — WITHDRAWN, it was false.** It claimed md3-owns ownership costs nothing. The
+  supporting check tested md3<-md5 and md3<-md6 and omitted md8, the largest non-spine
+  source. md5 and md6 hold only duplicate values, so the zeros were real but meaningless.
+- **PCM-F-18** — md3-owns ownership WAS discarding data, from md8 only. A sweep of all 578
+  owner/donor/variable combinations found exactly five variables affected, all donated by
+  md8, all with ZERO disagreements where both sources hold a value:
+  `Cognitive_Score` 8,412 · `Cognitive_Category` 8,445 · `Frailty_Score` 9,268 ·
+  `Frailty_Category` 1,789 · `ORAL_MORPHINE_EQUIV_mg_POD_DAY6` 7,695.
+  Resolved by MRG-06. Confirms the Phase 7 expectations that had been failing:
+  12,128 + 8,412 = 20,540 and 14,043 + 9,268 = 23,311.
+- **PCM-F-19 — PCM-F-12 is now false for the geriatric scores.** PCM-F-12 said the
+  complete-case subgroup was 100% INPATIENT/OBSERVATION, which was the entire justification
+  for the cohort restriction. After MRG-06, 13,288 of 20,540 cognitive scores and 15,161 of
+  23,311 frailty scores belong to patients OUTSIDE the admitted cohort — md8 covers the
+  ambulatory population. Within the admitted cohort those two are now the weaker variables
+  (52.2% and 58.7%). **`Admit_BMI` is what actually forces the restriction**: all 12,726
+  values sit inside the admitted cohort (91.6% there, zero outside). PCM-D-05 must be
+  re-decided on that basis.
+
+## Traps added 2026-08-27
+
+- **PCM-T-12 — spot checks answered this wrong twice.** The variables losing data were not
+  the ones anyone would have guessed: `Cognitive_Category` and `Frailty_Category` surfaced
+  only from sweeping every shared variable, and `Cognitive_Score`/`Frailty_Score` only
+  because Phase 7 happened to assert on them. For any question of the form "does X hold
+  data that Y is discarding", enumerate every candidate. Do not sample.
+- **PCM-T-13 — `dictionary.columns.type` is CHARACTER (`'char'`/`'num'`), not numeric.**
+  `PROC CONTENTS OUT=` uses numeric 1=NUM / 2=CHAR. Both appear in this pipeline. Comparing
+  the dictionary form against `2` silently never matches and sends every variable down the
+  wrong branch.
 
 ## Evolution
 

@@ -75,10 +75,15 @@ restart between each.
 | Negative operative intervals | 0 | **67** → nulled by PREP-08 | 52 rt1 + 15 rt2, disjoint |
 | QC-06 unflagged violations | 0 | **0** (after MRG-05) | assertion passes |
 | rt_envelope_flag = 1 | reported | **9** | 5 rt1 + 4 rt2 — flagged, not nulled (PCM-D-08) |
-| Complete-case N (BMI) | — | 12,726 | prior analysis, re-confirm in Phase 7 |
-| Complete-case N (Cognitive) | — | 20,540 | prior analysis |
-| Complete-case N (Frailty) | — | 23,311 | prior analysis |
-| Complete-case N (all three) | — | 6,523 | prior analysis |
+| MRG-06 gap-fill variables | 5 | **5** ✓ | md8 donor, 0 disagreements (PCM-F-18) |
+| Complete-case N (BMI), merged | — | **12,726** | unchanged by MRG-06 — md8 recovers 0 BMI |
+| Complete-case N (Cognitive), merged | — | 12,128 → **20,540** ✓ | +8,412 from md8 (MRG-06) |
+| Complete-case N (Frailty), merged | — | 14,043 → **23,311** ✓ | +9,268 from md8 (MRG-06) |
+| Complete-case N (all three), merged | — | **RE-MEASURE** | the 6,523 figure was pre-coalesce and is stale |
+| Admitted cohort N | — | **13,890** | INPATIENT 13,223 + OBSERVATION 667 |
+| Within-cohort BMI | — | **12,726** (91.6%) | ALL BMI values are inside the admitted cohort |
+| Within-cohort Cognitive | — | **7,252** (52.2%) | 13,288 of 20,540 sit OUTSIDE the cohort |
+| Within-cohort Frailty | — | **8,150** (58.7%) | 15,161 of 23,311 sit OUTSIDE the cohort |
 
 **md8-only block population** — the old "22,473 for the whole block" target was wrong and has
 been removed. Within-md8 population varies by design: `Total_Midazolam_mg` 22,473 (100%),
@@ -149,8 +154,19 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 - A bound that has never fired and cannot fire is not a check (QC-07). Floors at source,
   containment by relationship assertion
 
-- md3-owns inherits md3's missingness at zero measured cost (PCM-F-17): BMI, Cognitive_Score
-  and Frailty_Score all recover nothing from any other source
+- **PCM-F-17 WITHDRAWN 2026-08-27 — it was false.** It claimed md3-owns costs nothing, on a
+  check that tested md3<-md5 and md3<-md6 and OMITTED md8, the largest non-spine source.
+  md5 and md6 hold only duplicates, so the zeros were real but irrelevant. See PCM-F-18.
+- **PCM-F-18** — md3-owns DID discard data, from md8 only. A sweep of all 578 owner/donor/
+  variable combinations found exactly five variables losing values, all donated by md8,
+  all with ZERO disagreements where both sources hold a value:
+    Cognitive_Score 8,412 | Cognitive_Category 8,445 | Frailty_Score 9,268 |
+    Frailty_Category 1,789 | ORAL_MORPHINE_EQUIV_mg_POD_DAY6 7,695
+  Arithmetic confirms: 12,128 + 8,412 = 20,540 and 14,043 + 9,268 = 23,311, matching the
+  Phase 7 expectations that had been failing.
+- **PCM-T-12 (method)** — spot checks produced the wrong answer twice on this question. The
+  variables at risk were not the ones anyone would have guessed: Cognitive_Category and
+  Frailty_Category were found only by sweeping every shared variable. Sweep, do not sample.
 
 ### Pending Decisions (blockers)
 
@@ -168,11 +184,23 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   MRG-05, derived in Phase 4). QC-06 asserts zero UNFLAGGED violations and passes
 
 - **PCM-D-09** — QC-05 operative-interval ceilings: **drop them** (QC-07). QC-05 8 → 5 assertions
-- **PCM-D-11** — md3-owns missingness: **closed, costs nothing** (PCM-F-17)
+- **PCM-D-11** — md3-owns missingness: **REOPENED then RESOLVED 2026-08-27.** The original
+  closure ("costs nothing") was wrong — see PCM-F-17 withdrawn / PCM-F-18. Resolved by
+  MRG-06: `04_merge.sas` builds `work.md8_donors` and fills md3's blanks from md8 for the
+  five affected variables. One-way only — an md3 value is never overwritten.
 
 **Still open:**
 
-- **PCM-D-05** — Analytic cohort INPATIENT/OBSERVATION restriction: pending (Phase 7)
+- **PCM-D-05** — Analytic cohort INPATIENT/OBSERVATION restriction: **pending, and its
+  original rationale no longer holds.** The justification was PCM-F-12: only admitted
+  patients had the geriatric assessments, so ambulatory patients were never eligible. After
+  MRG-06 that is false — 13,288 of 20,540 cognitive scores and 15,161 of 23,311 frailty
+  scores belong to patients OUTSIDE the admitted cohort (md8 covers the ambulatory
+  population). Within the cohort those two are now the WEAKER variables (52% and 59%).
+  **`Admit_BMI` is what actually forces the restriction**: all 12,726 values are inside the
+  admitted cohort, 91.6% coverage there and zero outside. So a cognitive/frailty analysis
+  may not want the admitted restriction at all, while anything using BMI has no choice.
+  This is a question for Erin, not a settled default.
 - **PCM-D-10** — Negatives in other `rt_*` variables: needs the PREP-09 report from 03-06.
   `rt_ANCHOR_to_*_days` CAN legitimately be negative — offsets, not durations
 

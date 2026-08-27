@@ -318,6 +318,59 @@ quit;
 %mend assert_no_negtime;
 %assert_no_negtime(n=&n_negsurv, dsn=g.prep_md7);
 
+/* SECTION 5e: PREP-09 -- report-only negative scan of every rt_* numeric variable.
+   This section modifies NOTHING. It derives the variable list at run time so that
+   any rt_* column not listed here is still covered. The rt_ANCHOR_to_*_days variables
+   may show negatives -- that is EXPECTED and legitimate (offsets, not durations).
+   This report is the evidence for PCM-D-10; do not act on it inside this program.   */
+proc sql noprint;
+  select name into :rtvars separated by ' '
+  from dictionary.columns
+  where libname='G' and upcase(memname)="PREP_MD&mdnum"
+    and type='num' and upcase(name) like 'RT!_%' escape '!';
+
+  select count(*) into :n_rtvars trimmed
+  from dictionary.columns
+  where libname='G' and upcase(memname)="PREP_MD&mdnum"
+    and type='num' and upcase(name) like 'RT!_%' escape '!';
+quit;
+
+%macro scan_negtime;
+  %local i v;
+  filename negrep "&logs_path.\03_negtime_md&mdnum..txt";
+  data _null_;
+    file negrep;
+    put "PREP-08 / PREP-09 negative-time report -- md&mdnum -- Run: %sysfunc(datetime(), datetime20.)";
+    put " ";
+    put "PREP-08 nulled: rt_INCISE_to_DRESS_mins, rt_RM_START_to_INCISION_mins,";
+    put "                rt_RM_START_to_RM_END_mins  (must read 0 below)";
+    put "PREP-09 report-only: every other rt_* numeric variable. NOT modified.";
+    put "  NOTE: negatives in rt_ANCHOR_to_*_days are EXPECTED and legitimate --";
+    put "  those are offsets from an anchor date, not durations. See PCM-D-10.";
+    put " ";
+    put @1 "Variable" @40 "N_Negative";
+    put @1 "--------------------------------------------------";
+  run;
+
+  %do i = 1 %to &n_rtvars;
+    %let v = %scan(&rtvars, &i);
+    %local n_neg;
+    proc sql noprint;
+      select count(*) into :n_neg trimmed
+      from g.prep_md&mdnum
+      where &v is not missing and &v < 0;   /* PCM-T-11 guard */
+    quit;
+    data _null_;
+      file negrep mod;
+      put @1 "&v" @40 "&n_neg";
+    run;
+  %end;
+
+  filename negrep clear;
+  %put NOTE: PREP-09 -- negative-time scan written for &n_rtvars rt_* variables in md&mdnum.;
+%mend scan_negtime;
+%scan_negtime;
+
 
 /*==========================================================================
   Close-out

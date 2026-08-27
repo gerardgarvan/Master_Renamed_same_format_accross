@@ -57,7 +57,7 @@ libname g "&g_path";
 %macro fail_out(msg=);
   %put ERROR: &msg;
   ods listing;                 /* reopen the default destination */
-  %restore_log;                /* restore the log BEFORE aborting */
+  proc printto; run;           /* restore the log BEFORE aborting */
   %put ERROR: 07_cohort.sas aborted -- &msg;
   %abort cancel;
 %mend fail_out;
@@ -75,26 +75,8 @@ libname g "&g_path";
 %check_dir(path=&logs_path, label=logs);
 
 /* Route the log to the documented grep target */
-/* Log routing. Standalone: redirect to this program's own log file.
-   Under 99_run_all (in_pipeline=1): leave the master log alone, or the driver's
-   log gets a hole exactly where a failure would need investigating.          */
-%macro route_log(name=);
-  %if &in_pipeline = 0 %then %do;
-    proc printto log="&logs_path.\&name..log" new;
-    run;
-    %put NOTE: log routed to &logs_path.\&name..log;
-  %end;
-  %else %put NOTE: running under 99_run_all -- log stays in the master log.;
-%mend route_log;
-
-%macro restore_log;
-  %if &in_pipeline = 0 %then %do;
-    proc printto;
-    run;
-  %end;
-%mend restore_log;
-
-%route_log(name=07_cohort);
+proc printto log="&logs_path.\07_cohort.log" new;
+run;
 
 %put NOTE: ==== Phase 7 Cohort and Missingness starting ====;
 
@@ -300,7 +282,7 @@ quit;
 
 /* BMI availability. LACK is derived FROM the HAVE value, not computed
    independently -- two independent 5.1-rounded quotients can sum to 100.1.
-   strip() removes putn()'s right-alignment padding so the key=value lines
+   strip() removes putn()s right-alignment padding so the key=value lines
    in the summary have no leading space.                                       */
 %macro bmi_pct;
   %global pct_bmi_have pct_bmi_lack;
@@ -466,4 +448,5 @@ run;
 %put NOTE- Tables  : qc/07_cohort_tables.txt;
 
 /* Restore the log. Every abort path restores it too, via %fail_out. */
-%restore_log;
+proc printto;
+run;

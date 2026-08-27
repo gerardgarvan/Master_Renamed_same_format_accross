@@ -46,7 +46,7 @@ libname g   "&g_path";
 /* =========================================================================
    SECTION 2: Exception report (PREP-02)
    Two counts, BOTH measured -- never hardcoded (RESEARCH Pitfall 10).
-     n_sent : literal 'NULL' sentinel strings in character variables.
+     n_sent : literal NULL sentinel strings in character variables.
               Expected 0 for md1-md7. Nonzero means source was re-exported
               from Excel like md8 -> ABORT.
      n_enc  : encoding-damaged Base_Procedure_1 rows -> FLAG ONLY (PCM-C-01).

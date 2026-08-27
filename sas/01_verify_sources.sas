@@ -19,7 +19,7 @@
               valid in open code)
             * %GLOBAL added to count_src so the counts survive the macro
             * blank-key sum() protected against a zero-row source
-            * SRC-05 extended to catch the literal 'NULL' sentinel (PCM-F-05)
+            * SRC-05 extended to catch the literal NULL sentinel (PCM-F-05)
             * qc output directory checked before the first FILE statement
 ==========================================================================*/
 
@@ -37,7 +37,7 @@ libname src "&source_path" access=readonly;
 /* ---- Precondition 1: libname must resolve ---- */
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib could not be assigned. Check &source_path is accessible.;
+    %put ERROR: LIBNAME &lib could not be assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;
@@ -120,7 +120,7 @@ quit;
 %assert_src06;
 
 /*
-  Note: upcase(name) = 'PRECEDE_STUDY_ID' deliberately excludes md6's duplicate
+  Note: upcase(name) = PRECEDE_STUDY_ID deliberately excludes md6s duplicate
   PRECEDE_Study_ID_1 column, whose name differs by the _1 suffix.
 
   Note: src._all_ enumerates EVERY dataset in the library. If stale artifacts
@@ -267,8 +267,8 @@ filename qccnt clear;
 ==========================================================================*/
 /* Runs BEFORE SRC-01: a single blank is "unique" and would pass uniqueness,
    and several blanks would surface there as a confusing duplicate error.
-   The 'NULL' arm exists because md8 stores that literal string where the other
-   seven store a blank (PCM-F-05) -- a 'NULL' key is not missing(), so the
+   The NULL arm exists because md8 stores that literal string where the other
+   seven store a blank (PCM-F-05) -- a NULL key is not missing(), so the
    blank check alone would not catch it.
    coalesce() guards the zero-row case: sum() over no rows returns missing,
    and %if . > 0 compares as text and silently passes.                       */

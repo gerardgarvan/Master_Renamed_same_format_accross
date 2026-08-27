@@ -50,7 +50,7 @@ libname qclib "&qc_path";
 %macro fail_out(msg=);
   %put ERROR: &msg;
   ods listing;
-  %restore_log;
+  proc printto; run;
   %abort cancel;
 %mend fail_out;
 
@@ -63,26 +63,8 @@ libname qclib "&qc_path";
 %check_dir(path=&qc_path,   label=qc);
 %check_dir(path=&logs_path, label=logs);
 
-/* Log routing. Standalone: redirect to this program's own log file.
-   Under 99_run_all (in_pipeline=1): leave the master log alone, or the driver's
-   log gets a hole exactly where a failure would need investigating.          */
-%macro route_log(name=);
-  %if &in_pipeline = 0 %then %do;
-    proc printto log="&logs_path.\&name..log" new;
-    run;
-    %put NOTE: log routed to &logs_path.\&name..log;
-  %end;
-  %else %put NOTE: running under 99_run_all -- log stays in the master log.;
-%mend route_log;
-
-%macro restore_log;
-  %if &in_pipeline = 0 %then %do;
-    proc printto;
-    run;
-  %end;
-%mend restore_log;
-
-%route_log(name=03b_recover_sweep);
+proc printto log="&logs_path.\03b_recover_sweep.log" new;
+run;
 
 %put NOTE: ==== Cross-source recoverability sweep starting ====;
 
@@ -199,7 +181,7 @@ quit;
     run;
 
     /* Type-aware difference test. For CHARACTER (type=2) an exact `ne` is what
-       you want -- a code of 'GQ' vs 'U' is a real disagreement. For NUMERIC,
+       you want -- a code of GQ vs U is a real disagreement. For NUMERIC,
        exact `ne` flags floating-point representation noise (differences of
        ~1e-14 between two exports of the same value) as disagreement, which
        would bury the real conflicts in false positives.                       */
@@ -237,7 +219,7 @@ quit;
    SECTION 3: Restrict to the losses the CURRENT ownership map actually causes
    -------------------------------------------------------------------------
    The full matrix is reference. What matters operationally is narrower: for
-   each variable, only the OWNER's row matters, because only the owner's copy
+   each variable, only the OWNERs row matters, because only the owners copy
    survives the KEEP= merge. A high recoverable count from a non-owner pair is
    irrelevant -- that source was never going to supply the value anyway.
    ========================================================================= */
@@ -363,4 +345,5 @@ run;
 %put NOTE- Full matrix: work.recover_all;
 %put NOTE- Action list: work.recover_owner_loss;
 
-%restore_log;
+proc printto;
+run;

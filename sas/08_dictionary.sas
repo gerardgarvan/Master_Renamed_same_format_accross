@@ -12,7 +12,7 @@
    PCM violations avoided:
      PCM-T-01: no PROC SQL UPDATE
      PCM-T-02: no data X; set X;
-     PCM-T-13: dictionary.columns.type is CHARACTER ('char'/'num'), not 1/2
+     PCM-T-13: dictionary.columns.type is CHARACTER (char/num), not 1/2
      All counts use SELECT COUNT(*) INTO :macvar TRIMMED
      All %abort cancel calls are inside named %macro definitions (PCM-R-05)
    Coverage: PROC SQL COUNT() for ALL variables (both numeric and character).
@@ -87,7 +87,7 @@ quit;
 
 /* =========================================================================
    SECTION 1 -- COLUMN METADATA (dictionary.columns)
-   PCM-T-13: type column is CHARACTER ('char' or 'num'), not numeric 1/2.
+   PCM-T-13: type column is CHARACTER (char or num), not numeric 1/2.
    Filter uses upcase() on both libname and memname.
    ========================================================================= */
 proc sql noprint;

@@ -41,7 +41,7 @@ options mprint nofmterr nodate nonumber ps=max ls=200;
 /* ---- Single path config; all macros (&sas_path etc.) resolve from here ---- */
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 
-/* This driver owns the master log. Suppress each program's own PROC PRINTTO
+/* This driver owns the master log. Suppress each programs own PROC PRINTTO
    redirection so the -log file is a complete record of the whole run.        */
 %let in_pipeline = 1;
 

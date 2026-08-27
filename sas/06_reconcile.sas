@@ -75,7 +75,7 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, preconditions
    =========================================================================
-   g_path, logs_path and qc_path all live under the P: merge tree (see 00_config.sas), consistent
+   g_path, logs_path and qc_path all live under C:\Master_Renamed_same_format_accross, consistent
    with all prior phases (copied from sas/05_qc_merge.sas SECTION 0).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
@@ -108,26 +108,8 @@ libname g "&g_path";
 /* 0b2: R7 -- route the log to the documented grep target. Previously
    logs_path was defined but never used, so logs/06_reconcile.log existed only
    if an external wrapper happened to create it. */
-/* Log routing. Standalone: redirect to this program's own log file.
-   Under 99_run_all (in_pipeline=1): leave the master log alone, or the driver's
-   log gets a hole exactly where a failure would need investigating.          */
-%macro route_log(name=);
-  %if &in_pipeline = 0 %then %do;
-    proc printto log="&logs_path.\&name..log" new;
-    run;
-    %put NOTE: log routed to &logs_path.\&name..log;
-  %end;
-  %else %put NOTE: running under 99_run_all -- log stays in the master log.;
-%mend route_log;
-
-%macro restore_log;
-  %if &in_pipeline = 0 %then %do;
-    proc printto;
-    run;
-  %end;
-%mend restore_log;
-
-%route_log(name=06_reconcile);
+proc printto log="&logs_path.\06_reconcile.log" new;
+run;
 
 %put NOTE: ==== Log routed to &logs_path.\06_reconcile.log ====;
 
@@ -180,14 +162,14 @@ filename outref clear;
 
 /* =========================================================================
    SECTION 1: Column presence and type checks (D-01, D-02, D-03, D-04, MRG-05)
-   Uses dictionary.columns with libname='G' and upcase(memname)='MASTER_DATA_MERGED'.
+   Uses dictionary.columns with libname=G and upcase(memname)=MASTER_DATA_MERGED.
    %macro assert_col aborts loudly on absence -- that is a real finding, not a defect.
    Each %put on success contains "PASS" so `grep -c "PASS" logs/06_reconcile.log`
    returns at least 18.
 
    R2: assert_col now optionally checks type. Pass type=num or type=char to
-   assert; omit to check presence only. dictionary.columns.type holds 'num' or
-   'char'. Catching a type surprise here, with a clear message, beats a PROC SQL
+   assert; omit to check presence only. dictionary.columns.type holds num or
+   char. Catching a type surprise here, with a clear message, beats a PROC SQL
    data-type error three sections downstream.
    ========================================================================= */
 
@@ -242,7 +224,7 @@ filename outref clear;
 %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Unintended_Weight_Loss_Value, label=REC-02/D-02);
 %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=Week_Grip_Strength_Value,     label=REC-02/D-02);
 
-/* D-03: ISO_SEV columns (PCM-D-03 -- keep separate; md8's is a TOTAL not an average) */
+/* D-03: ISO_SEV columns (PCM-D-03 -- keep separate; md8s is a TOTAL not an average) */
 %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=ISO_SEV_Exp_IntraOp_MAC_Average, label=REC-03/D-03);
 %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=ISO_SEV_IntraOp_MAC_Average,     label=REC-03/D-03);
 %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=ISO_SEV_MAC_TOTAL_Exp,           label=REC-03/D-03);
@@ -257,7 +239,7 @@ filename outref clear;
    reported in the log by assert_col so a change is visible without being fatal. */
 %assert_col(lib=G, dsn=MASTER_DATA_MERGED, col=rt_envelope_flag, label=MRG-05);
 
-/* Capture rt_envelope_flag's actual type for the summary narrative */
+/* Capture rt_envelope_flags actual type for the summary narrative */
 proc sql noprint;
   select type into :flag_type trimmed
   from dictionary.columns
@@ -297,7 +279,7 @@ run;
 /* =========================================================================
    SECTION 2: Emergent distribution (D-04 / REC-04)
    Emergent is CHARACTER $1 (md3-owned; Phase 4 LENGTH block). Values are Y/N/blank.
-   NOT 1/0 -- using '1'/'0' returns 0 for both counts (PCM-F-06 established this).
+   NOT 1/0 -- using 1/0 returns 0 for both counts (PCM-F-06 established this).
    Guard applied: IS NOT MISSING before comparison (PCM-T-11).
    Report counts only; assert NOTHING about the Y/N split (no expected value for
    the merged md3-owned column).
@@ -584,4 +566,5 @@ run;
 %put NOTE: ==== Populated-check status: &pop_status ====;
 
 /* Restore the log destination so an enclosing driver is not left writing here */
-%restore_log;
+proc printto;
+run;

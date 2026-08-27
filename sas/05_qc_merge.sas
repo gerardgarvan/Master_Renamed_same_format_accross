@@ -22,8 +22,7 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, %assert_eq macro
    =========================================================================
-   g_path, logs_path and qc_path all live under the P: merge tree (see 00_config.sas).
-   Code and docs are on C: in git; data, QC output and logs are on P: outside it. Everything this
+   g_path, logs_path and qc_path all live under C:\Master_Renamed_same_format_accross. Everything this
    pipeline reads or writes is on C:; nothing is written to the local repo.
 
    CONSEQUENCE, stated so it is a choice and not an accident: qc/05_qc_merge_report.txt
@@ -117,7 +116,7 @@ quit;
 %check_owmap;
 
 /* 1e: qclib.ownership_map carries an OWNER column.
-   Section 4 filters on `where upcase(owner) = 'MD8'`. If Phase 4 ever writes resolved
+   Section 4 filters on `where upcase(owner) = MD8`. If Phase 4 ever writes resolved
    owners back under a different name (owner_resolved), that filter fails inside a PROC SQL
    subquery mid-QC instead of at a labelled precondition. Pairs with the `> 30` upper band
    in %check_md8_list: between them, both failure modes of the ownership-map dependency
@@ -169,7 +168,7 @@ run;
 
 /* --- QC-02: Character variable owner-width check ---
    Build the OWNER-width reference table fully enumerated from qc/03_charvars_all.txt
-   filtered to each variable's resolved owner (OWNER width, NOT cross-source max).
+   filtered to each variables resolved owner (OWNER width, NOT cross-source max).
    Owner rule: md3 wins if it carries the var, else highest-row-count source;
    five frailty-component flags (Feels_Exausted, Low_Physical_Activity, Slow_Walking_Speed,
    Unintended_Weight_Loss, Week_Grip_Strength) override to md7 on the width signal ($3).
@@ -227,7 +226,7 @@ proc sql noprint;
     values ('Slow_Walking_Speed',                3, 'md7')
     values ('Unintended_Weight_Loss',            3, 'md7')
     values ('Week_Grip_Strength',                3, 'md7')
-    /* PCM-D-01 death-naming variants -- carried through UNRECONCILED pending Erin's
+    /* PCM-D-01 death-naming variants -- carried through UNRECONCILED pending Erins
        sign-off (Phase 6). All three are $1 character columns in the merged file and
        MUST have reference rows or the QC-02 completeness guard aborts.            */
     values ('IsDead_Y_N',                        1, 'md6')
@@ -357,7 +356,7 @@ quit;
    macro adds NO assertions to the QC-04 count. */
 %macro check_md8_expected;
   %local expected n_exp i v missing;
-  /* The list is ONE line deliberately. %SCAN's default delimiter set does not include a
+  /* The list is ONE line deliberately. %SCANs default delimiter set does not include a
      line-break character, so a newline inside the argument can survive into the returned
      token; indexw then fails to match and this guard aborts reporting drift that does not
      exist -- a false failure in the very check meant to separate real drift from noise.  */
@@ -529,7 +528,7 @@ run;
    rt_INCISE_to_DRESS_mins (positive, inside the old 0-2000 bound) is LONGER
    than the room occupancy that contains it. 9 such rows exist (5 + 4).
 
-   PCM-D-08 resolved 2026-08-27: FLAG, DON'T NULL. Each timestamp in a violating
+   PCM-D-08 resolved 2026-08-27: FLAG, DONT NULL. Each timestamp in a violating
    row is individually plausible; only the combination is impossible, and nothing
    identifies which of the three is wrong. 04_merge.sas derives rt_envelope_flag
    (MRG-05); this section asserts that NO violation ESCAPED the flag.

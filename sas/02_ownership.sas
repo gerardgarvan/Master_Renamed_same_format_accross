@@ -35,7 +35,7 @@ libname src "&source_path" access=readonly;
 /* ---- Precondition 1: libname src must resolve ---- */
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib could not be assigned. Check &source_path is accessible.;
+    %put ERROR: LIBNAME &lib could not be assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;
@@ -84,7 +84,7 @@ run;
 
 /* Normalise case and restrict to the eight master sources.
    CRITICAL: use IN, never IN: (prefix match).
-   IN: would admit master_data_7b for the literal 'MASTER_DATA_7' --
+   IN: would admit master_data_7b for the literal MASTER_DATA_7 --
    defeating the stale-artifact filter entirely (RESEARCH Pitfall 1).
    Write to work.allvars_src, NOT back into work.allvars (PCM-R-01).    */
 data work.allvars_src;
@@ -102,9 +102,9 @@ run;
   Columns: varname $32, owner $12, n_sources 8, sources_present $40,
            coalesce_flag $1.
   Single-source variables: owner = the one source label (md1 .. md8).
-  Multi-source variables:  owner = 'CONFLICT' (Plan 02 resolves specific owners).
-  coalesce_flag initialized to 'N' for all rows; Plan 02 flips Admit_BMI
-  and Race to 'Y'.
+  Multi-source variables:  owner = CONFLICT (Plan 02 resolves specific owners).
+  coalesce_flag initialized to N for all rows; Plan 02 flips Admit_BMI
+  and Race to Y.
 ==========================================================================*/
 
 proc sql noprint;
@@ -241,7 +241,7 @@ run;
 
 /* 5c: Append conflict block only on first run (own03_written = 0).
    Uses FILE ... MOD so the rest of DECISIONS.md is preserved (never REPLACE).
-   The marker string 'OWN-03 CONFLICT ROWS GENERATED' is what the guard scans. */
+   The marker string OWN-03 CONFLICT ROWS GENERATED is what the guard scans. */
 %macro write_own03_block;
   %if &own03_written = 0 %then %do;
     filename dcsnmd "&docs_path.\DECISIONS.md";

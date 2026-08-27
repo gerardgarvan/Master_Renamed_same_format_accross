@@ -49,7 +49,7 @@ libname g   "&g_path";
 
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib not assigned. Check the path in 00_config.sas is accessible.;
+    %put ERROR: LIBNAME &lib not assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;
@@ -72,7 +72,7 @@ libname g   "&g_path";
 /*==========================================================================
   SECTION 2: Exception report (PREP-02)
   Two counts, both measured -- never hardcode zero (RESEARCH Pitfall 10).
-    n_sent : literal 'NULL' sentinel strings in character variables.
+    n_sent : literal NULL sentinel strings in character variables.
              Expected 0 for md6 (only md8 has them). Nonzero -> ABORT.
     n_enc  : encoding-damaged Base_Procedure_1 rows -> FLAG ONLY (PCM-C-01).
   Note: Base_Procedure_Code_1 is NUM in md6 -- not in the NULL scan.
@@ -174,7 +174,7 @@ quit;
   %end;
   %else %do;
     /* Two %put statements, not one. A %PUT ends at its FIRST semicolon, so an
-       embedded ';' left "safe to drop.;" as an orphan statement and logged
+       embedded ; left "safe to drop.;" as an orphan statement and logged
        ERROR 180-322 on every run. NOTE- continues the previous NOTE block.   */
     %put NOTE: PREP-04 OK -- PRECEDE_Study_ID_1 identical to PRECEDE_STUDY_ID in all rows.;
     %put NOTE- Safe to drop.;
@@ -310,7 +310,7 @@ quit;
 
 /*  5b: PREP-04 absence assertion -- PRECEDE_Study_ID_1 must NOT appear in
     g.prep_md6 after the DROP. dictionary.columns is the authoritative check.
-    dictionary.columns type is CHARACTER ('char'/'num').                      */
+    dictionary.columns type is CHARACTER (char/num).                      */
 
 proc sql noprint;
   select count(*) into :n_dup_col trimmed
@@ -330,7 +330,7 @@ quit;
 %assert_col_absent(n=&n_dup_col, colname=PRECEDE_Study_ID_1, dsn=g.prep_md6);
 
 /*  5c: PREP-07 type assertion -- Base_Procedure_Code_1 must be CHAR in g.prep_md6.
-    dictionary.columns type is CHARACTER ('char'/'num'), distinct from PROC CONTENTS
+    dictionary.columns type is CHARACTER (char/num), distinct from PROC CONTENTS
     OUT= where type is numeric 1=NUM / 2=CHAR. Do not interchange them.          */
 
 proc sql noprint;

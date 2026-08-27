@@ -45,10 +45,10 @@ libname g   "&g_path";
   %else %put NOTE: &label directory present: &path.;
 %mend check_dir;
 
-/* Gate on src libref -- confirms &source_path (P: read-only masters) is accessible */
+/* Gate on src libref -- confirms C:\Master_Renamed_same_format_accross is accessible */
 %check_libname(lib=src);
 
-/* Gate on g libref -- confirms &g_path (P: merge tree, outside the repo) exists */
+/* Gate on g libref -- confirms C:\Master_Renamed_same_format_accross\ exists (Task 1 of Plan 01) */
 %check_libname(lib=g);
 
 /* Confirm output directories */

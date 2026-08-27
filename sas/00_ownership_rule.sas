@@ -5,7 +5,7 @@
             qclib.ownership_map records which sources carry each variable, but
             it does NOT choose an owner: Phase 2 deliberately wrote the literal
             string CONFLICT into the `owner` column for every multi-source
-            variable -- 135 of 163. Choosing the owner is this file's job.
+            variable -- 135 of 163. Choosing the owner is this files job.
 
   Usage   : %include-d INSIDE an already-open DATA step that has done:
 
@@ -24,7 +24,7 @@
             owner_resolved  (char $4, declared by the caller)
 
   Callers : sas/04_merge.sas          -- builds the KEEP= lists from the result
-            sas/08_dictionary.sas     -- fills the dictionary's source column
+            sas/08_dictionary.sas     -- fills the dictionarys source column
 
             Both MUST use this file. A second copy of the rule lets the data
             dictionary describe an ownership the merge never applied, and that
@@ -56,7 +56,7 @@ else if index(sources_present,'md5') then owner_resolved = 'md5';
 
 /* Rule 4 -- OVERRIDE, applied after the row-count rule.
    The five frailty components are $3 in md7 and $1 in md6. Rule 2 would pick
-   md6 (9,462 rows vs 9,215), but md6's $1 width cannot hold md7's 3-character
+   md6 (9,462 rows vs 9,215), but md6s $1 width cannot hold md7s 3-character
    values -- and that width difference is itself evidence the two sources are
    not storing the same encoding. PCM-D-02 covers this and is resolved as
    "keep separate"; the override makes md7 the owner so no value is truncated. */

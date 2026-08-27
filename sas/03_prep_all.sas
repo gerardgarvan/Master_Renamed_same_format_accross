@@ -11,8 +11,7 @@
             PREP-05 (each included program gates LENGTH-before-SET)
             PREP-06 (all 16 per-source artifacts confirmed downstream)
   Usage   : sas -sysin "C:\Master_Renamed_same_format_accross\sas\03_prep_all.sas"
-                 -log "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs\03_prep_all.log"
-            (code on C: in git; logs and data on P: outside git)
+                 -log "C:\Master_Renamed_same_format_accross\logs\03_prep_all.log"
             (or open in SAS Display Manager and submit; close SAS between phases)
   Author  : Executor (Phase 3 Plan 05)
   Created : 2026-08-26
@@ -30,7 +29,7 @@ options mprint nofmterr;
 
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 /* sas_path corrected 2026-08-27. It previously pointed at
-   a sas\ folder that did not exist at the time -- so all nine
+   C:\Master_Renamed_same_format_accross\sas, which does not exist -- so all nine
    %include statements below resolved to nothing. The driver ran, included no
    programs, and produced no PREP-08 nulling and no PREP-09 reports, with no error
    obvious enough to notice. If a future run produces no logs/03_negtime_mdN.txt
@@ -115,7 +114,7 @@ filename sumf clear;
 /*==========================================================================
   SECTION 3: Final assertion gate
   Build a mismatch count; abort with a clear error message if nonzero.
-  Each source's expected count is read from &&exp&i (set by one_summary)
+  Each sources expected count is read from &&exp&i (set by one_summary)
   so there is a single authoritative source per count.
 ==========================================================================*/
 

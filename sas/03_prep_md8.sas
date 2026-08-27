@@ -3,11 +3,11 @@
   Phase      : Phase 3 -- Per-Source Normalization
   Purpose    : md8 NULL sentinel clear + forced-char-to-numeric conversion.
                md8 is the only source that (a) stores the literal string
-               'NULL' where SAS would store missing, and (b) had eight
+               NULL where SAS would store missing, and (b) had eight
                numeric variables forced to CHAR ($4 or $11) during a prior
                Excel export. This program:
                  1. Scans for non-parseable values BEFORE conversion (PREP-02)
-                 2. Clears every 'NULL' sentinel to blank (PREP-03)
+                 2. Clears every NULL sentinel to blank (PREP-03)
                  3. Converts the eight forced-char numerics to numeric via
                     INPUT() (PREP-03)
                  4. Logs conversion counts to logs/ (PREP-06)
@@ -34,7 +34,7 @@ libname g   "&g_path";
 %let mdnum        = 8;        /* PREP-09 builds its dictionary.columns lookup and its
                                  logs/03_negtime_mdN.txt filename from &mdnum. Present in
                                  md1-md7; without it here &mdnum is unresolved, the lookup
-                                 returns nothing, and md8's report is written as
+                                 returns nothing, and md8s report is written as
                                  03_negtime_md.txt or not at all.                        */
 
 
@@ -197,7 +197,7 @@ filename excfile clear;
 ==========================================================================*/
 
 /* Step 1: Clear NULL sentinels across ALL character variables.
-   Done BEFORE INPUT() so the conversion never receives the literal 'NULL'.
+   Done BEFORE INPUT() so the conversion never receives the literal NULL.
    Reading _CHARACTER_ here is safe because no temp _c variables exist yet
    (two-step approach isolates the rename, Pitfall 3).                       */
 data work.prep_md8_s1;
@@ -238,7 +238,7 @@ data work.prep_md8_s1;
 
   /* Clear NULL sentinel in ALL character variables (Pitfall 2 prevention).
      _CHARACTER_ expands to every character variable in the PDV at this point.
-     After Step 1 sentinel clear, INPUT() never receives the literal 'NULL'. */
+     After Step 1 sentinel clear, INPUT() never receives the literal NULL. */
   array _charv {*} _CHARACTER_;
   do _i = 1 to dim(_charv);
     if strip(upcase(_charv{_i})) = 'NULL' then _charv{_i} = ' ';
@@ -285,7 +285,7 @@ data g.prep_md8;
              rt_RM_START_to_RM_END_mins=rt3_c));
 
   /* INPUT(STRIP(var), best12.) handles blanks (now missing after sentinel
-     clear) cleanly: INPUT('', best12.) = . (numeric missing). Correct.      */
+     clear) cleanly: INPUT(, best12.) = . (numeric missing). Correct.      */
   Admit_BMI                    = input(strip(Admit_BMI_c), best12.);
   ASA__Anesth_Record_          = input(strip(ASA_c),       best12.);
   Age_at_Encounter             = input(strip(Age_c),       best12.);
@@ -321,7 +321,7 @@ run;
   SECTION 4: Conversion count log (PREP-06)
   Written to logs/ (not qc/ -- different artifact semantics, RESEARCH
   anti-pattern). Count per variable: successful conversions (numeric non-
-  missing in g.prep_md8) and sentinels cleared (strip(upcase)='NULL' in
+  missing in g.prep_md8) and sentinels cleared (strip(upcase)=NULL in
   the original src.master_data_8). Never use &SQLOBS -- always SELECT
   COUNT(*) INTO :n TRIMMED (Phases 1-2 established rule).
 ==========================================================================*/
@@ -366,8 +366,8 @@ filename convlog clear;
 /*==========================================================================
   SECTION 5: Post-conversion assertions (PREP-03, PREP-05)
   Three assertions:
-    1. Zero surviving 'NULL' strings in any character variable of g.prep_md8
-    2. The eight converted variables are NUMERIC (type=1 / type ne 'char')
+    1. Zero surviving NULL strings in any character variable of g.prep_md8
+    2. The eight converted variables are NUMERIC (type=1 / type ne char)
     3. Row count preserved: g.prep_md8 = &expected_nobs (22,473)
   All %abort cancel calls inside macro definitions (PCM-R-05).
 ==========================================================================*/
@@ -392,13 +392,13 @@ proc sql noprint;
      or strip(upcase(Base_Procedure_1)) = 'NULL'
   /* TODO: add all remaining character variables from qc/03_charvars_all.txt,
      one OR clause per variable. Pattern:
-       or strip(upcase(VarName)) = 'NULL'                                    */
+       or strip(upcase(VarName)) = NULL                                    */
   ;
 quit;
 %assert_zero(n=&n_null_surv, msg=surviving NULL sentinel strings in g.prep_md8);
 
 /* 5b: The eight converted variables are NUMERIC in g.prep_md8.
-   dictionary.columns type='char' means still character -- assert zero.       */
+   dictionary.columns type=char means still character -- assert zero.       */
 proc sql noprint;
   select count(*) into :n_stillchar trimmed from dictionary.columns
   where libname='G' and memname='PREP_MD8'

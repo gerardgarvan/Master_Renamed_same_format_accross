@@ -6,7 +6,7 @@
    Created: 2026-08-26
    Notes  : md3 is the merge spine (PCM-F-02); its 41,150 row count drives
             Phase 4 base. A deviation from 41,150 is a hard abort -- the entire
-            pipeline's row target is 41,150 (MRG-01), so if the spine changed,
+            pipelines row target is 41,150 (MRG-01), so if the spine changed,
             everything downstream is invalid.
             md3 has no forced-char numerics and no NULL sentinel.
             The exception scan measures both sentinel count and encoding-damage
@@ -50,7 +50,7 @@ libname g   "&g_path";
 /* =========================================================================
    SECTION 2: Exception report (PREP-02)
    Two counts, BOTH measured -- never hardcoded (RESEARCH Pitfall 10).
-     n_sent : literal 'NULL' sentinel strings in character variables.
+     n_sent : literal NULL sentinel strings in character variables.
               Expected 0 for md1-md7. Nonzero means source was re-exported
               from Excel like md8 -> ABORT.
      n_enc  : encoding-damaged Base_Procedure_1 rows -> FLAG ONLY (PCM-C-01).

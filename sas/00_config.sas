@@ -21,16 +21,6 @@
 %let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
 %let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
 
-/* ---- Pipeline flag ----
-   0 = program is being run on its own, so it redirects the log to its own file
-       in &logs_path.
-   1 = program is running under 99_run_all.sas, which owns the master log.
-       Per-program redirection is SUPPRESSED so the master log stays a complete
-       record -- otherwise Phases 6 and 7 divert output mid-run and the driver's
-       log has holes exactly where you look after a failure.
-   99_run_all.sas sets this to 1 immediately after including this file.        */
-%let in_pipeline = 0;
-
 %put NOTE: [00_config] sas_path    = &sas_path;
 %put NOTE: [00_config] docs_path   = &docs_path;
 %put NOTE: [00_config] source_path = &source_path;

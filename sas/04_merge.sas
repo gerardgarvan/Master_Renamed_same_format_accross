@@ -142,14 +142,14 @@ quit;
    This section is the core of MRG-04. It NEVER hand-transcribes ownership:
    all 163 variable assignments (28 single-source + 135 CONFLICT) flow from
    qclib.ownership_map at run time. The work.ownership_resolved dataset is
-   also the reference for SECTION 5's reconciliation assertions.
+   also the reference for SECTION 5s reconciliation assertions.
 
    Variable deletion before keep-list build:
      PRECEDE_STUDY_ID   -- the merge key; supplied explicitly on all 8 inputs
      PRECEDE_STUDY_ID_1 -- dropped in Phase 3 PREP-04; must not reach any list
 
    MD3-OWNS MISSINGNESS TRADE-OFF (PCM-D-09):
-     Any variable owned by md3 inherits md3's missingness pattern -- that is,
+     Any variable owned by md3 inherits md3s missingness pattern -- that is,
      the merged file will show missing values wherever md3 was missing, even if
      another source had a non-missing value. For Admit_BMI this is provably free:
      PCM-F-07 showed that coalescing every other source recovers nothing (all
@@ -176,7 +176,7 @@ data work.ownership_resolved;
   length owner_resolved $4;
   /* THE ownership rule lives in 00_ownership_rule.sas and is included here, not
      duplicated. 08_dictionary.sas includes the same file to fill the data
-     dictionary's source column. Two copies would let the dictionary describe an
+     dictionarys source column. Two copies would let the dictionary describe an
      ownership the merge never applied, and that divergence would stay invisible
      until someone traced a value back to its source.
      The include expects: set qclib.ownership_map + length owner_resolved $4
@@ -214,7 +214,7 @@ quit;
 
 /* =========================================================================
    SECTION 3: Spine-first DATA step merge with generated KEEP= lists
-   LENGTH block declares each character variable at its OWNER's width.
+   LENGTH block declares each character variable at its OWNERs width.
    PCM-R-02: LENGTH before MERGE.
    PCM-F-02, MRG-04: work.sort_prep_md3 is the FIRST dataset in MERGE.
    No RENAME= blocks (the prefix-suppress scheme overflows the 32-char name limit -- PCM violation).
@@ -226,8 +226,8 @@ data g.master_data_merged;
     PRECEDE_STUDY_ID                $12
 
     /* ---------------------------------------------------------------
-       Character variables at OWNER'S width (from qc/03_charvars_all.txt).
-       Under KEEP= only the owner's copy enters the PDV -- max-width would
+       Character variables at OWNERS width (from qc/03_charvars_all.txt).
+       Under KEEP= only the owners copy enters the PDV -- max-width would
        be wasteful and misleading.
        --------------------------------------------------------------- */
 
@@ -245,7 +245,7 @@ data g.master_data_merged;
     Marital_Status                  $22   /* md3 owns */
     Service                         $32   /* md3 owns */
     Room_Type                       $22   /* md3 owns */
-    Emergent                        $1    /* md3 owns; md8's $4 is char-forced (not kept) */
+    Emergent                        $1    /* md3 owns; md8s $4 is char-forced (not kept) */
     Base_Procedure_1                $199  /* md3 owns */
     Base_Procedure_Code_1           $10   /* md3 owns */
     CPT_1                           $8    /* md3 owns */
@@ -255,8 +255,8 @@ data g.master_data_merged;
     Payer                           $12   /* md3 owns */
     ICD10_Principal_Diagnosis_Desc  $60   /* md3 owns (md1/md2/md4/md5 also have it) */
     ICD10_Principal_Diagnosis       $7    /* md3 owns */
-    Intraop_Ketamine                $1    /* md3 owns; md8's $4 is char-forced (not kept) */
-    Preop_block                     $1    /* md3 owns; md8's $4 is char-forced (not kept) */
+    Intraop_Ketamine                $1    /* md3 owns; md8s $4 is char-forced (not kept) */
+    Preop_block                     $1    /* md3 owns; md8s $4 is char-forced (not kept) */
     Admit_Source                    $40   /* md3 owns */
     Dischg_Disposition              $43   /* md3 owns */
 
@@ -279,14 +279,14 @@ data g.master_data_merged;
 
     /* ISO_SEV_Exp_IntraOp_MAC_Average: numeric in md2/md3 (type 1, length 8), char in md1.
        md3 owns it (spine rule) so it is NUMERIC -- not declared in character LENGTH block.
-       md1's char copy is excluded by KEEP=. See PCM-D-03 block below. */
+       md1s char copy is excluded by KEEP=. See PCM-D-03 block below. */
 
     /* md6 owns */
     IsDead_Y_N                      $1    /* md6 owns; single-source; see PCM-D-01 block above */
     ICD10_Principal_Diagnosis_POA   $6    /* md6 owns (md6|md7 both $6) */
     SSDI_Death_Y_N                  $1    /* md6 owns (md4|md5|md6; md6 highest rows) */
 
-    /* PCM-D-03 PENDING: three ISO_SEV columns retained separately; md8's is a TOTAL, not an
+    /* PCM-D-03 PENDING: three ISO_SEV columns retained separately; md8s is a TOTAL, not an
        average -- do not fold it in even when D-03 is decided. */
 
     /* md7 owns (single-source) */
@@ -477,7 +477,7 @@ run;
      MRG-02: n_blank_key = 0  (no PRECEDE_STUDY_ID missing from any merged row)
      MRG-03: in_mdN totals match expected source row counts from qc/src_counts.txt
              for all eight sources
-     NULL sentinel: md8-owned character columns have zero surviving 'NULL' strings
+     NULL sentinel: md8-owned character columns have zero surviving NULL strings
      MRG-04: ownership reconciliation -- no orphaned columns, no absent mapped vars
 
    The %assert_eq macro is defined here (not in SECTION 1) because it is
@@ -580,7 +580,7 @@ proc sql noprint;
                              'RT_ENVELOPE_FLAG');
     /* RT_ENVELOPE_FLAG is derived in SECTION 3 (MRG-05), not read from a source, so it
        is legitimately absent from the ownership map. Omitting it here would make MRG-04
-       fail on the merge's own derived column.                                         */
+       fail on the merges own derived column.                                         */
 
   select count(*) into :n_absent trimmed
   from work.ownership_resolved

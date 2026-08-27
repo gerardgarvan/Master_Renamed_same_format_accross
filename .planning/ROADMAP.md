@@ -106,7 +106,11 @@ Plans:
  3. Negatives in the other `rt_*` variables triaged from the PREP-09 report; `rt_ANCHOR_to_*_days` left alone (PCM-D-10)
  4. `rt_envelope_flag` documented for downstream users (MRG-05)
  5. The deferred age-floor question recorded as inherited by Phase 7 (D-07)
-**Plans**: not yet planned — no longer blocked; Phase 6 is now largely documentation
+**Plans**: 3 plans
+Plans:
+- [x] 06-01-PLAN.md — PCM-D-10 triage: read PREP-09 report (logs/03_negtime_md3.txt), record resolution in DECISIONS.md; human checkpoint flags any bucket-D duration for Phase 3->4->5 re-run (PCM-D-10)
+- [ ] 06-02-PLAN.md — Write and run sas/06_reconcile.sas: confirm 16 deliberate columns present, count Emergent (D-04), document rt_envelope_flag (MRG-05), write qc/06_reconcile_summary.txt (D-01, D-02, D-03, D-04, MRG-05)
+- [ ] 06-03-PLAN.md — Create docs/data_dictionary_notes.txt stub: document five concept groups, record D-07 as inherited by Phase 7, cross-reference D-09/D-11 (D-07, D-08, D-09, D-11)
 
 ### Phase 7: Cohort & Missingness
 **Goal**: The analytic cohort is defined on a pre-specifiable criterion rather than on data availability, and the missingness profile is documented with complete-case Ns stated

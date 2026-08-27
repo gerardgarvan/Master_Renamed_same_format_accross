@@ -343,6 +343,32 @@ data g.master_data_merged;
     work.sort_prep_md6 (in=in6 keep=PRECEDE_STUDY_ID &keep6)
     work.sort_prep_md7 (in=in7 keep=PRECEDE_STUDY_ID &keep7)
     work.sort_prep_md8 (in=in8 keep=PRECEDE_STUDY_ID &keep8)
+
+    /* ---- MRG-06 / PCM-D-11 (REOPENED 2026-08-27): md8 gap-fill donors ----
+       md8 is read a SECOND time, supplying only five columns under _d8_ names.
+       These are the variables where md3 owns the column but md8 holds values for
+       patients md3 has blanks for -- measured across all seven donors:
+           Cognitive_Score                  8,412
+           Cognitive_Category               8,445
+           Frailty_Score                    9,268
+           Frailty_Category                 1,789
+           ORAL_MORPHINE_EQUIV_mg_POD_DAY6  7,695
+       Zero disagreements on all five where both sources have a value, so the
+       coalesce below is a pure gap-fill, not a choice between conflicting data.
+
+       Renamed on the way in so they cannot collide with md3's owned copies --
+       the KEEP= ownership rule still holds for the canonical names. The _d8_
+       columns are dropped before the dataset is written, so MRG-04's
+       unmapped-column reconciliation is unaffected.                            */
+    work.sort_prep_md8 (keep=PRECEDE_STUDY_ID
+                             Cognitive_Score Cognitive_Category
+                             Frailty_Score Frailty_Category
+                             ORAL_MORPHINE_EQUIV_mg_POD_DAY6
+                        rename=(Cognitive_Score    = _d8_cog_score
+                                Cognitive_Category = _d8_cog_cat
+                                Frailty_Score      = _d8_frl_score
+                                Frailty_Category   = _d8_frl_cat
+                                ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6))
     ;
   by PRECEDE_STUDY_ID;
 
@@ -382,6 +408,33 @@ data g.master_data_merged;
           or (not missing(rt_RM_START_to_INCISION_mins)
               and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins) ) );
   label rt_envelope_flag = 'Operative sub-interval exceeds room interval (1=yes)';
+
+  /* ---- MRG-06 / PCM-D-11: fill md3's blanks from md8 ----------------------
+     Direction is one-way and explicit: md3's value is NEVER overwritten. Only a
+     MISSING md3 value is filled, and only from md8, and only for these five.
+
+     Why this is needed: the KEEP= ownership rule gives md3 first claim, so md8's
+     copy is normally never kept -- correct for preventing last-wins overwrites,
+     but it also discards values for patients md3 simply has no data on. PCM-D-11
+     was originally closed as "costs nothing" on a check that tested md5 and md6
+     and OMITTED md8. That was wrong: md5 and md6 hold only duplicates, md8 holds
+     8-9k real values per score variable.
+
+     Arithmetic check on the result:
+       Cognitive_Score  12,128 + 8,412 = 20,540  (Phase 7 expected N)
+       Frailty_Score    14,043 + 9,268 = 23,311  (Phase 7 expected N)
+
+     DATA step, so the guard is `missing(x)` -- `x IS MISSING` is PROC SQL syntax. */
+  if missing(Cognitive_Score)    then Cognitive_Score    = _d8_cog_score;
+  if missing(Cognitive_Category) then Cognitive_Category = _d8_cog_cat;
+  if missing(Frailty_Score)      then Frailty_Score      = _d8_frl_score;
+  if missing(Frailty_Category)   then Frailty_Category   = _d8_frl_cat;
+  if missing(ORAL_MORPHINE_EQUIV_mg_POD_DAY6)
+                                 then ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = _d8_ome_d6;
+
+  /* Donor columns are working storage only -- dropped so the merged column list
+     still reconciles against the ownership map (MRG-04).                       */
+  drop _d8_:;
 run;
 
 %put NOTE: DATA step merge complete. Proceeding to SECTION 4 log.;
@@ -393,6 +446,25 @@ proc sql noprint;
   select sum(rt_envelope_flag) into :n_env_flag trimmed from g.master_data_merged;
 quit;
 %put NOTE: MRG-05 -- &n_env_flag rows carry rt_envelope_flag=1 (expected 9, PCM-D-08).;
+
+/* MRG-06: report post-coalesce coverage. Reported, not asserted here -- Phase 7
+   asserts the two score Ns, which is where the expectation is established.     */
+proc sql noprint;
+  select sum(Cognitive_Score is not missing),
+         sum(Frailty_Score   is not missing),
+         sum(Cognitive_Category is not missing),
+         sum(Frailty_Category   is not missing),
+         sum(ORAL_MORPHINE_EQUIV_mg_POD_DAY6 is not missing)
+    into :n_cog trimmed, :n_frl trimmed, :n_cogc trimmed,
+         :n_frlc trimmed, :n_ome trimmed
+  from g.master_data_merged;
+quit;
+%put NOTE: MRG-06 -- post-coalesce coverage (md3 owned, md8 gap-filled):;
+%put NOTE-   Cognitive_Score    = &n_cog  (expect 20540);
+%put NOTE-   Frailty_Score      = &n_frl  (expect 23311);
+%put NOTE-   Cognitive_Category = &n_cogc;
+%put NOTE-   Frailty_Category   = &n_frlc;
+%put NOTE-   ORAL_MORPHINE_EQUIV_mg_POD_DAY6 = &n_ome;
 
 /* =========================================================================
    SECTION 4: Merge summary log written to logs/04_merge_log.txt

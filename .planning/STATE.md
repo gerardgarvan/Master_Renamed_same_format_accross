@@ -8,13 +8,13 @@ progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
-  percent: 73
+  completed_plans: 13
+  percent: 80
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-26T21:24:36.971Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27
 
 ---
 
@@ -28,13 +28,13 @@ progress:
 
 ## Current Position
 
-Phase: 05 (merge-qc) — EXECUTING
-Plan: 1 of 3
+Phase: 05 (merge-qc) — COMPLETE
+Plan: 3 of 3 (all complete)
 | Field | Value |
 |-------|-------|
-| Current Phase | 3 — Per-Source Normalization (REOPENED by AMENDMENT-01) |
-| Current Plan | 03-06-PLAN.md — Tasks 1 & 2 done; awaiting Task 3 human-verify |
-| Phase Status | Executing |
+| Current Phase | 5 — Merge QC (COMPLETE) |
+| Current Plan | 05-03-PLAN.md — all 4 tasks complete; QC-01 through QC-07 pass |
+| Phase Status | Complete |
 | Milestone | 1 of 1 |
 
 **Progress:** [███████░░░] 73%
@@ -47,7 +47,7 @@ Plan: 1 of 3
 | 2 | Ownership Map | ✅ Complete (2 of 2 plans) |
 | 3 | Per-Source Normalization | 🔄 Reopened — 5 of 6 plans; 03-06 pending |
 | 4 | Merge | ⚠️ Complete but STALE — must re-run after 03-06 |
-| 5 | Merge QC | 🔄 Executing — 05-02 blocked at QC-05; 05-03 pending |
+| 5 | Merge QC | ✅ Complete (3 of 3 plans) |
 | 6 | Variable Reconciliation | ⬜ Not planned — blocked on Erin (PCM-D-01, D-02) |
 | 7 | Cohort & Missingness | ⬜ Not planned |
 | 8 | Documentation & Handoff | ⬜ Not planned |
@@ -196,7 +196,7 @@ exercise: record the three multi-column concepts in the data dictionary.
 
 ### Blockers
 
-- **Phase 5 is blocked** on the 03-06 → Phase 4 → Phase 5 re-run chain
+- Phase 5 is COMPLETE — QC-01 through QC-07 all pass; 41,150 rows, 9 envelope-flagged rows
 - Phase 6 is NO LONGER blocked — D-01 and D-02 resolved as keep-separate 2026-08-27
 - No decision blockers remain for Phases 3–6. D-05 is a Phase 7 question; D-10 needs the
   PREP-09 report that 03-06 produces

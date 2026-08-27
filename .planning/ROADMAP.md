@@ -94,7 +94,7 @@ Plans:
 Plans:
 - [x] 05-01-PLAN.md — Write sas/05_qc_merge.sas: SECTION 0–3 (assert_eq macro, five preconditions, QC-01 row count, QC-02 owner-width check, QC-03 all-char NULL scan) + SECTION 4–6 (QC-04 derived md8-owned list, QC-05 guarded clinical ranges, close-out) (QC-01…QC-05)
 - [~] 05-02-PLAN.md — Static PCM validation + human SAS run. RAN 2026-08-26: QC-01–QC-04 passed; QC-05 aborted on `rt_INCISE_to_DRESS_mins` = 52. Blocked pending 03-06 (QC-01…QC-05)
-- [ ] 05-03-PLAN.md — AMENDMENT-01: QC-06 unflagged-containment assertion, QC-07 ceiling removal, distribution report retained as the PCM-D-09 record (QC-06, QC-07)
+- [x] 05-03-PLAN.md — AMENDMENT-01: QC-06 unflagged-containment assertion, QC-07 ceiling removal, distribution report retained as the PCM-D-09 record (QC-06, QC-07)
 
 ### Phase 6: Variable Reconciliation
 **Goal**: The variable-naming conflicts deliberately carried through unreconciled are resolved with Erin's sign-off, so the merged file has one column per measured concept rather than three

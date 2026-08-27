@@ -14,7 +14,7 @@ progress:
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27T15:44:47.319Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27 -- 06-03 complete
 
 ---
 
@@ -28,8 +28,8 @@ progress:
 
 ## Current Position
 
-Phase: 06 (variable-reconciliation) — EXECUTING
-Plan: 2 of 3
+Phase: 06 (variable-reconciliation) — COMPLETE
+Plan: 3 of 3
 | Field | Value |
 |-------|-------|
 | Current Phase | 5 — Merge QC (COMPLETE) |
@@ -37,7 +37,7 @@ Plan: 2 of 3
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [████████░░] 83%
+**Progress:** [█████████░] 88%
 
 **Phase status at a glance:**
 
@@ -48,7 +48,7 @@ Plan: 2 of 3
 | 3 | Per-Source Normalization | 🔄 Reopened — 5 of 6 plans; 03-06 pending |
 | 4 | Merge | ⚠️ Complete but STALE — must re-run after 03-06 |
 | 5 | Merge QC | ✅ Complete (3 of 3 plans) |
-| 6 | Variable Reconciliation | ⬜ Not planned — blocked on Erin (PCM-D-01, D-02) |
+| 6 | Variable Reconciliation | ✅ Complete (3 of 3 plans) |
 | 7 | Cohort & Missingness | ⬜ Not planned |
 | 8 | Documentation & Handoff | ⬜ Not planned |
 

@@ -172,6 +172,21 @@ data g.prep_md4;
   set src.master_data_4 (rename=(Base_Procedure_Code_1=_bpc_n));
   if not missing(_bpc_n) then Base_Procedure_Code_1 = strip(put(_bpc_n, best12.));
   drop _bpc_n;
+
+  /* PREP-08: a negative elapsed time is invalid at any threshold. Set to missing.
+     Evidence: AMENDMENT-01 section 2 (PCM-F-13, PCM-F-14). 52 rows in
+     rt_INCISE_to_DRESS_mins and 15 in rt_RM_START_to_INCISION_mins, disjoint sets.
+     Max negative is -1 and 75% sit between -6.5 and -1 -- consistent with the two
+     timestamps being charted out of order, concentrated in percutaneous services
+     (EP/interventional cardiology, 46% neurosurgery) where there is no incision or
+     dressing in the surgical sense. Missing is more honest there than a number.
+     IS NOT MISSING guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.        */
+  if rt_INCISE_to_DRESS_mins is not missing
+     and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
+  if rt_RM_START_to_INCISION_mins is not missing
+     and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
+  if rt_RM_START_to_RM_END_mins is not missing
+     and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
 run;
 
 
@@ -246,6 +261,24 @@ quit;
 %mend assert_bpc_char;
 
 %assert_bpc_char(n=&n_bpc_num, dsn=g.prep_md4);
+
+/* SECTION 5d: PREP-08 assertion -- no negative operative intervals survive.
+   IS NOT MISSING guard required (PCM-T-11): missing < 0 is TRUE in SAS.   */
+proc sql noprint;
+  select sum( (rt_INCISE_to_DRESS_mins is not missing and rt_INCISE_to_DRESS_mins < 0)
+            + (rt_RM_START_to_INCISION_mins is not missing and rt_RM_START_to_INCISION_mins < 0)
+            + (rt_RM_START_to_RM_END_mins is not missing and rt_RM_START_to_RM_END_mins < 0) )
+         into :n_negsurv trimmed
+  from g.prep_md4;
+quit;
+%macro assert_no_negtime(n=, dsn=);
+  %if &n > 0 %then %do;
+    %put ERROR: PREP-08 VIOLATION -- &n negative operative intervals survived in &dsn;
+    %abort cancel;
+  %end;
+  %else %put NOTE: PREP-08 OK -- no negative operative intervals in &dsn;
+%mend assert_no_negtime;
+%assert_no_negtime(n=&n_negsurv, dsn=g.prep_md4);
 
 
 /*==========================================================================

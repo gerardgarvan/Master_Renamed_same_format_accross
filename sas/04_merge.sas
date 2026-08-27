@@ -546,7 +546,7 @@ quit;
 %macro null_scan;
   %if &n_md8_char = 0 %then %do;
     %put NOTE: MRG -- md8 owns no character variables in the merged file.;
-    %put NOTE- The NULL sentinel is unreachable by construction. md8's owned columns;
+    %put NOTE- The NULL sentinel is unreachable by construction. md8 owned columns;
     %put NOTE- are entirely numeric (hemodynamic block converted in PREP-03).;
     %put NOTE- This is a stronger result than a scan -- no md8-char values to corrupt.;
     %let n_null_merged = 0;

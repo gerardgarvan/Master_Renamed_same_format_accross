@@ -130,7 +130,7 @@ quit;
 %macro check_owcol;
   %if &n_owcol ne 1 %then %do;
     %put ERROR: QC PRECONDITION -- qclib.ownership_map has no OWNER column.;
-    %put ERROR- Section 4 derives the md8-only variable list from `where upcase(owner)='MD8'`.;
+    %put ERROR- Section 4 derives the md8-only variable list from where upcase(owner) = MD8.;
     %put ERROR- If resolved owners were written back as owner_resolved, update the Section 4;
     %put ERROR- filter to read that column instead.;
     %abort cancel;

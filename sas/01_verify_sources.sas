@@ -290,7 +290,7 @@ filename qccnt clear;
   %end;
 
   %if &n_sentinel > 0 %then %do;
-    %put ERROR: SRC-05 VIOLATION: &n_sentinel literal 'NULL' PRECEDE_STUDY_ID in &ds;
+    %put ERROR: SRC-05 VIOLATION: &n_sentinel literal NULL PRECEDE_STUDY_ID in &ds;
     %put ERROR- This is the md8 sentinel (PCM-F-05). It is not missing(), so it;
     %put ERROR- would survive the blank check and merge as a real key value.;
     %abort cancel;

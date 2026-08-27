@@ -1,6 +1,6 @@
 /*==========================================================================
   Program : 99_run_all.sas
-  Purpose : Full pipeline runner. Submits all seven phases in order in a
+  Purpose : Full pipeline runner. Submits all eight phases in order in a
             single clean SAS session. Any %abort cancel in an included
             program stops execution immediately; the log shows which phase
             failed.
@@ -13,10 +13,12 @@
     Phase 5  05_qc_merge.sas        -- QC assertions on merged file
     Phase 6  06_reconcile.sas       -- variable reconciliation
     Phase 7  07_cohort.sas          -- cohort definition & missingness
+    Phase 8  08_dictionary.sas      -- data dictionary (docs/DATA_DICTIONARY.xlsx)
 
   Expected final output
     g.master_data_merged   41,150 rows
     g.analytic_cohort      cohort subset
+    docs/DATA_DICTIONARY.xlsx  variable dictionary (gitignored; produced on the analyst machine)
     qc/                    all QC artifacts
     logs/                  all per-phase logs
 
@@ -122,11 +124,23 @@ options mprint nofmterr nodate nonumber ps=max ls=200;
 
 
 /* =========================================================================
+   PHASE 8 -- Documentation & Handoff
+   Reads g.master_data_merged and qclib.ownership_map (read-only).
+   Reads docs/data_dictionary_notes.txt for derivation metadata.
+   Writes docs/DATA_DICTIONARY.xlsx.
+   ========================================================================= */
+%put NOTE: ---- Phase 8: Documentation & Handoff --------------------;
+%include "&sas_path.\08_dictionary.sas";
+%put NOTE: ---- Phase 8 complete --------------------------------------;
+
+
+/* =========================================================================
    PIPELINE COMPLETE
    ========================================================================= */
 %put NOTE: ============================================================;
 %put NOTE: 99_run_all.sas -- all phases complete.;
 %put NOTE: g.master_data_merged and g.analytic_cohort are ready.;
+%put NOTE: docs/DATA_DICTIONARY.xlsx written to: &docs_path;
 %put NOTE: QC artifacts are in: &qc_path;
 %put NOTE: Logs are in:         &logs_path;
 %put NOTE: ============================================================;

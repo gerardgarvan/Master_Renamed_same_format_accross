@@ -9,15 +9,17 @@ All entries are ASCII only (session encoding is not UTF-8).
 
 | ID | Topic | Status | Owner |
 |----|-------|--------|-------|
-| PCM-D-01 | Death variable naming (Death_Date_Y_N / IsDead_Y_N / Death) | Pending | Erin |
-| PCM-D-02 | Frailty component encoding (char Y/N vs numeric) | Pending | Erin |
-| PCM-D-03 | ISO_SEV naming (md4/md8 vs others) | Pending | TBD |
-| PCM-D-04 | Emergent usability (near-zero positives) | Pending | TBD |
-| PCM-D-05 | Analytic cohort INPATIENT/OBSERVATION restriction | Pending | TBD |
-| PCM-D-06 | PRECEDE_Study_ID_1 drop vs retain | Resolved (drop, PREP-04) | Gerard |
-| PCM-D-07 | Age floor (minimum 64) | Pending | TBD |
-| PCM-D-08 | g library location | Resolved (P: drive, Phase 3) | Gerard |
-| PCM-D-09 | md3-owns missingness trade-off (Phase 4 merge) | Resolved (accepted, Phase 4) | Gerard |
+| PCM-D-01 | Death variable naming (Death_Date_Y_N / IsDead_Y_N / Death) | **Resolved 2026-08-27 -- keep separate** | Gerard |
+| PCM-D-02 | Frailty component encoding (char Y/N vs numeric _Value) | **Resolved 2026-08-27 -- keep separate** | Gerard |
+| PCM-D-03 | ISO_SEV naming (md4/md8 vs others) | **Resolved 2026-08-27 -- keep separate** | Gerard |
+| PCM-D-04 | Emergent usability (7 and 21 positives) | **Resolved 2026-08-27 -- retain despite rarity** | Gerard |
+| PCM-D-05 | Analytic cohort INPATIENT/OBSERVATION restriction | Pending -- Phase 7 | TBD |
+| PCM-D-06 | PRECEDE_Study_ID_1 drop vs retain | Resolved -- drop (PREP-04), proven identical first | Gerard |
+| PCM-D-07 | Age floor (minimum 64) | **Deferred 2026-08-27 -- not pursuing** | Gerard |
+| PCM-D-08 | The 9 envelope-violating rows | **Resolved 2026-08-27 -- flag, don't null** | Gerard |
+| PCM-D-09 | QC-05 operative-interval ceilings never fire | **Resolved 2026-08-27 -- drop them** | Gerard |
+| PCM-D-10 | Negatives in other rt_* variables | Pending -- needs the PREP-09 report | Gerard |
+| PCM-D-11 | md3-owns missingness trade-off | **Closed 2026-08-27 -- costs nothing** | Gerard |
 
 ---
 
@@ -51,6 +53,138 @@ sources. They should check the per-source prep datasets (g.prep_mdN) if imputati
 recovery from another source is later authorized.
 
 **Resolved:** 2026-08-26 | Owner: Gerard | Phase 4 Plan 01
+
+---
+
+## Resolutions -- 2026-08-27
+
+### PCM-D-01 -- Death variable naming: KEEP SEPARATE
+
+`Death_Date_Y_N` (md1-md5), `IsDead_Y_N` (md6) and `Death` (md7) land as three columns in the
+merged file. `_30_DAY_MORTALITY` and `Death_Days_After_Surgery` are separate measures and were
+never candidates for merging.
+
+**Rationale:** this project delivers an analysis-ready merged file, not analysis decisions.
+Collapsing three source-specific names into one asserts they measure the same thing, which
+nobody has verified. Keeping them separate preserves the information and lets whoever runs the
+mortality analysis make that call with the provenance flags in hand.
+
+**Consequence:** any mortality analysis must decide which column applies to which patients.
+`in_md1`-`in_md8` make that determinable. Note in the data dictionary.
+
+### PCM-D-02 -- Frailty component encoding: KEEP SEPARATE
+
+The five frailty items exist as character Y/N (md6, md7) and numeric `_Value` (md3, md5) -- ten
+columns for five concepts. All ten are retained.
+
+**Rationale:** the width difference that forced the md7 ownership override ($3 in md7 vs $1 in
+md6) is itself evidence the two encodings are not interchangeable. Reconciling them without
+knowing why they differ would be guessing.
+
+### PCM-D-03 -- ISO_SEV naming: KEEP SEPARATE
+
+`ISO_SEV_Exp_IntraOp_MAC_Average` (md1-md3), `ISO_SEV_IntraOp_MAC_Average` (md4) and
+`ISO_SEV_MAC_TOTAL_Exp` (md8) land as three columns.
+
+**Rationale:** md8's is a **TOTAL**, not an average -- it was never a naming variant and must
+stay separate on its own merits. The md4 name may be a variant of the md1-md3 name, but that
+is unverified.
+
+### PCM-D-04 -- Emergent: RETAIN despite rarity
+
+`Emergent` stays in the merged file at 0.05% / 0.09% positive (7 in md1, 21 in md8).
+
+**Rationale:** the rate is consistent across two independently exported cohorts, and the
+blank/missing share matches to within a tenth of a percent (7.92% vs 7.98%). Whatever the
+field means, it behaves consistently. Dropping a column is irreversible for downstream users;
+documenting its limitation is not.
+
+**Caveat for the data dictionary:** at 7 and 21 positives this is almost certainly a field
+clinicians rarely complete rather than a true emergency rate. `Patient_Type` and `Admit_Source`
+are likely better urgency proxies. Do not model on `Emergent` without checking that first.
+
+### PCM-D-07 -- Age floor: DEFERRED
+
+The observed minimum of 64 is not being investigated in this project.
+
+**Consequence:** the QC-05 `Age_at_Encounter` floor of 18 stays as a type-sanity guard and
+cannot fire. **Do not tighten it to 64** -- that would convert an unexamined question into a
+pipeline abort. Whoever defines the analytic cohort in Phase 7 inherits this.
+
+### PCM-D-08 -- The 9 envelope-violating rows: FLAG, DON'T NULL
+
+9 rows have an operative sub-interval longer than the room-occupancy interval containing it
+(5 on `rt_INCISE_to_DRESS_mins`, 4 on `rt_RM_START_to_INCISION_mins`). All values are positive
+and were inside the old QC-05 bounds.
+
+**Resolution:** add `rt_envelope_flag` (MRG-05), derived in the Phase 4 merge DATA step. Values
+are retained.
+
+**Rationale:** each of the three timestamps is individually plausible; only the combination is
+impossible, and nothing identifies which one is wrong. Nulling would destroy two good values to
+punish one bad one. A flag preserves all three and moves the judgment to the analyst.
+
+**Why Phase 4 and not Phase 3:** the ownership map is built in Phase 2 from the source files, so
+a variable invented during prep is not in it -- and MRG-04 asserts zero unmapped columns in the
+merged file. A prep-created flag would fail that assertion. Derived at merge time, it joins the
+exclusion list beside `n_sources` and `in_md1`-`in_md8`.
+
+**QC-06 is reframed** to assert zero *unflagged* violations. It passes now and still fires if a
+future re-extract introduces a violation the flag logic misses. Asserting zero violations would
+have meant a permanently red pipeline or eventually deleting the check.
+
+**Still open:** report the 9 upstream to the PeCAN data group. The flag makes the pipeline
+honest; it does not fix the extract.
+
+### PCM-D-09 -- Operative-interval ceilings: DROP
+
+The three QC-05 ceilings (`rt_INCISE_to_DRESS_mins` 2000, `rt_RM_START_to_INCISION_mins` 500,
+`rt_RM_START_to_RM_END_mins` 2000) are removed. QC-05 goes from 8 assertions to 5.
+
+**Rationale:** none of the three fired on any of 41,150 rows. Every QC-05 time failure was a
+negative value. A bound that has never fired and has no mechanism to fire is not a check -- it is
+an invitation to widen it later to make a run green.
+
+**What replaced them:** floors are handled at source by PREP-08 (negatives nulled); impossible
+combinations by QC-06. The SECTION 5c distribution report is retained as the record of the
+measurement that justified this.
+
+### PCM-D-11 -- md3-owns missingness: CLOSED, costs nothing
+
+**Question:** ownership gives md3 first claim on every variable it carries, so the merged file
+inherits md3's missing values and discards any value another source holds for the same patient.
+How much is lost?
+
+**Answer: nothing measurable.**
+
+| Variable | Comparison | Recoverable |
+|---|---|---|
+| `Admit_BMI` | md3 <- all seven others | 0 (PCM-F-07) |
+| `Cognitive_Score` | md3 <- md5 | 0 |
+| `Cognitive_Score` | md3 <- md6 | 0 |
+| `Frailty_Score` | md3 <- md5 | 0 |
+| `Frailty_Score` | md3 <- md6 | 0 |
+
+Where md3 carries a column and the value is blank, no other source has a value for that patient.
+Consistent with md3 being the fullest extract, not merely the widest. Recorded as **PCM-F-17**.
+
+**Caveat:** three variables, not all of them -- but these three drive the 6,523 complete-case N,
+so the ones that matter are checked. A patient present only in md3 cannot be recovered from
+anywhere, so zero here means "no recoverable overlap," not "no missingness."
+
+---
+
+## Standing note for the data dictionary
+
+Three concepts appear as multiple columns by decision, not by oversight:
+
+| Concept | Columns | Decision |
+|---|---|---|
+| Mortality flag | `Death_Date_Y_N`, `IsDead_Y_N`, `Death` | PCM-D-01 |
+| Frailty components | five char Y/N + five numeric `_Value` | PCM-D-02 |
+| ISO_SEV exposure | three columns; md8's is a TOTAL | PCM-D-03 |
+
+Anyone consuming the merged file needs to know these are deliberate.
 
 ---
 

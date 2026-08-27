@@ -544,6 +544,15 @@ proc sql noprint;
 quit;
 
 %macro null_scan;
+  /* %GLOBAL is required. The two branches set this variable by different
+     mechanisms: the zero branch uses %let, which is LOCAL by default and would
+     vanish at %mend, leaving %assert_eq below to resolve &n_null_merged to
+     nothing and fail with "character operand ... where a numeric operand is
+     required". The scan branch uses call symputx(...,'G'), which is global.
+     Declaring it here makes both paths global and the behaviour consistent.
+     The zero branch is the one that actually runs -- md8 owns no character
+     variables -- so without this the assertion fails on every run.          */
+  %global n_null_merged;
   %if &n_md8_char = 0 %then %do;
     %put NOTE: MRG -- md8 owns no character variables in the merged file.;
     %put NOTE- The NULL sentinel is unreachable by construction. md8 owned columns;

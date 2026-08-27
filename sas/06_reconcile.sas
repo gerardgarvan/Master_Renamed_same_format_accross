@@ -459,6 +459,12 @@ quit;
 %let pop_status = PASS;
 
 %macro flag_if_zero(n=, col=, owner=);
+  /* %GLOBAL is required and this one fails SILENTLY without it. pop_status is
+     initialised to PASS in open code; a bare %let inside this macro creates a
+     LOCAL copy that dies at %mend, so the global stays PASS and a genuine
+     populated-column failure is reported as a pass -- in the log, the banner,
+     and the committed QC file. No error, no warning, just a wrong verdict.   */
+  %global pop_status;
   %if &n = 0 %then %do;
     %put WARNING: POPULATED CHECK FAILED -- &col is present but entirely missing.;
     %put WARNING: The keep-separate resolution did not take for &col (&owner).;

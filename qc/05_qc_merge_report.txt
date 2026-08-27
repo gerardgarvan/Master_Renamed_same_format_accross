@@ -1,0 +1,52 @@
+05_qc_merge_report -- Run:   26AUG2026:22:09:31
+Post-merge QC over g.master_data_merged
+=============================================================
+QC-01 merged row count: 41150 (expected 41150)
+QC-02 char vars missing from width reference: 0 (expected 0)
+QC-02 truncated character variables: 0 (expected 0)
+QC-03 NULL strings in any character variable: 0 (expected 0)
+QC-04 Part B: md8-owned vars non-missing outside md8 rows -- all asserted zero (see log).
+QC-04 Part A: within-md8 non-missing counts (informational; md8 rows = 22,473):
+  Total_Midazolam_mg:             22473 (expected ~22473, ~100%)
+  Total_Phenylephrine_HCl_Pressors: 22473 (expected ~22473, ~100%)
+  ISO_SEV_MAC_TOTAL_Exp:          10788 (expected ~22473, ~100%)
+  AVG_ABP_Mean:                   4005 (expected ~4005, ~18%)
+  SD_ABP_Mean:                    4005 (expected ~4005, ~18%)
+  BIS_INDEX_LESS_30_COUNT:        3604 (expected ~3604, ~16%)
+  ABP_LESS_THAN_60_COUNT:         3519 (expected ~3519, ~16%)
+  NIBP_LESS_60_COUNT:             7549 (expected ~16-18%)
+Part A is informational, not asserted. Monitoring-derived columns (ABP_*, NIBP_*, BIS_*, SD_*,
+AVG_*) are expected at roughly 16-18% of md8 rows because those monitors are not used on most
+cases. Only the pressor/medication Total_* columns approach 22,473. A LOW count here is not
+evidence of a conversion failure.
+QC-05 clinical range checks -- 5 assertions (IS NOT MISSING guard applied to each):
+  Admit_BMI (10-100):                    0 out-of-range rows (expected 0)
+  ASA__Anesth_Record_ (1-6):             0 out-of-range rows (expected 0)
+  Age_at_Encounter (18-120):             0 out-of-range rows (expected 0)
+    [PCM-D-07 PENDING: floor 18 provisional; observed min is 64]
+  Cognitive_Score (0-3, NOT MMSE):       0 out-of-range rows (expected 0)
+  Frailty_Score (0-5, Fried phenotype):  0 out-of-range rows (expected 0)
+ 
+  QC-07: the three operative-interval CEILINGS were removed (PCM-D-09). They never
+  fired on 41,150 rows and every time failure was a negative. Floors are handled at
+  source by PREP-08; impossible combinations by QC-06 below.
+QC-06 operative sub-interval containment (both sides IS NOT MISSING guarded):
+  rows flagged by rt_envelope_flag:        9 (expected 9)
+    of which rt_INCISE_to_DRESS_mins:      5 (expected 5)
+    of which rt_RM_START_to_INCISION_mins: 4 (expected 4)
+  UNFLAGGED violations (asserted zero):    0
+  A sub-interval cannot exceed the room occupancy containing it. Values are
+  RETAINED and flagged, not nulled (PCM-D-08): each timestamp is individually
+  plausible and nothing identifies which of the three is wrong.
+  A flagged count other than 9 is not a failure, but it is a change worth reading.
+Operative-interval distribution (report only -- PCM-D-09 record):
+Variable                           N       Min       Max         Mean        Former ceiling
+------------------------------------------------------------------------------------------
+rt_INCISE_to_DRESS_mins            28858   -483      870         110.479     2000 (removed)
+rt_RM_START_to_INCISION_mins       36187   -188      334         34.78047    500 (removed)
+rt_RM_START_to_RM_END_mins         37159   0         1006        145.125     2000 (removed)
+ 
+Min must be >= 0 on all three -- PREP-08 nulled every negative at source.
+If a Max ever approaches its former ceiling, revisit QC-07.
+=============================================================
+ALL QC CHECKS PASSED (QC-01 through QC-07)

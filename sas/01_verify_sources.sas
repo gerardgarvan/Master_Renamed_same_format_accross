@@ -26,8 +26,8 @@
 options mprint;   /* macro-generated code visible in the log for audit */
 
 /* ---- Paths ---- */
-%let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
+%let source_path = C:\Master_Renamed_same_format_accross;
+%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
 libname src "&source_path" access=readonly;
 
 
@@ -38,7 +38,7 @@ libname src "&source_path" access=readonly;
 /* ---- Precondition 1: libname must resolve ---- */
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib could not be assigned. Check P: drive availability.;
+    %put ERROR: LIBNAME &lib could not be assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;

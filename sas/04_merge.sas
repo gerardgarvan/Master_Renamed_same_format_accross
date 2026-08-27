@@ -1,4 +1,4 @@
-/* Program: 04_merge.sas | Phase 4 | Requirements: MRG-01, MRG-04
+﻿/* Program: 04_merge.sas | Phase 4 | Requirements: MRG-01, MRG-04
    Purpose: Ownership-map-governed DATA step merge producing g.master_data_merged
             (41,150 rows). md3 is the spine (PCM-F-02, MRG-04). Ownership for every
             variable is resolved at run time from qclib.ownership_map; keep lists are
@@ -17,20 +17,20 @@
    SECTION 0: Options, paths, libname assignments
    =========================================================================
    Path notes:
-     g_path    = P: drive location for g.prep_mdN and g.master_data_merged.
+     g_path    = C: drive location for g.prep_mdN and g.master_data_merged.
                  SAS7BDAT files are gitignored; no PHI reaches the repo.
-     logs_path = P: drive logs directory (sibling of merge/ on the network share).
+     logs_path = C: drive logs directory (sibling of merge/ on the network share).
                  The merge log and provenance text file are committed artifacts
                  from the C: side; they contain only row counts, not PHI.
-     qc_path   = P: drive qc directory (sibling of merge/ on the network share); qclib libname points here to read
+     qc_path   = C: drive qc directory (sibling of merge/ on the network share); qclib libname points here to read
                  qclib.ownership_map (Phase 2 artifact).
    The g libname is left open at end of this program (no LIBNAME CLEAR) so
    that 99_run_all.sas can chain phases without re-assigning the library.
    ========================================================================= */
 options nodate nonumber ps=max ls=200 mprint nofmterr;
-%let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
-%let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let qc_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
+%let g_path    = C:\Master_Renamed_same_format_accross;
+%let logs_path = C:\Master_Renamed_same_format_accross\logs;
+%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
 libname g "&g_path";
 
 %put NOTE: ==== Phase 4 merge starting ====;

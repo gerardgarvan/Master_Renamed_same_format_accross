@@ -29,10 +29,10 @@ options mprint nofmterr;
   g library MUST be outside the repo tree (RESEARCH Pitfall 9 / PCM-C-04).
 ==========================================================================*/
 
-%let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
-%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree */
+%let source_path = C:\Master_Renamed_same_format_accross;
+%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
+%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
+%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 
@@ -44,7 +44,7 @@ libname g   "&g_path";
 
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib not assigned. Check P: drive availability.;
+    %put ERROR: LIBNAME &lib not assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;

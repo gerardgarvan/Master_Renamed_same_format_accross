@@ -1,4 +1,4 @@
-/* Program: 05_qc_merge.sas
+﻿/* Program: 05_qc_merge.sas
    Phase   : 5 -- Merge QC
    Purpose : Post-merge QC sentinel over g.master_data_merged (produced by Phase 4).
              Independent second-program assertions: QC-01 row count, QC-02 character
@@ -22,8 +22,8 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, %assert_eq macro
    =========================================================================
-   g_path, logs_path and qc_path all live under the P: merge tree. Everything this
-   pipeline reads or writes is on P:; nothing is written to the local repo.
+   g_path, logs_path and qc_path all live under C:\Master_Renamed_same_format_accross. Everything this
+   pipeline reads or writes is on C:; nothing is written to the local repo.
 
    CONSEQUENCE, stated so it is a choice and not an accident: qc/05_qc_merge_report.txt
    is no longer inside the git working tree, so it is not version-controlled and there is
@@ -33,9 +33,9 @@
    &qc_path (see the 1d precondition).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
-%let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
-%let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let qc_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
+%let g_path    = C:\Master_Renamed_same_format_accross;
+%let logs_path = C:\Master_Renamed_same_format_accross\logs;
+%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
 libname g "&g_path";
 
 /* PCM-R-05: %abort cancel must live inside a named macro definition. Copied verbatim from
@@ -95,7 +95,7 @@ quit;
    Fails here with a clear message rather than silently at the PROC SQL in Section 4,
    which would produce a confusing "table not found" error mid-QC.
    NOTE: Phase 2 wrote ownership_map.sas7bdat to the REPO qc/ folder on C:. With qc_path
-   now on P:, that file must be copied to &qc_path (or Phase 2 re-run against the P: path)
+   now at &qc_path 
    before this program can run. This precondition is what tells you so. */
 libname qclib "&qc_path";
 
@@ -110,7 +110,7 @@ quit;
     %put ERROR: QC PRECONDITION -- qclib.ownership_map not found at &qc_path..;
     %put ERROR- This is a Phase 2 artifact. Phase 2 wrote it to the repo qc/ folder on C:;;
     %put ERROR- copy ownership_map.sas7bdat into &qc_path, or re-run Phase 2 against the;
-    %put ERROR- P: qc path. Section 4 derives the md8-only variable list from it.;
+    %put ERROR- qc path. Section 4 derives the md8-only variable list from it.;
     %abort cancel;
   %end;
   %else %put NOTE: PRECONDITION OK -- qclib.ownership_map present.;

@@ -23,9 +23,9 @@ options mprint;   /* macro-generated code visible in the log for audit */
   SECTION 0: Paths and libnames
 ==========================================================================*/
 
-%let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
-%let docs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\docs;
+%let source_path = C:\Master_Renamed_same_format_accross;
+%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
+%let docs_path   = C:\Master_Renamed_same_format_accross\docs;
 libname src "&source_path" access=readonly;
 
 
@@ -37,7 +37,7 @@ libname src "&source_path" access=readonly;
 /* ---- Precondition 1: libname src must resolve ---- */
 %macro check_libname(lib=);
   %if %sysfunc(libref(&lib)) ne 0 %then %do;
-    %put ERROR: LIBNAME &lib could not be assigned. Check P: drive availability.;
+    %put ERROR: LIBNAME &lib could not be assigned. Check C:\Master_Renamed_same_format_accross is accessible.;
     %abort cancel;
   %end;
   %else %put NOTE: LIBNAME &lib resolved.;
@@ -76,7 +76,7 @@ libname src "&source_path" access=readonly;
 
 /* Raw enumeration -- src._ALL_ expands to every dataset in the library.
    This may include stale artifacts (master_data_all, master_data_dedup,
-   master_data_7b, master_data_merged) still present on the P: drive.
+   master_data_7b, master_data_merged) still present on the C: drive.
    The filter step below restricts to the eight canonical sources only.
    We keep work.allvars intact (PCM-R-01 / PCM-T-02 -- no in-place rewrite). */
 proc contents data=src._all_

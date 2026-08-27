@@ -1,4 +1,4 @@
-/* Program: 03b_recover_sweep.sas
+﻿/* Program: 03b_recover_sweep.sas
    Phase   : cross-cutting diagnostic (feeds PCM-D-11, MRG-04)
    Purpose : For EVERY ordered pair of prep sources and EVERY variable they
              share, count the rows where the first source is missing and the
@@ -42,9 +42,9 @@
 
 options nodate nonumber ps=max ls=200;
 
-%let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
-%let qc_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
-%let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
+%let g_path    = C:\Master_Renamed_same_format_accross;
+%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
+%let logs_path = C:\Master_Renamed_same_format_accross\logs;
 
 libname g     "&g_path";
 libname qclib "&qc_path";

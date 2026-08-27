@@ -20,10 +20,10 @@ options mprint nofmterr;
 /* =========================================================================
    SECTION 0: Paths and libnames
    ========================================================================= */
-%let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
-%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree -- RESEARCH Pitfall 9 */
+%let source_path = C:\Master_Renamed_same_format_accross;
+%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
+%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
+%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree -- RESEARCH Pitfall 9 */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 

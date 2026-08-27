@@ -20,10 +20,10 @@ options mprint nofmterr;
 /* =========================================================================
    SECTION 0 -- Paths (canonical values reused verbatim by Plans 02-05)
    ========================================================================= */
-%let source_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross;
-%let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
-%let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
+%let source_path = C:\Master_Renamed_same_format_accross;
+%let qc_path     = C:\Master_Renamed_same_format_accross\qc;
+%let logs_path   = C:\Master_Renamed_same_format_accross\logs;
+%let g_path      = C:\Master_Renamed_same_format_accross;   /* OUTSIDE the repo tree -- see RESEARCH Pitfall 9 */
 libname src "&source_path" access=readonly;
 libname g   "&g_path";
 
@@ -48,10 +48,10 @@ libname g   "&g_path";
   %else %put NOTE: &label directory present: &path.;
 %mend check_dir;
 
-/* Gate on src libref -- confirms P: drive is mapped */
+/* Gate on src libref -- confirms C:\Master_Renamed_same_format_accross is accessible */
 %check_libname(lib=src);
 
-/* Gate on g libref -- confirms P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\ exists (Task 1 of Plan 01) */
+/* Gate on g libref -- confirms C:\Master_Renamed_same_format_accross\ exists (Task 1 of Plan 01) */
 %check_libname(lib=g);
 
 /* Confirm output directories */

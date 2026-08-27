@@ -1,4 +1,4 @@
-/* Program: 06_reconcile.sas
+﻿/* Program: 06_reconcile.sas
    Phase   : 6 -- Variable Reconciliation
    Purpose : Read-only QC program over g.master_data_merged. Confirms the 16 deliberately-
              separate columns are present (D-01, D-02, D-03), counts the Emergent
@@ -75,13 +75,13 @@
 /* =========================================================================
    SECTION 0: Options, paths, libname, preconditions
    =========================================================================
-   g_path, logs_path and qc_path all live under the P: merge tree, consistent
+   g_path, logs_path and qc_path all live under C:\Master_Renamed_same_format_accross, consistent
    with all prior phases (copied from sas/05_qc_merge.sas SECTION 0).
    ========================================================================= */
 options nodate nonumber ps=max ls=200;
-%let g_path    = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
-%let logs_path = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
-%let qc_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
+%let g_path    = C:\Master_Renamed_same_format_accross;
+%let logs_path = C:\Master_Renamed_same_format_accross\logs;
+%let qc_path   = C:\Master_Renamed_same_format_accross\qc;
 libname g "&g_path";
 
 %put NOTE: ==== Phase 6 Variable Reconciliation starting -- read-only QC over g.master_data_merged ====;

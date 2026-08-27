@@ -102,7 +102,7 @@ quit;
 %mend _gate2;
 %_gate2;
 
-%put NOTE: [08_dictionary] Preconditions OK -- &n_merged rows in g.master_data_merged; &n_own rows in ownership_map.;
+%put NOTE: [08_dictionary] Preconditions OK -- &n_merged rows in g.master_data_merged, &n_own rows in ownership_map.;
 
 /* =========================================================================
    SECTION 1 -- COLUMN METADATA (dictionary.columns)
@@ -211,7 +211,7 @@ quit;
 %mend _gate4;
 %_gate4;
 
-%put NOTE: [08_dictionary] SECTION 3 OK -- ownership resolved; 0 CONFLICT rows.;
+%put NOTE: [08_dictionary] SECTION 3 OK -- ownership resolved, 0 CONFLICT rows.;
 
 /* =========================================================================
    SECTION 4 -- DERIVATION OVERLAY
@@ -346,7 +346,7 @@ quit;
 %mend _gate6;
 %_gate6;
 
-%put NOTE: [08_dictionary] SECTION 6 OK -- &n_final rows in dict_final; 0 missing sources.;
+%put NOTE: [08_dictionary] SECTION 6 OK -- &n_final rows in dict_final, 0 missing sources.;
 
 /* =========================================================================
    SECTION 7 -- ODS EXCEL OUTPUT

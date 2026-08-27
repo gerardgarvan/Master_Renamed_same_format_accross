@@ -378,7 +378,7 @@ quit;
   %if &n_orphan > 0 %then %do;
     %put ERROR: PCM-F-02 VIOLATION: md3 is NOT a superset -- &n_orphan IDs missing from md3;
     %put ERROR- Orphan IDs retained in work._not_in_md3 (column SOURCE_DS names the source).;
-    %put ERROR- Phase 4 assumes md3 is the spine; a merge would silently grow past 41,150 rows.;
+    %put ERROR- Phase 4 assumes md3 is the spine -- a merge would silently grow past 41,150 rows.;
     %abort cancel;
   %end;
   %else %put NOTE: PCM-F-02 OK -- md3 is a complete superset of md1,md2,md4-md8;

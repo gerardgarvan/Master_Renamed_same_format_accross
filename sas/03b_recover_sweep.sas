@@ -145,7 +145,7 @@ data work.pairvars_testable;
   where type_mismatch = 0;
 run;
 
-%put NOTE: &n_tests comparable variable-pairs to test; &n_skip skipped on type mismatch.;
+%put NOTE: &n_tests comparable variable-pairs to test -- &n_skip skipped on type mismatch.;
 
 
 /* =========================================================================

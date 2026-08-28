@@ -1,0 +1,315 @@
+sheet,dict_name,dict_type,description,source,note,sas_name
+MASTER_DATASET,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+MASTER_DATASET,ENCRYPTED_MRN,Foreign Key,Encrypted hospital medical record number (MRN),,,ENCRYPTED_MRN
+MASTER_DATASET,ENCRYPTED_ENCOUNTER,Foreign Key,Encrypted hospital encounter number (CSN),,,ENCRYPTED_ENCOUNTER
+MASTER_DATASET,rt_ANCHOR_to_ADMIT_days,num,"the relative admission date, which is the number of days elapsed since the anchor date, a undisclosed date in 2011",Clinical Encounters -> Admit DateTime,,rt_ANCHOR_to_ADMIT_days
+MASTER_DATASET,rt_ANCHOR_to_SURGERY_days,num,"the relative surgical case date, which is the number of days elapsed since the anchor date, a undisclosed date in 2011",Clinical Encounters -> Case Date,,rt_ANCHOR_to_SURGERY_days
+MASTER_DATASET,rt_ANCHOR_to_DISCHG_days,num,"the relative discharge date, which is the number of days elapsed since the anchor date, a undisclosed date in 2011",Clinical Encounters -> Dischg DateTime,,rt_ANCHOR_to_DISCHG_days
+MASTER_DATASET,rt_ADMIT_to_AN_START_mins,num,"the relative time of OR anesthesia start, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Anesthesia Start Datetime,,rt_ADMIT_to_AN_START_mins
+MASTER_DATASET,rt_ADMIT_to_AN_END_mins,num,"the relative time of OR anesthesia end, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Anesthesia Stop Datetime,,rt_ADMIT_to_AN_END_mins
+MASTER_DATASET,rt_ADMIT_to_BLOCK_START_mins,num,"the relative time of Block start, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Anes Block Start Datetime,,rt_ADMIT_to_BLOCK_START_mins
+MASTER_DATASET,rt_ADMIT_to_BLOCK_END_mins,num,"the relative time of Block end, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Anes Block End Datetime,,rt_ADMIT_to_BLOCK_END_mins
+MASTER_DATASET,rt_ADMIT_to_RM_START_mins,num,"the relative time of OR room start, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Room Start Datetime,,rt_ADMIT_to_RM_START_mins
+MASTER_DATASET,rt_ADMIT_to_RM_END_mins,num,"the relative time of OR room end, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Room End Datetime,,rt_ADMIT_to_RM_END_mins
+MASTER_DATASET,rt_ADMIT_to_INCISION_mins,num,"the relative time of surgery start, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Incision Datetime,,rt_ADMIT_to_INCISION_mins
+MASTER_DATASET,rt_ADMIT_to_DRESS_mins,num,"the relative time of surgery end, which is the length of time in minutes elapsed since admission",Clinical Encounters -> Dressing Datetime,,rt_ADMIT_to_DRESS_mins
+MASTER_DATASET,rt_INCISE_to_DRESS_mins,num,"the relative time of surgery end, which is the length of time in minutes elapsed since incision","Clinical Encounters -> Incision Datetime, Clinical Encounters -> Dressing Datetime",,rt_INCISE_to_DRESS_mins
+MASTER_DATASET,rt_RM_START_to_RM_END_mins,num,the relative time of OR room start to OR room end time in minutes,"Clinical Encounters -> Room Start Datetime, Clinical Encounters -> Room End Datetime",,rt_RM_START_to_RM_END_mins
+MASTER_DATASET,rt_AN_START_to_AN_END_mins,num,the relative time of anesthesia start to anesthesia stop time in minutes,"Clinical Encounters -> Anesthesia Start Datetime, Clinical Encounters -> Anesthesia Stop Datetime",,rt_AN_START_to_AN_END_mins
+MASTER_DATASET,rt_BLOCK_START_TO_BLOCK_END_mins,num,the relative time of block start to block end time in minutes,Clinical Encounters -> Dressing Datetime,,rt_BLOCK_START_TO_BLOCK_END_mins
+MASTER_DATASET,Day of Week (CHAR),num,"the day of the week (e.g., Sun, Mon, ..., Sat)",Clinical Encounters -> Day of Week (CHAR),,Day_of_Week__CHAR
+MASTER_DATASET,Holidays,num,US holiday indicators,Clinical Encounters -> Holidays,,Holidays
+MASTER_DATASET,Weekend_Indicator,char(1),weekend indicator ('Y' is weekend; 'N' is weekdays),derived,,Weekend_Indicator
+MASTER_DATASET,Age at Encounter,num,Patient age at admission (changed to 90 if age is 90 or above),Clinical Encounters -> Age at Encounter,,Age_at_Encounter
+MASTER_DATASET,EmployeeStatus,char(25),Patient employement subject status,,,EmployeeStatus
+MASTER_DATASET,Education,char(),Highest level of education (last record before surgery),EPICFLO -> (FLO_MEAS_ID= 3049800025 ),matched thru MRN,Education
+MASTER_DATASET,Race,char(15),Patient race,Clinical Encounters -> Race,,Race
+MASTER_DATASET,Ethnicity,char(15),Patient ethnicity,Clinicl Encounters -> Ethnicity,,Ethnicity
+MASTER_DATASET,Sex,char(6),Patient gender,Clinical Encounters -> Sex,,Sex
+MASTER_DATASET,MARITAL_STATUS,char(25),Patient marital status at encounter,Clinical Encounters -> Martital Status,,MARITAL_STATUS
+MASTER_DATASET,BMI_ADMIT,num,BMI at admission,Clinical Encounters -> Admit BMI,,BMI_ADMIT
+MASTER_DATASET,Service,char(35),type of surgical service,Clinical Encounters -> Service,,Service
+MASTER_DATASET,ROOM_TYPE,char(),"Operation Room Type (Main OR - North/South, CATH Lab, etc.)",Clinical Encounters -> Room Type,,ROOM_TYPE
+MASTER_DATASET,ASA (Anesth Record),char(1),ASA score,Clinical Encounters -> ASA,SmartForm 769 ; SmrtData Identifier='EPIC#10040',ASA__Anesth_Record
+MASTER_DATASET,Emergent Y/N (Anesth Record),char(1),ASA Emergent status (1 is emergent; otherwise is missing),Clinical Encounters -> Emergent Y/N,SmartForm 769 ; SmrtData Identifier='EPIC#10041',Emergent_Y_N__Anesth_Record
+MASTER_DATASET,Base_Procedure_1,char(200),UF procedure code 1 description,Clinical Encounters -> Base Procedure 1,,Base_Procedure_1
+MASTER_DATASET,Base_Procedure_Code_1,char(6),UF procedure code 1,Clinical Encounters -> Base Procedure Code 1,,Base_Procedure_Code_1
+MASTER_DATASET,CPT_1,char(8),CPT code 1,Clinical Encounters -> CPT 1,,CPT_1
+MASTER_DATASET,CPT_1_DESC,char(70),CPT code 1 description,Clinical Encounters -> CPT 1 Description,,CPT_1_DESC
+MASTER_DATASET,PATIENT_TYPE,char(),"Patient Type (e.g. Inpatient, Observation, etc.)",Clinical Encounters -> Patient Type,,PATIENT_TYPE
+MASTER_DATASET,LOS,num,Length of Stay in days (inpatient/observation),Billing Accounts -> LOS,,LOS
+MASTER_DATASET,LOS in Hours,num,Length of Stay in hours (inpatient/observation),Billing Accounts -> LOS in Hours,,LOS_in_Hours
+MASTER_DATASET,Payer,char(20),"The payer associated with the primary insurance. Payers are group such as Blue Cross, Medicaid, etc. When no Payer is listed in the data, the logic checks the Guarantor Types that include research funding. If present, the payer is shown as OTHER. All other patients are considered SELF PAY.",Billing Accounts -> Payer,,Payer
+MASTER_DATASET,charges,num,Total hospital charges (ancillary charges + room charges),Billing Accounts -> Charges,,charges
+MASTER_DATASET,ICD10_Principal_Diagnosis_Desc,char(),Primary ICD10-CM diagnosis code,Billing Accounts -> ICD10 Principal Diagnosis Desc,,ICD10_Principal_Diagnosis_Desc
+MASTER_DATASET,ICD10_Principal_Diagnosis,char(),Primary ICD10-CM diagnosis code description,Billing Accounts -> ICD10 Principal Diagnosis,,ICD10_Principal_Diagnosis
+MASTER_DATASET,Charlson_Comorbidity_Index,int,Charlson Comorbidity Index (2011 ver.),Billing Accounts -> Total Score 2011,,Charlson_Comorbidity_Index
+MASTER_DATASET,COMP10_T80 - COMP10_T88,int,ICD10-CM Hospital complication codes indicators by scanning  ICD10-CM Dx1-50 (1is pertinent complication detected; otherwise is 0,derived from Dx1-Dx51,,COMP10_T80___COMP10_T88
+MASTER_DATASET,complication_sum,int,sum of complication code flags,derived from complication code flags,,complication_sum
+MASTER_DATASET,Intraop_Ketamine,char(1),"Med given = KETEMINE, INTEROP = True","Clinical Encounters -> Intra-Op Med Y/N, Clinical Encounters ->  Med Name",,Intraop_Ketamine
+MASTER_DATASET,Preop_block,char(1),Is there a PREOP Block,If there is a block start?,,Preop_block
+MASTER_DATASET,Admit Source,char,From where the patient was admitted,,,Admit_Source
+MASTER_DATASET,Dischg Disposition,char,Where the patient was discharged to.,,,Dischg_Disposition
+MASTER_DATASET,30_DAY_MORTALITY,char,"Mortality after 30 days Yes, No",,,_30_DAY_MORTALITY
+MASTER_DATASET,Death_Date Y/N,char,Is there a death date in EPIC,,,Death_Date_Y_N
+MASTER_DATASET,SSDI Death Date Y/N,char,Is there a SSDI death date in EPIC,,,SSDI_Death_Date_Y_N
+MASTER_DATASET,Anesthesia Type,char,The type of anesthesia performed,,,Anesthesia_Type
+MASTER_DATASET,Sleep_Apnea_YN,char,Has ICD code for Sleep Apnea,,,Sleep_Apnea_YN
+MASTER_DATASET,Diabetes_YN,char,Has ICD code for Diabetes,,,Diabetes_YN
+MASTER_DATASET,Hyperlipidemia_YN,char,Has ICD code for Hyperlipidemia,,,Hyperlipidemia_YN
+MASTER_DATASET,Hypertension_YN,char,Has ICD code for Hypertension,,,Hypertension_YN
+MASTER_DATASET,MovementDisorder_YN,char,Has ICD code for Movement Disorder,,,MovementDisorder_YN
+MASTER_DATASET,CognitiveDisorder_YN,char,Has ICD code for Cognitive Disorder,,,CognitiveDisorder_YN
+MASTER_DATASET,Latitude,double,Latitude of patient residence,,,Latitude
+MASTER_DATASET,Longitude,double,Longitude of patient residence,,,Longitude
+DERIVED_VARIABLES_MASTER,PRECEDE Study ID,Primary Key,subject ID,MASTER_DATASET,,PRECEDE_Study_ID
+DERIVED_VARIABLES_MASTER,Propofol_mg_IntraOp_Total,num,Total mg for Itraop Propofol from Periop Meds,PERIOP_MEDS,,Propofol_mg_IntraOp_Total
+DERIVED_VARIABLES_MASTER,Ketamine_mg_IntraOp_Total,num,Total mg for Itraop Ketamine from Periop Meds,PERIOP_MEDS,,Ketamine_mg_IntraOp_Total
+DERIVED_VARIABLES_MASTER,fentaNYL_SUBLIMAZE_mg_IntraOp_Total,num,Total mg for Itraop Fentanyl from Periop Meds,PERIOP_MEDS,,fentaNYL_SUBLIMAZE_mg_IntraOp_To
+DERIVED_VARIABLES_MASTER,Sufentanil_mg_IntraOp_Total,num,Total mg for Itraop Sufentanil from Periop Meds,PERIOP_MEDS,,Sufentanil_mg_IntraOp_Total
+DERIVED_VARIABLES_MASTER,Hydromorphone_mg_IntraOp_Total,num,Total mg for Itraop Hydromorphone from Periop Meds,PERIOP_MEDS,,Hydromorphone_mg_IntraOp_Total
+DERIVED_VARIABLES_MASTER,Lidocaine_mg_IntraOp_Total,num,Total mg for Itraop Lidocaine from Periop Meds,PERIOP_MEDS,,Lidocaine_mg_IntraOp_Total
+DERIVED_VARIABLES_MASTER,Oral_Morphine_Equiv_IntraOp_Total_mg,num,Total mg for Itraop Morphine Equiv to oral from Periop Meds,PERIOP_MEDS,,Oral_Morphine_Equiv_IntraOp_Tota
+DERIVED_VARIABLES_MASTER,ISO_Exp_IntraOp_Total,num,Total ISO exp IntraOp,INTRAOP_FLO_MEAS,,ISO_Exp_IntraOp_Total
+DERIVED_VARIABLES_MASTER,ISO_Exp_IntraOp_MAC_Average,num,Total MAC Average ISO exp IntraOp,INTRAOP_FLO_MEAS,,ISO_Exp_IntraOp_MAC_Average
+DERIVED_VARIABLES_MASTER,ISO_Exp_IntraOp_MAC_Minutes_Total,num,Total MAC Minutes ISO exp IntraOp,INTRAOP_FLO_MEAS,,ISO_Exp_IntraOp_MAC_Minutes_Tota
+DERIVED_VARIABLES_MASTER,ISO_Exp_IntraOp_MAC_Total,num,Total MAC ISO exp IntraOp,INTRAOP_FLO_MEAS,,ISO_Exp_IntraOp_MAC_Total
+DERIVED_VARIABLES_MASTER,SEV_Exp_IntraOp_Total,num,Total SEV exp IntraOp,INTRAOP_FLO_MEAS,,SEV_Exp_IntraOp_Total
+DERIVED_VARIABLES_MASTER,SEV_IntraOp_MAC_Average,num,Total MAC Average SEV exp IntraOp,INTRAOP_FLO_MEAS,,SEV_IntraOp_MAC_Average
+DERIVED_VARIABLES_MASTER,SEV_IntraOp_MAC_Minutes_Total,num,Total MAC Minutes SEV exp IntraOp,INTRAOP_FLO_MEAS,,SEV_IntraOp_MAC_Minutes_Total
+DERIVED_VARIABLES_MASTER,SEV_IntraOp_MAC_Total,num,Total MAC SEV exp IntraOp,INTRAOP_FLO_MEAS,,SEV_IntraOp_MAC_Total
+DERIVED_VARIABLES_MASTER,ISO_SEV_IntraOp_MAC_Average,num,Total MAC Average ISO/SEV exp IntraOp,INTRAOP_FLO_MEAS,,ISO_SEV_IntraOp_MAC_Average
+DERIVED_VARIABLES_MASTER,Propofol_GIVEN_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Propofol given,PERIOP_MEDS,,Propofol_GIVEN_mg_POD_1_7_Total
+DERIVED_VARIABLES_MASTER,Ketamine_GIVEN_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Ketamine given,PERIOP_MEDS,,Ketamine_GIVEN_mg_POD_1_7_Total
+DERIVED_VARIABLES_MASTER,fentaNYL_SUBLIMAZE_GIVEN_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Fentanyl given,PERIOP_MEDS,,fentaNYL_SUBLIMAZE_GIVEN_mg_POD_
+DERIVED_VARIABLES_MASTER,Sufentanil_GIVEN_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Sufentanil given,PERIOP_MEDS,,Sufentanil_GIVEN_mg_POD_1_7_Tota
+DERIVED_VARIABLES_MASTER,Hydromorphone_GIVEN_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Hydromorphone given,PERIOP_MEDS,,Hydromorphone_GIVEN_mg_POD_1_7_T
+DERIVED_VARIABLES_MASTER,Lidocaine_GIVEN_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Lidocaine given,PERIOP_MEDS,,Lidocaine_GIVEN_mg_POD_1_7_Total
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_1_7_Total,num,Postoperative days 1 thru 7 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_1_7_T
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY1,num,Postoperative day 1 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY1
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY2,num,Postoperative day 2 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY2
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY3,num,Postoperative day 3 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY3
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY4,num,Postoperative day 4 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY4
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY5,num,Postoperative day 5 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY5
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY6,num,Postoperative day 6 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY6
+DERIVED_VARIABLES_MASTER,ORAL_MORPHINE_EQUIV_mg_POD_DAY7,num,Postoperative day 7 total Oral Morphine Equiv given,PERIOP_MEDS,,ORAL_MORPHINE_EQUIV_mg_POD_DAY7
+DERIVED_VARIABLES_MASTER,ICU_LOS_TOTAL_TIME_HOURS,num,ICU length of stay in hours,CU_LOS_DETAIL_EXIT,,ICU_LOS_TOTAL_TIME_HOURS
+MASTER_DATASET_PAIN,PRECEDE Study ID,ID,the subject ID provided by PI,,,PRECEDE_Study_ID
+MASTER_DATASET_PAIN,rt_RM_END_to_RECORDED_mins,num,"the relative time of flowsheet measure got recorded, which is the length of time that has elapsed since OR stop time (we collect pain/mobility info up to 7 days after OR stop time, or discharge, whichever comes first.)",EPICFLO-> Recorded Time,,rt_RM_END_to_RECORDED_mins
+MASTER_DATASET_PAIN,rt_RM_END_to_RECORDED_days,num,"(same as above, except the length of time in days)",,,rt_RM_END_to_RECORDED_days
+MASTER_DATASET_PAIN,Pain_raw,char(14),"the raw values of Pain Scale (UF) - DVPRS (values: 0-10, or ‘Patient Asleep’), which may contains any values being inputted.",EPICFLO -> Meas Value (FLO_MEAS_ID = 304655516 ),,Pain_raw
+MASTER_DATASET_PAIN,pain_num,num,only numeric values of pain_raw (Asleep is converted to 0),derived,,pain_num
+MASTER_DATASET_PAIN,pain_severity,char(10),"pain severity levels according to pain scores
+No pain (0, 'Patient Asleep')
+Mild (1, 2, 3, 4)
+Moderate (5, 6)
+Severe (7, 8, 9, 10)",derived,,pain_severity
+MASTER_DATASET_PAIN,time_category,char,"Time recorded, day, night, 0700-1900 or 1900-0700",,,time_category
+MASTER_DATASET_PAIN,MASTER_DATASET,record,,,,MASTER_DATASET
+PERIOP_MEDS,PRECEDE Study ID,ID,the subject ID provided by PI,,,PRECEDE_Study_ID
+PERIOP_MEDS,MASTER RECORD,record,data from MASTER DATASET,,,MASTER_RECORD
+PERIOP_MEDS,rt_RM_START_to_TAKEN_mins,num,"the relative time of patient taking medication, which is the length of time that has elapsed since OR start time (negative value means before OR start time)",Clinical Encounters -> Taken Datetime,,rt_RM_START_to_TAKEN_mins
+PERIOP_MEDS,rt_RM_START_to_TAKEN_days,num,days elapsed since OR start time,Clinical Encounters -> Taken Datetime,,rt_RM_START_to_TAKEN_days
+PERIOP_MEDS,Intra-Op Med Y/N,char(1),indicator of intraop medication ('Y' is intraop medication; otherwise is 'N'),Clinical Encounters -> Intra-Op Med Y/N,,Intra_Op_Med_Y_N
+PERIOP_MEDS,MAR_ACTION,char(25),"medication given status (GIVEN, NEW BAG, RATE CHANGE and STOP)",Clinical Encounters -> MAR Action,,MAR_ACTION
+PERIOP_MEDS,MED_ORDER_DOSING_WEIGHT,,,,,MED_ORDER_DOSING_WEIGHT
+PERIOP_MEDS,MED_ORDER_DISPLAY_NAME,,,,,MED_ORDER_DISPLAY_NAME
+PERIOP_MEDS,MED_NAME,char(60),UF medication name,Clinical Encounters -> Med Name,,MED_NAME
+PERIOP_MEDS,MED_FORM,char(45),Medication form (e.g. ‘Tablet’),Clinical Encounters -> Med Form,,MED_FORM
+PERIOP_MEDS,MED_ROUTE,char(15),Medication route (e.g. ‘Oral’),Clinical Encounters -> Med Route,,MED_ROUTE
+PERIOP_MEDS,MED_STRENGTH,char(15),Medication strength (e.g. ‘1 MG/ML’),Clinical Encounters -> Med Strength,,MED_STRENGTH
+PERIOP_MEDS,Dosage,num,total medication administered dosage,Clinical Encounters -> Total Dose,,Dosage
+PERIOP_MEDS,Dosage_Unit,char(10),Dose unit (e.g. ‘mg’),Clinical Encounters -> Med Dose Unit Desc,,Dosage_Unit
+PERIOP_MEDS,Med Duration Desc,num,infusion duration,Clinical Encounters -> Med Duration Desc,,Med_Duration_Desc
+PERIOP_MEDS,Med Duration Unit Desc,char(10),infusion duration time unit,Clinical Encounters -> Med Duration Unit Desc,,Med_Duration_Unit_Desc
+PERIOP_MEDS,Med Infusion Rate,num,infusion rate,Clinical Encounters -> Med Infusion Rate,,Med_Infusion_Rate
+PERIOP_MEDS,Med Infusion Rate Unit Desc,char(10),infusion rate unit,Clinical Encounters -> Med Infusion Rate Unit Desc,,Med_Infusion_Rate_Unit_Desc
+PERIOP_MEDS,Med Code,num,UF medication code,Clinical Encounters -> Med Code,,Med_Code
+PERIOP_MEDS,Med Therapy Class,char(),medication therapy class,Clinical Encounters -> Med Therapy Class,,Med_Therapy_Class
+PERIOP_MEDS,Pharmacy Class,char(),medication classifcation,Clinical Encounters -> Pharmacy Class,,Pharmacy_Class
+PERIOP_MEDS,Pharmacy Subclass,char(),medication sub-classification,Clinical Encounters -> Pharmacy Subclass,,Pharmacy_Subclass
+PERIOP_MEDS,ORAL_MORPHINE_EQUIV_mg,num,Oral morphine equivlants in MG,Calculated,,ORAL_MORPHINE_EQUIV_mg
+INTRAOP_RPOV,ENCRYPTED_ID_CASE,Primary Key,Encrypted surgical case number,Clinical Encounters -> Hospital Encounter #,,ENCRYPTED_ID_CASE
+INTRAOP_RPOV,ENCRYPTED_ID_PROV,ID,Encrypted provider ID,Clinical Encounters -> Staff ID,,ENCRYPTED_ID_PROV
+INTRAOP_RPOV,rt_ANCHOR_to_SURGERY_days,num,"the relative surgical case date, which is the number of days elapsed since the anchor date, a undisclosed date in 2011",Clinical Encounters -> Case Date,,rt_ANCHOR_to_SURGERY_days
+INTRAOP_RPOV,PROV_TYPE,char(35),"provider types, such as physician, anesthesiologist, etc.",CLARITY -> PROV_TYPE,,PROV_TYPE
+INTRAOP_RPOV,PROV_TYPE_GRP,char(10),"provider groups, such as DOCTOR, ANEST, NURSE and OTHER",(see prov grouping tab),,PROV_TYPE_GRP
+INTRAOP_RPOV,rt_RM_START_to_RM_END_mins,num,the length of time elapsed from OR start time to OR end time. This is same as 'Room Elapsed' in Master_Dataset,Clinical Encounters -> Room Elapsed,,rt_RM_START_to_RM_END_mins
+INTRAOP_FLO_MEAS,PRECEDE Study ID,ID,the subject ID provided by PI,,,PRECEDE_Study_ID
+INTRAOP_FLO_MEAS,rt_RM_START_to_RECORDED_mins,Num,"the relative vital values recorded time, which is the length of time that has elapsed since patient is in the OR.",,,rt_RM_START_to_RECORDED_mins
+INTRAOP_FLO_MEAS,rt_RM_START_to_AN_START_mins,Num,the elapsed time from OR start to anesthesia start,,,rt_RM_START_to_AN_START_mins
+INTRAOP_FLO_MEAS,rt_RM_START_to_INCISION_mins,Num,the elapsed time from OR start to incision,,,rt_RM_START_to_INCISION_mins
+INTRAOP_FLO_MEAS,rt_RM_START_to_DRESS_mins,Num,the elapsed time from OR start to dressing,,,rt_RM_START_to_DRESS_mins
+INTRAOP_FLO_MEAS,rt_RM_START_to_AN_END_mins,Num,the elapsed time from OR start to anesthesia end,,,rt_RM_START_to_AN_END_mins
+INTRAOP_FLO_MEAS,rt_RM_START_to_RM_END_mins,Num,the elapsed time from OR start to OR end,,,rt_RM_START_to_RM_END_mins
+INTRAOP_FLO_MEAS,NIBP,Char(7),Non-invasive blood pressure (e.g. ‘94/55’),,matched thru CSN(Anes),NIBP
+INTRAOP_FLO_MEAS,NIBP_mean,num,Non-invasive blood pressure mean,,matched thru CSN(Anes),NIBP_mean
+INTRAOP_FLO_MEAS,ABP,Char(7),Arterial Blood Pressure (e.g. ‘130/60’),,matched thru CSN(Anes),ABP
+INTRAOP_FLO_MEAS,ABP_mean,num,Arterial Blood Pressure mean,,matched thru CSN(Anes),ABP_mean
+INTRAOP_FLO_MEAS,HR_monitor,num,Heart rate from monitor,,matched thru CSN(Anes),HR_monitor
+INTRAOP_FLO_MEAS,HR_SpO2,num,Heart rate from oximetry,,matched thru CSN(Anes),HR_SpO2
+INTRAOP_FLO_MEAS,SpO2,num,Pulse oximetry,,matched thru CSN(Anes),SpO2
+INTRAOP_FLO_MEAS,BIS_Index,num,Bispectral Index,,matched thru CSN(Anes),BIS_Index
+INTRAOP_FLO_MEAS,ETCO2,num,End Tidal CO2,,matched thru CSN(Anes),ETCO2
+INTRAOP_FLO_MEAS,ETCO2_Avance,num,End Tidal CO2 Avance,,matched thru CSN(Anes),ETCO2_Avance
+INTRAOP_FLO_MEAS,ETCO2_RR,num,End Tidal CO2 Respiratory Rate,,matched thru CSN(Anes),ETCO2_RR
+INTRAOP_FLO_MEAS,AWRR,num,Airway Respiration Rate,,matched thru CSN(Anes),AWRR
+INTRAOP_FLO_MEAS,RR,num,Respiration Rate,,matched thru CSN(Anes),RR
+INTRAOP_FLO_MEAS,PEEP_set,num,Positive End-Expiratory Pressure setting,,matched thru CSN(Anes),PEEP_set
+INTRAOP_FLO_MEAS,PIP,num,Peak Inspiratory Pressure,,matched thru CSN(Anes),PIP
+INTRAOP_FLO_MEAS,PPV,num,Pulse Pressure Variation,,matched thru CSN(Anes),PPV
+INTRAOP_FLO_MEAS,TV_Et,num,Tidal Volume Exhaled,,matched thru CSN(Anes),TV_Et
+INTRAOP_FLO_MEAS,FiO2,num,Fraction of Inspired Oxygen,,matched thru CSN(Anes),FiO2
+INTRAOP_FLO_MEAS,N2O_Exp,num,Expired N2O,,matched thru CSN(Anes),N2O_Exp
+INTRAOP_FLO_MEAS,N2O_Insp,num,Inspired N2O,,matched thru CSN(Anes),N2O_Insp
+INTRAOP_FLO_MEAS,ISO_Exp,num,Isoflurance expiration,,matched thru CSN(Anes),ISO_Exp
+INTRAOP_FLO_MEAS,ISO_Insp,num,Isoflurance inspiration,,matched thru CSN(Anes),ISO_Insp
+INTRAOP_FLO_MEAS,SEV_Exp,Num,Expired SEVO,,matched thru CSN(Anes),SEV_Exp
+INTRAOP_FLO_MEAS,SEV_Insp,Num,Inspired SEVO,,matched thru CSN(Anes),SEV_Insp
+INTRAOP_FLO_MEAS,Temp,num,Temperature from monitor,,matched thru CSN(Anes),Temp
+INTRAOP_FLO_MEAS,Temp_esoph,num,Esophageal temperature,,matched thru CSN(Anes),Temp_esoph
+INTRAOP_FLO_MEAS,Temp_naso,num,Nasopharangeal temperature,,matched thru CSN(Anes),Temp_naso
+INTRAOP_FLO_MEAS,Temp_skin,num,Skin temperature,,matched thru CSN(Anes),Temp_skin
+INTRAOP_FLO_MEAS,Temp_bladder,Num,Bladder temperature,,matched thru CSN(Anes),Temp_bladder
+INTRAOP_FLO_MEAS,Temp_core,Num,Core temperature,,matched thru CSN(Anes),Temp_core
+INTRAOP_FLO_MEAS,Temp_rectal,Num,Rectal temperature,,matched thru CSN(Anes),Temp_rectal
+Delirium,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+Delirium,Count of psychotic drug given,Integer,Count how many psychotic drugs were given to the patient.,,,Count_of_psychotic_drug_given
+Delirium,Presence of Preop Pyscotic Disorder (Y/N),Bool Y/N,"ICD 10-CM complication code description: ICD10 Principal Diagnosis-ICD10 Diagnosis 50-F20-F29, F05, F06, F06.8 (Reference website:    https://www.icd10data.com/ICD10CM/Codes/F01-F99/F20-F29)",IDC 10-Complication codeset,,Presence_of_Preop_Pyscotic_Disor
+CU_LOS_DETAIL_EXIT,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+CU_LOS_DETAIL_EXIT,FROM_HOSP_ORG_LVL4_DESC,String,Where the patient came from,,,FROM_HOSP_ORG_LVL4_DESC
+CU_LOS_DETAIL_EXIT,FROM_BED_TYPE,String,What the bed type was,,,FROM_BED_TYPE
+CU_LOS_DETAIL_EXIT,ON_HOSP_ORG_LVL4_DESC,String,Where the patient stayed,,,ON_HOSP_ORG_LVL4_DESC
+CU_LOS_DETAIL_EXIT,ON_BED_TYPE,String,What the bed type was,,,ON_BED_TYPE
+CU_LOS_DETAIL_EXIT,TO_HOSP_ORG_LVL4_DESC,String,Where the patient went to,,,TO_HOSP_ORG_LVL4_DESC
+CU_LOS_DETAIL_EXIT,TO_BED_TYPE,String,What the bed type was,,,TO_BED_TYPE
+CU_LOS_DETAIL_EXIT,ENTER_DT,Date Time,DATE TIME arrived,,,ENTER_DT
+CU_LOS_DETAIL_EXIT,EXIT_DT,Date Time,DATE TIME left,,,EXIT_DT
+CU_LOS_DETAIL_EXIT,TIME_IN_HOURS,integer,Total time in hours,,,TIME_IN_HOURS
+CU_LOS_DETAIL_EXIT,TIME_IN_MINUTES,integer,Total time in minutes,,,TIME_IN_MINUTES
+CAM_ICU,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+CAM_ICU,RECORDED_TIME,DATE TIME,Date time of measurement,,,RECORDED_TIME
+CAM_ICU,FLO_MEAS_NAME,String,Measurement name,,,FLO_MEAS_NAME
+CAM_ICU,DISP_NAME,String,Display name,,,DISP_NAME
+CAM_ICU,MEAS_VALUE,String,Result,,,MEAS_VALUE
+APPT_30_DAYS_AFTER_SURGERY,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_INDUCTION_mins,integer,Elapse time from room start to induction in minutes,,,rt_RM_START_to_INDUCTION_mins
+APPT_30_DAYS_AFTER_SURGERY,rt_RM_START_to_EMERGENCE_mins,integer,Elapse time from room start to emergence,,,rt_RM_START_to_EMERGENCE_mins
+APPT_30_DAYS_AFTER_SURGERY,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+APPT_30_DAYS_AFTER_SURGERY,Minutes_After_Surgery,integer,Minutes after room end.,,,Minutes_After_Surgery
+FIBRINOGEN_30_DAYS_AFTER_SURG..,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_INDUCTION_mins,integer,Elapse time from room start to induction in minutes,,,rt_RM_START_to_INDUCTION_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,rt_RM_START_to_EMERGENCE_mins,integer,Elapse time from room start to emergence,,,rt_RM_START_to_EMERGENCE_mins
+FIBRINOGEN_30_DAYS_AFTER_SURG..,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+FIBRINOGEN_30_DAYS_AFTER_SURG..,Minutes_After_Surgery,integer,Minutes after room end.,,,Minutes_After_Surgery
+HEMATOCRIT_30_DAYS_AFTER_SURG..,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_INDUCTION_mins,integer,Elapse time from room start to induction in minutes,,,rt_RM_START_to_INDUCTION_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,rt_RM_START_to_EMERGENCE_mins,integer,Elapse time from room start to emergence,,,rt_RM_START_to_EMERGENCE_mins
+HEMATOCRIT_30_DAYS_AFTER_SURG..,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+HEMATOCRIT_30_DAYS_AFTER_SURG..,Minutes_After_Surgery,integer,Minutes after room end.,,,Minutes_After_Surgery
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_INDUCTION_mins,integer,Elapse time from room start to induction in minutes,,,rt_RM_START_to_INDUCTION_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,rt_RM_START_to_EMERGENCE_mins,integer,Elapse time from room start to emergence,,,rt_RM_START_to_EMERGENCE_mins
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+HEMOGLOBIN_30_DAYS_AFTER_SURG..,Minutes_After_Surgery,integer,Minutes after room end.,,,Minutes_After_Surgery
+PLATELET_30_DAYS_AFTER_SURG..,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_INDUCTION_mins,integer,Elapse time from room start to induction in minutes,,,rt_RM_START_to_INDUCTION_mins
+PLATELET_30_DAYS_AFTER_SURG..,rt_RM_START_to_EMERGENCE_mins,integer,Elapse time from room start to emergence,,,rt_RM_START_to_EMERGENCE_mins
+PLATELET_30_DAYS_AFTER_SURG..,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+PLATELET_30_DAYS_AFTER_SURG..,Minutes_After_Surgery,integer,Minutes after room end.,,,Minutes_After_Surgery
+PROTIMEINR_30_DAYS_AFTER_SURG..,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_INDUCTION_mins,integer,Elapse time from room start to induction in minutes,,,rt_RM_START_to_INDUCTION_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,rt_RM_START_to_EMERGENCE_mins,integer,Elapse time from room start to emergence,,,rt_RM_START_to_EMERGENCE_mins
+PROTIMEINR_30_DAYS_AFTER_SURG..,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+PROTIMEINR_30_DAYS_AFTER_SURG..,Minutes_After_Surgery,integer,Minutes after room end.,,,Minutes_After_Surgery
+INTRAOP_FLO_MEAS_Blood,PRECEDE Study ID,ID,the subject ID provided by PI,,,PRECEDE_Study_ID
+INTRAOP_FLO_MEAS_Blood,rt_RM_START_to_RECORDED_mins,Num,"the relative vital values recorded time, which is the length of time that has elapsed since patient is in the OR.",,,rt_RM_START_to_RECORDED_mins
+INTRAOP_FLO_MEAS_Blood,rt_RM_START_to_AN_START_mins,Num,the elapsed time from OR start to anesthesia start,,,rt_RM_START_to_AN_START_mins
+INTRAOP_FLO_MEAS_Blood,rt_RM_START_to_INCISION_mins,Num,the elapsed time from OR start to incision,,,rt_RM_START_to_INCISION_mins
+INTRAOP_FLO_MEAS_Blood,rt_RM_START_to_DRESS_mins,Num,the elapsed time from OR start to dressing,,,rt_RM_START_to_DRESS_mins
+INTRAOP_FLO_MEAS_Blood,rt_RM_START_to_AN_END_mins,Num,the elapsed time from OR start to anesthesia end,,,rt_RM_START_to_AN_END_mins
+INTRAOP_FLO_MEAS_Blood,rt_RM_START_to_RM_END_mins,Num,the elapsed time from OR start to OR end,,,rt_RM_START_to_RM_END_mins
+INTRAOP_FLO_MEAS_Blood,PRBC,num,,,matched thru CSN(Anes),PRBC
+INTRAOP_FLO_MEAS_Blood,Cryo_CPT,num,,,matched thru CSN(Anes),Cryo_CPT
+INTRAOP_FLO_MEAS_Blood,FFP,num,,,matched thru CSN(Anes),FFP
+INTRAOP_FLO_MEAS_Blood,Pit_Platelet,num,,,matched thru CSN(Anes),Pit_Platelet
+PERIOP_MEDS_Blood,PRECEDE Study ID,ID,the subject ID provided by PI,,,PRECEDE_Study_ID
+PERIOP_MEDS_Blood,MASTER RECORD,record,data from MASTER DATASET,,,MASTER_RECORD
+PERIOP_MEDS_Blood,rt_RM_START_to_TAKEN_mins,num,"the relative time of patient taking medication, which is the length of time that has elapsed since OR start time (negative value means before OR start time)",Clinical Encounters -> Taken Datetime,,rt_RM_START_to_TAKEN_mins
+PERIOP_MEDS_Blood,rt_RM_START_to_TAKEN_days,num,days elapsed since OR start time,Clinical Encounters -> Taken Datetime,,rt_RM_START_to_TAKEN_days
+PERIOP_MEDS_Blood,Intra-Op Med Y/N,char(1),indicator of intraop medication ('Y' is intraop medication; otherwise is 'N'),Clinical Encounters -> Intra-Op Med Y/N,,Intra_Op_Med_Y_N
+PERIOP_MEDS_Blood,MAR_ACTION,char(25),"medication given status (GIVEN, NEW BAG, RATE CHANGE and STOP)",Clinical Encounters -> MAR Action,,MAR_ACTION
+PERIOP_MEDS_Blood,MED_ORDER_DOSING_WEIGHT,,,,,MED_ORDER_DOSING_WEIGHT
+PERIOP_MEDS_Blood,MED_ORDER_DISPLAY_NAME,,,,,MED_ORDER_DISPLAY_NAME
+PERIOP_MEDS_Blood,MED_NAME,char(60),UF medication name,Clinical Encounters -> Med Name,,MED_NAME
+PERIOP_MEDS_Blood,MED_FORM,char(45),Medication form (e.g. ‘Tablet’),Clinical Encounters -> Med Form,,MED_FORM
+PERIOP_MEDS_Blood,MED_ROUTE,char(15),Medication route (e.g. ‘Oral’),Clinical Encounters -> Med Route,,MED_ROUTE
+PERIOP_MEDS_Blood,MED_STRENGTH,char(15),Medication strength (e.g. ‘1 MG/ML’),Clinical Encounters -> Med Strength,,MED_STRENGTH
+PERIOP_MEDS_Blood,Dosage,num,total medication administered dosage,Clinical Encounters -> Total Dose,,Dosage
+PERIOP_MEDS_Blood,Dosage_Unit,char(10),Dose unit (e.g. ‘mg’),Clinical Encounters -> Med Dose Unit Desc,,Dosage_Unit
+PERIOP_MEDS_Blood,Med Duration Desc,num,infusion duration,Clinical Encounters -> Med Duration Desc,,Med_Duration_Desc
+PERIOP_MEDS_Blood,Med Duration Unit Desc,char(10),infusion duration time unit,Clinical Encounters -> Med Duration Unit Desc,,Med_Duration_Unit_Desc
+PERIOP_MEDS_Blood,Med Infusion Rate,num,infusion rate,Clinical Encounters -> Med Infusion Rate,,Med_Infusion_Rate
+PERIOP_MEDS_Blood,Med Infusion Rate Unit Desc,char(10),infusion rate unit,Clinical Encounters -> Med Infusion Rate Unit Desc,,Med_Infusion_Rate_Unit_Desc
+PERIOP_MEDS_Blood,Med Code,num,UF medication code,Clinical Encounters -> Med Code,,Med_Code
+PERIOP_MEDS_Blood,Med Therapy Class,char(),medication therapy class,Clinical Encounters -> Med Therapy Class,,Med_Therapy_Class
+PERIOP_MEDS_Blood,Pharmacy Class,char(),medication classifcation,Clinical Encounters -> Pharmacy Class,,Pharmacy_Class
+PERIOP_MEDS_Blood,Pharmacy Subclass,char(),medication sub-classification,Clinical Encounters -> Pharmacy Subclass,,Pharmacy_Subclass
+PERIOP_MEDS_Blood,ORAL_MORPHINE_EQUIV_mg,num,Oral morphine equivlants in MG,Calculated,,ORAL_MORPHINE_EQUIV_mg
+LAB_90_DAY_BEFORE_SURG_MOST_REC,PRECEDE Study ID,ID; String,subject ID from Precede,,,PRECEDE_Study_ID
+LAB_90_DAY_BEFORE_SURG_MOST_REC,rt_RM_START_to_AN_START_mins,integer,Elapse time from room start to anesthesia start  in minutes,,,rt_RM_START_to_AN_START_mins
+LAB_90_DAY_BEFORE_SURG_MOST_REC,rt_RM_START_to_INCISION_mins,integer,Elapse time from room start to incision in minutes,,,rt_RM_START_to_INCISION_mins
+LAB_90_DAY_BEFORE_SURG_MOST_REC,rt_RM_START_to_DRESS_mins,integer,Elapse time from room start to dressing in minutes,,,rt_RM_START_to_DRESS_mins
+LAB_90_DAY_BEFORE_SURG_MOST_REC,rt_RM_START_to_AN_END_mins,integer,Elapse time from room start to anestesia end in minutes,,,rt_RM_START_to_AN_END_mins
+LAB_90_DAY_BEFORE_SURG_MOST_REC,rt_RM_START_to_RM_END_mins,integer,Elapse time from room start to room end in minutes,,,rt_RM_START_to_RM_END_mins
+LAB_90_DAY_BEFORE_SURG_MOST_REC,LAB_RESULT,double,Result of the lab,,,LAB_RESULT
+LAB_90_DAY_BEFORE_SURG_MOST_REC,APTT_LAB_DAYS_BEFORE_SURGERY,integer,Days before surgery,,,APTT_LAB_DAYS_BEFORE_SURGERY
+LAB_90_DAY_BEFORE_SURG_MOST_REC,APTT_LAB_RESULT_VALUE,double,Result of the lab,,,APTT_LAB_RESULT_VALUE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,FIBRINOGEN_LAB_DAYS_BEFORE_SURGERY,integer,Days before surgery,,,FIBRINOGEN_LAB_DAYS_BEFORE_SURGE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,FIBRINOGEN_LAB_RESULT_VALUE,double,Result of the lab,,,FIBRINOGEN_LAB_RESULT_VALUE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,HCT_LAB_DAYS_BEFORE_SURGERY,integer,Days before surgery,,,HCT_LAB_DAYS_BEFORE_SURGERY
+LAB_90_DAY_BEFORE_SURG_MOST_REC,HCT_LAB_RESULT_VALUE,double,Result of the lab,,,HCT_LAB_RESULT_VALUE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,HEMOGLOBIN_LAB_DAYS_BEFORE_SURGERY,integer,Days before surgery,,,HEMOGLOBIN_LAB_DAYS_BEFORE_SURGE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,HEMOGLOBIN_LAB_RESULT_VALUE,double,Result of the lab,,,HEMOGLOBIN_LAB_RESULT_VALUE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,PLATELET_COUNT_LAB_DAYS_BEFORE_SURGERY,integer,Days before surgery,,,PLATELET_COUNT_LAB_DAYS_BEFORE_S
+LAB_90_DAY_BEFORE_SURG_MOST_REC,PLATELET_COUNT_LAB_RESULT_VALUE,double,Result of the lab,,,PLATELET_COUNT_LAB_RESULT_VALUE
+LAB_90_DAY_BEFORE_SURG_MOST_REC,PROTIME_INR_LAB_DAYS_BEFORE_SURGERY,integer,Days before surgery,,,PROTIME_INR_LAB_DAYS_BEFORE_SURG
+LAB_90_DAY_BEFORE_SURG_MOST_REC,PROTIME_INR_LAB_RESULT_VALUE,double,Result of the lab,,,PROTIME_INR_LAB_RESULT_VALUE
+SURGERY_BLOOD_LOSS,PRECEDE Study ID,ID,the subject ID provided by PI,,,PRECEDE_Study_ID
+SURGERY_BLOOD_LOSS,rt_RM_START_to_RECORDED_mins,Num,"the relative vital values recorded time, which is the length of time that has elapsed since patient is in the OR.",,,rt_RM_START_to_RECORDED_mins
+SURGERY_BLOOD_LOSS,rt_RM_START_to_AN_START_mins,Num,the elapsed time from OR start to anesthesia start,,,rt_RM_START_to_AN_START_mins
+SURGERY_BLOOD_LOSS,rt_RM_START_to_INCISION_mins,Num,the elapsed time from OR start to incision,,,rt_RM_START_to_INCISION_mins
+SURGERY_BLOOD_LOSS,rt_RM_START_to_DRESS_mins,Num,the elapsed time from OR start to dressing,,,rt_RM_START_to_DRESS_mins
+SURGERY_BLOOD_LOSS,rt_RM_START_to_AN_END_mins,Num,the elapsed time from OR start to anesthesia end,,,rt_RM_START_to_AN_END_mins
+SURGERY_BLOOD_LOSS,rt_RM_START_to_RM_END_mins,Num,the elapsed time from OR start to OR end,,,rt_RM_START_to_RM_END_mins
+SURGERY_BLOOD_LOSS,Blood_Loss_Total_CC,num,Total blood loss,,matched thru CSN(Anes),Blood_Loss_Total_CC

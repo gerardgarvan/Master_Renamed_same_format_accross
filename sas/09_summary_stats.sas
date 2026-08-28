@@ -1,8 +1,8 @@
 /*==========================================================================
   Program : 09_summary_stats.sas
   Phase   : 9 -- Per-Variable Summary Statistics
-  Purpose : One row per variable in g.master_data_merged, with type-appropriate
-            summary statistics, written to docs/SUMMARY_STATS.xlsx.
+  Purpose : One row per variable in g.&src_ds, with type-appropriate
+            summary statistics, written to docs/&xl_name.
 
             Numeric : N, NMiss, coverage%, N distinct, Min, P25, Median, Mean,
                       P75, Max, StdDev
@@ -25,9 +25,9 @@
     SUM-05  PRECEDE_STUDY_ID distinct count is asserted equal to the row count,
             re-confirming PCM-F-01 at the merged level
 
-  Reads   : g.master_data_merged  (read-only -- never written)
-  Writes  : docs/SUMMARY_STATS.xlsx
-            qc/09_summary_stats.txt   (grep-able key=value summary)
+  Reads   : g.&src_ds  (read-only -- never written)
+  Writes  : docs/&xl_name
+            qc/&qc_name   (grep-able key=value summary)
 
   Author  : 2026-08-27
 
@@ -46,12 +46,40 @@
       pipeline three times.
     - PROC MEANS cannot process character variables -- VAR _CHARACTER_ is an
       error, not a no-op.
-    - g.master_data_merged never appears on the left of a DATA statement.
+    - g.&src_ds never appears on the left of a DATA statement.
 ==========================================================================*/
 
 options mprint nofmterr nodate nonumber ps=max ls=200;
 
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
+
+/* ---- WHICH DATASET TO SUMMARISE ----------------------------------------
+   master_data_merged     -- the Phase 4 output: 176 columns, every original
+                             source column, before concept harmonisation.
+   master_data_harmonized -- the Phase 10 output: adds the h_ columns and their
+                             h_*_src provenance companions, and omits the eleven
+                             aliases proven redundant. This is the working file.
+
+   Run it BOTH ways. The two workbooks together show what harmonisation changed:
+   which columns disappeared, which appeared, and how coverage moved. Each run
+   writes its own workbook, so neither overwrites the other.               */
+%let src_ds  = master_data_harmonized;
+
+/* Output names derive from the dataset, so the two runs cannot collide. */
+%macro set_outputs;
+  %global xl_name qc_name ds_label;
+  %if %upcase(&src_ds) = MASTER_DATA_HARMONIZED %then %do;
+    %let xl_name  = SUMMARY_STATS_HARMONIZED.xlsx;
+    %let qc_name  = 09_summary_stats_harmonized.txt;
+    %let ds_label = g.master_data_harmonized (Phase 10 output);
+  %end;
+  %else %do;
+    %let xl_name  = SUMMARY_STATS_MERGED.xlsx;
+    %let qc_name  = 09_summary_stats_merged.txt;
+    %let ds_label = g.&src_ds (Phase 4 output);
+  %end;
+%mend set_outputs;
+%set_outputs;
 
 /* Log routing. Standalone: own file. Under 99_run_all: leave the master log
    alone, or the driver log gets a hole exactly where a failure needs reading. */
@@ -103,18 +131,18 @@ libname g "&g_path";
 proc sql noprint;
   select count(*) into :n_tab trimmed
   from dictionary.tables
-  where libname='G' and memname='MASTER_DATA_MERGED';
+  where libname='G' and memname=%upcase("&src_ds");
 quit;
 
 %macro check_source;
   %if &n_tab ne 1 %then %do;
-    %fail_out(msg=g.master_data_merged not found -- run Phase 4 first);
+    %fail_out(msg=g.&src_ds not found -- run Phase 4 first);
   %end;
 %mend check_source;
 %check_source;
 
 proc sql noprint;
-  select count(*) into :n_rows trimmed from g.master_data_merged;
+  select count(*) into :n_rows trimmed from g.&src_ds;
 quit;
 
 %macro check_rows;
@@ -122,9 +150,9 @@ quit;
     %fail_out(msg=Row count query returned no value);
   %end;
   %if &n_rows = 0 %then %do;
-    %fail_out(msg=g.master_data_merged is empty);
+    %fail_out(msg=g.&src_ds is empty);
   %end;
-  %put NOTE: [09_summary] g.master_data_merged has &n_rows rows.;
+  %put NOTE: [09_summary] g.&src_ds has &n_rows rows.;
 %mend check_rows;
 %check_rows;
 
@@ -146,7 +174,7 @@ proc sql noprint;
          label         as vlabel  length=256,
          varnum
   from dictionary.columns
-  where libname='G' and memname='MASTER_DATA_MERGED'
+  where libname='G' and memname=%upcase("&src_ds")
   order by varnum;
 
   select count(*) into :n_vars trimmed from work.varlist;
@@ -176,7 +204,7 @@ quit;
 ods listing close;
 ods output nlevels=work.nlev;
 
-proc freq data=g.master_data_merged nlevels;
+proc freq data=g.&src_ds nlevels;
   tables _all_ / noprint;
 run;
 
@@ -263,7 +291,7 @@ quit;
   %else %do;
     ods listing close;
     ods output summary=work.numraw;
-    proc means data=g.master_data_merged
+    proc means data=g.&src_ds
                n nmiss min p25 median mean p75 max std
                stackodsoutput;
       var _numeric_;
@@ -332,7 +360,7 @@ quit;
              coalesce(min(ifn(missing(&v), ., length(strip(&v)))), .),
              coalesce(max(ifn(missing(&v), ., length(strip(&v)))), .)
         into :n trimmed, :nm trimmed, :mn trimmed, :mx trimmed
-      from g.master_data_merged;
+      from g.&src_ds;
 
       insert into work.chrstats values("&v", &n, &nm, &mn, &mx);
     quit;
@@ -524,33 +552,34 @@ quit;
    statement form has no such question.                                       */
 %macro drop_stale_xlsx;
   %local rc;
-  %if %sysfunc(fileexist(%bquote(&docs_path.\SUMMARY_STATS.xlsx))) %then %do;
-    filename _oldxl "&docs_path.\SUMMARY_STATS.xlsx";
+  %if %sysfunc(fileexist(%bquote(&docs_path.\&xl_name))) %then %do;
+    filename _oldxl "&docs_path.\&xl_name";
     %let rc = %sysfunc(fdelete(_oldxl));
     filename _oldxl clear;
     %if &rc ne 0 %then %do;
-      %fail_out(msg=Could not delete the previous SUMMARY_STATS.xlsx -- rc=&rc. It may be open in Excel.);
+      %fail_out(msg=Could not delete the previous &xl_name -- rc=&rc. It may be open in Excel.);
     %end;
-    %put NOTE: [09_summary] previous SUMMARY_STATS.xlsx removed.;
+    %put NOTE: [09_summary] previous &xl_name removed.;
   %end;
   %else %do;
-    %put NOTE: [09_summary] no previous SUMMARY_STATS.xlsx to remove.;
+    %put NOTE: [09_summary] no previous &xl_name to remove.;
   %end;
 %mend drop_stale_xlsx;
 %drop_stale_xlsx;
 
-ods excel file="&docs_path.\SUMMARY_STATS.xlsx"
+ods excel file="&docs_path.\&xl_name"
     options(sheet_name="KEY"
             embedded_titles="yes"
             autofilter="all"
             frozen_headers="1");
 
 title justify=left color=CX0021A5 height=14pt "PeCAN Merged Dataset -- Summary Statistics";
-title2 justify=left height=10pt "g.master_data_merged, &n_rows rows, &n_vars variables. Generated %sysfunc(datetime(), datetime20.)";
+title2 justify=left height=10pt "g.&src_ds, &n_rows rows, &n_vars variables. Generated %sysfunc(datetime(), datetime20.)";
 
 data work.key;
   length Item $40 Meaning $220;
-  Item="Source";              Meaning="g.master_data_merged (&n_rows rows, &n_vars variables)"; output;
+  Item="Source";              Meaning="&ds_label -- &n_rows rows, &n_vars variables"; output;
+  Item="Which workbook";      Meaning="This file is &xl_name. Run 09 with src_ds set the other way to produce the companion, and compare the two to see exactly what concept harmonisation changed."; output;
   Item="N Distinct";          Meaning="Number of distinct values, missing excluded. For a key this equals the row count"; output;
   Item="N Non-Missing";       Meaning="Rows with a value. Blank character strings count as missing"; output;
   Item="Coverage %";          Meaning="N Non-Missing divided by &n_rows, times 100"; output;
@@ -597,8 +626,8 @@ ods excel close;
 title;
 
 %macro check_xlsx;
-  %if %sysfunc(fileexist(&docs_path.\SUMMARY_STATS.xlsx)) = 0 %then %do;
-    %fail_out(msg=SUMMARY_STATS.xlsx was not written to &docs_path);
+  %if %sysfunc(fileexist(&docs_path.\&xl_name)) = 0 %then %do;
+    %fail_out(msg=&xl_name was not written to &docs_path);
   %end;
   %put NOTE: [09_summary] SUM-01 OK -- workbook written.;
 %mend check_xlsx;
@@ -610,7 +639,7 @@ title;
    ========================================================================= */
 
 data _null_;
-  file "&qc_path.\09_summary_stats.txt";
+  file "&qc_path.\&qc_name";
   put "09_summary_stats -- Run: %sysfunc(datetime(), datetime20.)";
   put "=======================================================================";
   put " ";
@@ -634,7 +663,7 @@ data _null_;
 run;
 
 %put NOTE: ==== Phase 9 complete ====;
-%put NOTE- Workbook: docs/SUMMARY_STATS.xlsx;
-%put NOTE- Summary : qc/09_summary_stats.txt;
+%put NOTE- Workbook: docs/&xl_name;
+%put NOTE- Summary : qc/&qc_name;
 
 %restore_log;

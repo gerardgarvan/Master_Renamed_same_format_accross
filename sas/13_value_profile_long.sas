@@ -305,10 +305,17 @@ quit;
                             else strip(put(&v, best12.)) end
                      %end;,
                      count(*), 100 * count(*) / &nr, &nr,
+                     /* MAX(), so this is an AGGREGATE. Without it the expression
+                        is neither aggregated nor in the GROUP BY, SAS remerges
+                        summary statistics back with the original data, and the
+                        insert returns ONE ROW PER DATA ROW instead of one per
+                        value -- 41,150 rows for a single variable. The first
+                        such insert succeeded silently and produced garbage; a
+                        later one failed hard and deleted the output table.   */
                      %if %upcase(&t) = CHAR %then %do;
-                       case when length(strip(&v)) > 200 then 1 else 0 end
+                       max(case when length(strip(&v)) > 200 then 1 else 0 end)
                      %end;
-                     %else %do; 0 %end;
+                     %else %do; max(0) %end;
               from g.&d
               group by
                      %if %upcase(&t) = CHAR %then %do;

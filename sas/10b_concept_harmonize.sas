@@ -633,15 +633,23 @@ quit;
 %macro prove_redundancy;
   %local i h p np nadd ndis;
 
+  /* Two plain steps rather than one correlated subquery. An earlier version
+     wrote `having pri = (select min(priority) ... where r2.harmonized_name =
+     work.rules.harmonized_name)` -- SAS rejects a LIBREF-QUALIFIED name as the
+     outer correlation reference, and the query failed. That in turn left n_sec
+     unset, so the %IF below errored inside the macro, %return was never reached,
+     and the whole gate reported "0 redundant" as though it had run.          */
   proc sql noprint;
-    /* the priority-1 source for each harmonized column */
-    create table work.primary_src as
-    select harmonized_name, varname as primary_var, min(priority) as pri
-    from work.rules group by harmonized_name, varname
-    having pri = (select min(priority) from work.rules as r2
-                  where r2.harmonized_name = work.rules.harmonized_name);
+    create table work.minpri as
+    select harmonized_name, min(priority) as pri
+    from work.rules group by harmonized_name;
 
-    /* every lower-priority source, paired with its primary */
+    create table work.primary_src as
+    select distinct r.harmonized_name, r.varname as primary_var
+    from work.rules as r
+    inner join work.minpri as m
+      on r.harmonized_name = m.harmonized_name and r.priority = m.pri;
+
     create table work.secondary as
     select distinct r.harmonized_name, r.varname, p.primary_var
     from work.rules as r
@@ -651,10 +659,15 @@ quit;
     select count(*) into :n_sec trimmed from work.secondary;
   quit;
 
-  %if &n_sec = 0 %then %do;
+  /* %LENGTH first. An unset n_sec must fail loudly, not silently skip the gate. */
+  %if %length(&n_sec) = 0 %then %do;
+    %fail_out(msg=Redundancy setup failed -- n_sec is unset. See the SQL errors above.);
+  %end;
+  %else %if &n_sec = 0 %then %do;
     %put NOTE: [10b] no secondary sources -- nothing is a drop candidate.;
     %return;
   %end;
+  %put NOTE: [10b] &n_sec secondary sources to test for redundancy.;
 
   %do i = 1 %to &n_sec;
     %local sv pv hn;
@@ -665,6 +678,13 @@ quit;
       call symputx('pv', primary_var, 'L');
       stop;
     run;
+
+    /* Blank them first. Both feed a %IF and an INSERT below; if either query
+       fails, an unset value makes the INSERT malformed and the %IF error out
+       inside this macro -- which is precisely how the redundancy gate came to
+       report "0 redundant" while never having run.                          */
+    %let nadd = ;
+    %let ndis = ;
 
     /* (a) would this column ever contribute a row the primary lacks? */
     proc sql noprint;
@@ -689,6 +709,9 @@ quit;
          %else %do; 'KEEP' %end;);
     quit;
 
+    %if %length(&nadd) = 0 or %length(&ndis) = 0 %then %do;
+      %fail_out(msg=Redundancy test failed for &sv -- a count query returned no value);
+    %end;
     %put NOTE: [10b] &sv vs &pv -- would add &nadd rows%str(,) &ndis disagreements.;
   %end;
 %mend prove_redundancy;
@@ -697,7 +720,23 @@ quit;
 proc sql noprint;
   select count(*) into :n_redundant trimmed from work.redundancy where verdict='REDUNDANT';
   select count(*) into :n_keepsec   trimmed from work.redundancy where verdict='KEEP';
+  select count(*) into :n_tested    trimmed from work.redundancy;
 quit;
+
+/* If rules exist but nothing was tested, the proof did not run -- and reporting
+   "0 redundant" would look identical to a genuine result. Fail instead.      */
+%macro assert_tested;
+  %if %length(&n_tested) = 0 %then %do;
+    %fail_out(msg=Redundancy test produced no table -- the proof did not run);
+  %end;
+  %if &n_tested = 0 and &n_h > 0 and &n_rules > &n_h %then %do;
+    %put ERROR: rules exist for more than one source per column, but no redundancy;
+    %put ERROR- test was recorded. The proof did not run and nothing can be dropped;
+    %put ERROR- safely. See the SQL errors above.;
+    %fail_out(msg=Redundancy proof did not execute);
+  %end;
+%mend assert_tested;
+%assert_tested;
 
 %macro report_redundancy;
   %if &n_keepsec > 0 %then %do;

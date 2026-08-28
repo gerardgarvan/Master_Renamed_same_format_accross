@@ -828,8 +828,54 @@ quit;
    SECTION 5: Build the harmonized dataset -- NO procedure inside this step
    ========================================================================= */
 
+/* Which harmonized columns actually need a _src companion?
+
+   A _src column records WHICH source supplied the value on a given row. That is
+   only informative when more than one source can supply it. Where a concept has
+   a single contributing source -- or where the secondary was proven redundant
+   and never fires -- every populated row carries the same string, and the column
+   holds no information at all.
+
+   The first build emitted eleven such columns, every one with a single distinct
+   value. They are now emitted ONLY where a row could genuinely have come from
+   either source, which is the case the column was designed for.
+
+   Set force_src = 1 to emit them regardless, if a downstream consumer expects
+   the companion column to exist unconditionally.                            */
+%let force_src = 1;   /* keep the _src companions -- see the note above */
+
+proc sql noprint;
+  create table work.src_needed as
+  select r.harmonized_name,
+         count(distinct r.varname) as n_src,
+         sum(case when d.verdict = 'REDUNDANT' then 1 else 0 end) as n_redundant
+  from work.rules as r
+  left join work.redundancy as d
+    on d.harmonized_name = r.harmonized_name and d.varname = r.varname
+  group by r.harmonized_name;
+
+  select count(*) into :n_src_needed trimmed
+  from work.src_needed where n_src - n_redundant > 1;
+
+  select harmonized_name into :srclist separated by ' '
+  from work.src_needed where n_src - n_redundant > 1;
+quit;
+
+%global srclist;
+%macro default_srclist;
+  %if %symexist(srclist) = 0 %then %let srclist = ;
+  %if &n_src_needed = 0 %then %do;
+    %let srclist = ;
+    %put NOTE: [10b] no harmonized column draws from more than one live source%str(,);
+    %put NOTE- so no _src companions are emitted. Every one would have held a single;
+    %put NOTE- repeated value. Set force_src=1 to emit them anyway.;
+  %end;
+  %else %put NOTE: [10b] _src companions emitted for: &srclist;
+%mend default_srclist;
+%default_srclist;
+
 %macro build_harmonized;
-  %local i k h;
+  %local i k h emit_src;
   data g.master_data_harmonized;
     set g.master_data_merged;
     /* Proven-redundant sources dropped here, AFTER the rules below have read
@@ -842,13 +888,19 @@ quit;
     length
     %do i = 1 %to &n_h;
       %let h = %scan(&hnames, &i);
-      &h $&max_tv &h._src $32
+      &h $&max_tv
+      %if &force_src = 1 or %sysfunc(indexw(&srclist, &h)) > 0 %then %do;
+        &h._src $32
+      %end;
     %end;
     ;
 
     %do i = 1 %to &n_h;
       %let h = %scan(&hnames, &i);
-      call missing(&h, &h._src);
+      call missing(&h);
+      %if &force_src = 1 or %sysfunc(indexw(&srclist, &h)) > 0 %then %do;
+        call missing(&h._src);
+      %end;
     %end;
 
     /* Rules in priority order. The first source holding a value wins; the
@@ -863,8 +915,10 @@ quit;
       if missing(&&r_h_&k) and not missing(&&r_v_&k)
          and strip(put(&&r_v_&k, best12.)) = "&&r_sv_&k" then do;
       %end;
-        &&r_h_&k       = "&&r_tv_&k";
+        &&r_h_&k = "&&r_tv_&k";
+      %if &force_src = 1 or %sysfunc(indexw(&srclist, &&r_h_&k)) > 0 %then %do;
         &&r_h_&k.._src = "&&r_v_&k";
+      %end;
       end;
     %end;
   run;

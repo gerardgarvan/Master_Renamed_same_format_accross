@@ -220,7 +220,7 @@ quit;
      IMPORT can type a sparse text column as numeric.                         */
   data work.decisions;
     length concept $32 varname $32 value_txt $60 target_value $40
-           confirmed $3 harmonized_name $32 priority 8 priority_invalid 3;
+           confirmed $3 harmonized_name $32 priority 8 priority_invalid 8;
     set work.dec_raw (rename=(concept=_c varname=_v value_txt=_x
                               target_value=_t confirmed=_f harmonized_name=_h
     %if &has_prio = 1 %then %do; priority=_p %end;
@@ -630,15 +630,15 @@ proc sql;
      n_would_add num, n_disagree num, verdict char(12));
 quit;
 
-%macro prove_redundancy;
-  %local i h p np nadd ndis;
+%global n_sec;
+%let n_sec = 0;
 
-  /* Two plain steps rather than one correlated subquery. An earlier version
-     wrote `having pri = (select min(priority) ... where r2.harmonized_name =
-     work.rules.harmonized_name)` -- SAS rejects a LIBREF-QUALIFIED name as the
-     outer correlation reference, and the query failed. That in turn left n_sec
-     unset, so the %IF below errored inside the macro, %return was never reached,
-     and the whole gate reported "0 redundant" as though it had run.          */
+%macro prove_redundancy;
+  %local i hn sv pv sv_t pv_t;
+
+  /* Two plain steps rather than one correlated subquery. An earlier version used
+     a LIBREF-QUALIFIED outer reference, which SAS rejects; the query failed,
+     n_sec went unset, and the gate reported zero as though it had run.       */
   proc sql noprint;
     create table work.minpri as
     select harmonized_name, min(priority) as pri
@@ -659,7 +659,6 @@ quit;
     select count(*) into :n_sec trimmed from work.secondary;
   quit;
 
-  /* %LENGTH first. An unset n_sec must fail loudly, not silently skip the gate. */
   %if %length(&n_sec) = 0 %then %do;
     %fail_out(msg=Redundancy setup failed -- n_sec is unset. See the SQL errors above.);
   %end;
@@ -670,48 +669,78 @@ quit;
   %put NOTE: [10b] &n_sec secondary sources to test for redundancy.;
 
   %do i = 1 %to &n_sec;
-    %local sv pv hn;
+    /* FIRSTOBS=/OBS=, not POINT=. POINT= takes a VARIABLE NAME, so point=&i
+       resolves to a literal and SAS reports "Expecting a name".             */
     data _null_;
-      set work.secondary point=&i;
+      set work.secondary (firstobs=&i obs=&i);
       call symputx('hn', harmonized_name, 'L');
       call symputx('sv', varname, 'L');
       call symputx('pv', primary_var, 'L');
-      stop;
     run;
 
-    /* Blank them first. Both feed a %IF and an INSERT below; if either query
-       fails, an unset value makes the INSERT malformed and the %IF error out
-       inside this macro -- which is precisely how the redundancy gate came to
-       report "0 redundant" while never having run.                          */
+    /* Types come from work.rules, which carries vtype from dictionary.columns.
+       They decide how a stored value is rendered as text, and that rendering
+       MUST match the one used by the profiler and the coverage gate:
+       strip(x) for character, strip(put(x,best12.)) for numeric.            */
+    %let sv_t = ;
+    %let pv_t = ;
+    proc sql noprint;
+      select distinct vtype into :sv_t trimmed from work.rules
+        where harmonized_name = "&hn" and varname = "&sv";
+      select distinct vtype into :pv_t trimmed from work.rules
+        where harmonized_name = "&hn" and varname = "&pv";
+    quit;
+
+    %if %length(&sv_t) = 0 or %length(&pv_t) = 0 %then %do;
+      %fail_out(msg=Could not determine the type of &sv or &pv for &hn);
+    %end;
+
     %let nadd = ;
     %let ndis = ;
 
-    /* (a) would this column ever contribute a row the primary lacks? */
+    /* (a) would this column ever contribute a row the primary lacks?
+       (b) where both are populated, do their MAPPED values ever differ?
+
+       Both are plain queries, and the mapped comparison is an INNER JOIN to
+       work.rules rather than a correlated subquery calling VVALUE(). VVALUE is
+       a DATA STEP function: in PROC SQL it does not resolve, so both lookups
+       returned missing, `missing ne missing` was FALSE, ndis came back 0, and
+       every column was declared redundant and dropped. A safety proof that
+       cannot fail is worse than no proof at all.                             */
     proc sql noprint;
       select count(*) into :nadd trimmed
       from g.master_data_merged
       where not missing(&sv) and missing(&pv);
 
-      /* (b) mapped-value disagreement where both are present */
       select count(*) into :ndis trimmed
       from g.master_data_merged as d
+      inner join work.rules as rs
+        on rs.harmonized_name = "&hn" and rs.varname = "&sv"
+       and rs.value_txt = %if %upcase(&sv_t) = CHAR %then %do; strip(d.&sv) %end;
+                          %else %do; strip(put(d.&sv, best12.)) %end;
+      inner join work.rules as rp
+        on rp.harmonized_name = "&hn" and rp.varname = "&pv"
+       and rp.value_txt = %if %upcase(&pv_t) = CHAR %then %do; strip(d.&pv) %end;
+                          %else %do; strip(put(d.&pv, best12.)) %end;
       where not missing(d.&sv) and not missing(d.&pv)
-        and (select max(target_value) from work.rules as r
-             where r.harmonized_name = "&hn" and r.varname = "&sv"
-               and r.value_txt = strip(vvalue(d.&sv)))
-         ne (select max(target_value) from work.rules as r
-             where r.harmonized_name = "&hn" and r.varname = "&pv"
-               and r.value_txt = strip(vvalue(d.&pv)));
+        and rs.target_value ne rp.target_value;
+    quit;
 
+    /* CHECK BEFORE USE. The previous version referenced &nadd and &ndis inside
+       the INSERT and the %IF that decided the verdict, and only checked they
+       were populated afterwards -- so a failed query broke macro expansion
+       before the guard could run.                                            */
+    %if %length(&nadd) = 0 or %length(&ndis) = 0 %then %do;
+      %fail_out(msg=Redundancy test failed for &sv -- a count query returned no value);
+    %end;
+
+    proc sql;
       insert into work.redundancy values
         ("&hn", "&sv", "&pv", &nadd, &ndis,
          %if &nadd = 0 and &ndis = 0 %then %do; 'REDUNDANT' %end;
          %else %do; 'KEEP' %end;);
     quit;
 
-    %if %length(&nadd) = 0 or %length(&ndis) = 0 %then %do;
-      %fail_out(msg=Redundancy test failed for &sv -- a count query returned no value);
-    %end;
     %put NOTE: [10b] &sv vs &pv -- would add &nadd rows%str(,) &ndis disagreements.;
   %end;
 %mend prove_redundancy;
@@ -729,10 +758,13 @@ quit;
   %if %length(&n_tested) = 0 %then %do;
     %fail_out(msg=Redundancy test produced no table -- the proof did not run);
   %end;
-  %if &n_tested = 0 and &n_h > 0 and &n_rules > &n_h %then %do;
-    %put ERROR: rules exist for more than one source per column, but no redundancy;
-    %put ERROR- test was recorded. The proof did not run and nothing can be dropped;
-    %put ERROR- safely. See the SQL errors above.;
+  /* n_sec counts SECONDARY SOURCES. An earlier version tested n_rules > n_h --
+     but n_rules counts VALUE MAPPINGS, so a single source with Y and N rules
+     gives n_rules=2, n_h=1, and the gate would abort a perfectly valid
+     single-source run.                                                       */
+  %if &n_tested = 0 and &n_sec > 0 %then %do;
+    %put ERROR: &n_sec secondary sources exist but no redundancy test was recorded.;
+    %put ERROR- The proof did not run and nothing can be dropped safely.;
     %fail_out(msg=Redundancy proof did not execute);
   %end;
 %mend assert_tested;
@@ -749,14 +781,39 @@ quit;
 %mend report_redundancy;
 %report_redundancy;
 
-%global droplist;
+%global droplist n_dropped;
 %let droplist = ;
+%let n_dropped = 0;
 %macro build_droplist;
+  /* Always create it, empty if need be -- SECTION 6 references it either way. */
+  proc sql;
+    create table work.drop_ok (varname char(32));
+  quit;
   %if &drop_redundant = 1 and &n_redundant > 0 %then %do;
+    proc sql; drop table work.drop_ok; quit;
+    /* A variable is droppable only if it is redundant AND is not the PRIMARY
+       source for some other harmonized column, and is not a secondary that was
+       KEPT elsewhere. Dropping a column that another concept still reads would
+       make the merged output depend on a column the file no longer carries.  */
     proc sql noprint;
-      select distinct varname into :droplist separated by ' '
-      from work.redundancy where verdict='REDUNDANT';
+      create table work.drop_ok as
+      select distinct r.varname
+      from work.redundancy as r
+      where r.verdict='REDUNDANT'
+        and upcase(r.varname) not in
+            (select upcase(primary_var) from work.primary_src)
+        and upcase(r.varname) not in
+            (select upcase(varname) from work.redundancy where verdict='KEEP');
+
+      select distinct varname into :droplist separated by ' ' from work.drop_ok;
+      select count(*) into :n_dropped trimmed from work.drop_ok;
     quit;
+
+    %if &n_dropped ne &n_redundant %then %do;
+      %put WARNING: [10b] &n_redundant proven redundant but only &n_dropped droppable.;
+      %put WARNING- The rest are primary for another harmonized column, or were kept;
+      %put WARNING- elsewhere. They are RETAINED. See work.redundancy and work.drop_ok.;
+    %end;
     %put NOTE: [10b] dropping from the harmonized output: &droplist;
     %put NOTE- g.master_data_merged is untouched, so this is reversible.;
   %end;
@@ -839,17 +896,19 @@ proc sql noprint;
              where libname='G' and memname='MASTER_DATA_HARMONIZED') as b
     on a.name = b.name
   where (b.name is null or a.type ne b.type or a.length ne b.length)
-    and a.name not in (select upcase(varname) from work.redundancy
-                       where verdict='REDUNDANT')
+    /* Keyed off what was ACTUALLY dropped, not what was proven redundant. With
+       drop_redundant=0 nothing is dropped, so any absence at all is a defect --
+       an exclusion based on the verdict would have let a stray drop through.
+       STRIP guards against trailing blanks in the char(32) varname column.   */
+    and a.name not in (select strip(upcase(varname)) from work.drop_ok)
   ;
   select count(*) into :n_changed trimmed from work.src_changed;
 
   /* And every column we DID intend to drop must actually be gone */
   create table work.drop_failed as
-  select varname from work.redundancy
-  where verdict='REDUNDANT'
-    and upcase(varname) in (select upcase(name) from dictionary.columns
-                            where libname='G' and memname='MASTER_DATA_HARMONIZED');
+  select varname from work.drop_ok
+  where strip(upcase(varname)) in (select upcase(name) from dictionary.columns
+                                   where libname='G' and memname='MASTER_DATA_HARMONIZED');
   select count(*) into :n_dropfail trimmed from work.drop_failed;
 quit;
 
@@ -872,7 +931,7 @@ quit;
     %fail_out(msg=Redundant columns were not dropped);
   %end;
   %put NOTE: [10b] CON-06 and CON-09 OK -- &n_out rows%str(,) key unique.;
-  %put NOTE- &n_redundant proven-redundant columns dropped%str(,) every other original intact.;
+  %put NOTE- &n_redundant proven redundant%str(,) &n_dropped actually dropped%str(,) every other original intact.;
 %mend assert_all;
 %assert_all;
 
@@ -895,7 +954,8 @@ quit;
     put "concepts_confirmed=&n_con_yes";
     put "rules_applied=&n_rules";
     put " ";
-    put "Proven-redundant source columns were DROPPED: &n_redundant";
+    put "Secondary sources proven redundant : &n_redundant";
+    put "Source columns actually DROPPED     : &n_dropped  (drop_redundant=&drop_redundant)";
     put "  A column is dropped ONLY when this run proved it adds no rows the";
     put "  primary lacks AND disagrees with it nowhere. g.master_data_merged is";
     put "  untouched, so re-running restores anything dropped.";

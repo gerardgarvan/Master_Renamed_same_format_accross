@@ -72,7 +72,7 @@ libname g   "&g_path";
 /*==========================================================================
   SECTION 2: Exception report (PREP-02)
   Two counts, both measured -- never hardcode zero (RESEARCH Pitfall 10).
-    n_sent : literal NULL sentinel strings in character variables.
+    n_sent : literal 'NULL' sentinel strings in character variables.
              Expected 0 for md6 (only md8 has them). Nonzero -> ABORT.
     n_enc  : encoding-damaged Base_Procedure_1 rows -> FLAG ONLY (PCM-C-01).
   Note: Base_Procedure_Code_1 is NUM in md6 -- not in the NULL scan.
@@ -174,7 +174,7 @@ quit;
   %end;
   %else %do;
     /* Two %put statements, not one. A %PUT ends at its FIRST semicolon, so an
-       embedded ; left "safe to drop.;" as an orphan statement and logged
+       embedded ';' left "safe to drop.;" as an orphan statement and logged
        ERROR 180-322 on every run. NOTE- continues the previous NOTE block.   */
     %put NOTE: PREP-04 OK -- PRECEDE_Study_ID_1 identical to PRECEDE_STUDY_ID in all rows.;
     %put NOTE- Safe to drop.;
@@ -242,20 +242,35 @@ data g.prep_md6;
   drop _bpc_n;
   drop PRECEDE_Study_ID_1;   /* PREP-04 / PCM-D-06: duplicate, proven identical above */
 
-  /* PREP-08: a negative elapsed time is invalid at any threshold. Set to missing.
-     Evidence: AMENDMENT-01 section 2 (PCM-F-13, PCM-F-14). 52 rows in
-     rt_INCISE_to_DRESS_mins and 15 in rt_RM_START_to_INCISION_mins, disjoint sets.
-     Max negative is -1 and 75% sit between -6.5 and -1 -- consistent with the two
-     timestamps being charted out of order, concentrated in percutaneous services
-     (EP/interventional cardiology, 46% neurosurgery) where there is no incision or
-     dressing in the surgical sense. Missing is more honest there than a number.
-     IS NOT MISSING guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.        */
-  if not missing(rt_INCISE_to_DRESS_mins)
-     and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
-  if not missing(rt_RM_START_to_INCISION_mins)
-     and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
-  if not missing(rt_RM_START_to_RM_END_mins)
-     and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
+  /* PREP-08 (REVISED 2026-08-27): COUNT the negatives, do NOT null them.
+
+     Original behaviour set them to missing. That was inconsistent with PCM-D-08,
+     which established flag-dont-null for the 9 envelope violations on the grounds
+     that you cannot tell WHICH of several timestamps is wrong, so nulling picks a
+     victim arbitrarily. The same argument applies here, and more strongly to
+     rt_RM_START_to_INCISION_mins:
+
+       rt_RM_START_to_INCISION_mins is one of the rt_RM_START_to_* family, and
+       rt_RM_START_to_AN_START_mins in that same family is NEGATIVE on 50-62% of
+       rows in every source -- because anesthesia routinely begins before OR entry.
+       The family behaves as OFFSETS FROM ROOM START, not durations. Negative may
+       therefore be meaningful rather than erroneous, and nulling 15 rows on a
+       clinical assumption that was never measured destroys real data.
+
+       rt_INCISE_to_DRESS_mins is a genuine duration between two procedure events
+       (dressing before incision is impossible in any setting), so its 52 are far
+       more likely to be true errors -- but flagging preserves that judgement for
+       the analyst instead of pre-empting it, and keeps the two treatments
+       consistent.
+
+     The flags themselves are derived in Phase 4 (see MRG-07). A flag created here
+     would be a column absent from the Phase 2 ownership map, and MRG-04 asserts
+     zero unmapped columns in the merged file.
+
+     Guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.
+     SYNTAX NOTE: this is a DATA step, so the guard is `not missing(x)`. The
+     `x IS NOT MISSING` operator is PROC SQL / WHERE-clause syntax ONLY and is a
+     syntax error in a DATA step IF.                                              */
 run;
 
 
@@ -310,7 +325,7 @@ quit;
 
 /*  5b: PREP-04 absence assertion -- PRECEDE_Study_ID_1 must NOT appear in
     g.prep_md6 after the DROP. dictionary.columns is the authoritative check.
-    dictionary.columns type is CHARACTER (char/num).                      */
+    dictionary.columns type is CHARACTER ('char'/'num').                      */
 
 proc sql noprint;
   select count(*) into :n_dup_col trimmed
@@ -330,7 +345,7 @@ quit;
 %assert_col_absent(n=&n_dup_col, colname=PRECEDE_Study_ID_1, dsn=g.prep_md6);
 
 /*  5c: PREP-07 type assertion -- Base_Procedure_Code_1 must be CHAR in g.prep_md6.
-    dictionary.columns type is CHARACTER (char/num), distinct from PROC CONTENTS
+    dictionary.columns type is CHARACTER ('char'/'num'), distinct from PROC CONTENTS
     OUT= where type is numeric 1=NUM / 2=CHAR. Do not interchange them.          */
 
 proc sql noprint;
@@ -361,14 +376,18 @@ proc sql noprint;
          into :n_negsurv trimmed
   from g.prep_md6;
 quit;
-%macro assert_no_negtime(n=, dsn=);
+/* PREP-08 (REVISED): REPORT the count, do NOT abort on it. Negatives are now
+   RETAINED and flagged in Phase 4 (MRG-07), so a non-zero count here is the
+   expected state, not a violation. Aborting would stop the pipeline on data the
+   revised design deliberately keeps.                                          */
+%macro report_negtime(n=, dsn=);
   %if &n > 0 %then %do;
-    %put ERROR: PREP-08 VIOLATION -- &n negative operative intervals survived in &dsn;
-    %abort cancel;
+    %put NOTE: PREP-08 -- &n negative operative interval values retained in &dsn;
+    %put NOTE- Flagged in Phase 4 as rt_*_neg. Not nulled -- see MRG-07 and PCM-D-08.;
   %end;
-  %else %put NOTE: PREP-08 OK -- no negative operative intervals in &dsn;
-%mend assert_no_negtime;
-%assert_no_negtime(n=&n_negsurv, dsn=g.prep_md6);
+  %else %put NOTE: PREP-08 -- no negative operative intervals in &dsn;
+%mend report_negtime;
+%report_negtime(n=&n_negsurv, dsn=g.prep_md6);
 
 /* SECTION 5e: PREP-09 -- report-only negative scan of every rt_* numeric variable.
    This section modifies NOTHING. It derives the variable list at run time so that

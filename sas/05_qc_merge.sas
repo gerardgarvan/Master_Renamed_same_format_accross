@@ -588,6 +588,59 @@ run;
 
 
 /* =========================================================================
+   SECTION 5d: QC-08 -- negative operative intervals are FLAGGED, not nulled
+   -------------------------------------------------------------------------
+   PREP-08 stopped nulling these on 2026-08-27; Phase 4 flags them instead
+   (MRG-07). The values are therefore PRESENT and negative by design, so a plain
+   floor check would fail on correct data.
+
+   What must hold is that no negative ESCAPED its flag -- the same shape as
+   QC-06. That assertion passes now and still fires if a future re-extract
+   introduces a negative the flag logic misses.
+
+   Both sides guarded (PCM-T-11): missing < 0 is TRUE in SAS, so an unguarded
+   comparison would count every missing row as a violation.
+   ========================================================================= */
+proc sql noprint;
+  select count(*) into :n_unflag_neg trimmed
+  from g.master_data_merged
+  where ( rt_INCISE_to_DRESS_neg ne 1
+          and rt_INCISE_to_DRESS_mins is not missing
+          and rt_INCISE_to_DRESS_mins < 0 )
+     or ( rt_RM_START_to_INCISION_neg ne 1
+          and rt_RM_START_to_INCISION_mins is not missing
+          and rt_RM_START_to_INCISION_mins < 0 )
+     or ( rt_RM_START_to_RM_END_neg ne 1
+          and rt_RM_START_to_RM_END_mins is not missing
+          and rt_RM_START_to_RM_END_mins < 0 );
+
+  select sum(rt_INCISE_to_DRESS_neg),
+         sum(rt_RM_START_to_INCISION_neg),
+         sum(rt_RM_START_to_RM_END_neg)
+    into :q_neg_dress trimmed, :q_neg_incis trimmed, :q_neg_room trimmed
+  from g.master_data_merged;
+quit;
+
+data _null_;
+  file "&qc_path.\05_qc_merge_report.txt" mod;
+  put "QC-08 negative operative intervals (retained and flagged, not nulled):";
+  put "  rt_INCISE_to_DRESS_neg      = &q_neg_dress (expected 52)";
+  put "  rt_RM_START_to_INCISION_neg = &q_neg_incis (expected 15)";
+  put "  rt_RM_START_to_RM_END_neg   = &q_neg_room (expected 0)";
+  put "  UNFLAGGED negatives (asserted zero): &n_unflag_neg";
+  put "  Values are RETAINED. rt_RM_START_to_INCISION_mins belongs to the";
+  put "  rt_RM_START_to_* family, which behaves as OFFSETS from room start rather";
+  put "  than durations -- rt_RM_START_to_AN_START_mins is negative on 50-62% of";
+  put "  rows because anesthesia routinely begins before OR entry. A negative there";
+  put "  may be meaningful. rt_INCISE_to_DRESS_mins is a true duration and its 52";
+  put "  are more likely genuine errors, but the analyst decides, not the pipeline.";
+run;
+
+%assert_eq(actual=&n_unflag_neg, expected=0, label=QC-08 unflagged negative operative intervals);
+%put NOTE: QC-08 -- &q_neg_dress dress / &q_neg_incis incision / &q_neg_room room negatives flagged and retained.;
+
+
+/* =========================================================================
    SECTION 5c: operative-interval distribution -- REPORT ONLY (PCM-D-09 record)
    Retained as the evidence that justified dropping the three ceilings in QC-07.
    NO ASSERTION HERE -- do not add one. If a future re-extract pushes these maxima
@@ -628,11 +681,11 @@ run;
 /* =========================================================================
    SECTION 6: Close-out
    ========================================================================= */
-%put NOTE: ==== Phase 5 QC complete -- all checks passed (QC-01 through QC-07) ====;
+%put NOTE: ==== Phase 5 QC complete -- all checks passed (QC-01 through QC-08) ====;
 data _null_;
   file "&qc_path.\05_qc_merge_report.txt" mod;
   put "=============================================================";
-  put "ALL QC CHECKS PASSED (QC-01 through QC-07)";
+  put "ALL QC CHECKS PASSED (QC-01 through QC-08)";
 run;
 
 /* qclib is assigned by THIS program for the Section 4 ownership lookup, so this program

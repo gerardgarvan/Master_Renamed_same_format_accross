@@ -356,6 +356,9 @@ data g.master_data_merged;
     in_md1 3 in_md2 3 in_md3 3 in_md4 3
     in_md5 3 in_md6 3 in_md7 3 in_md8 3 n_sources 3
     rt_envelope_flag 3                     /* MRG-05 -- derived below, see PCM-D-08 */
+    rt_INCISE_to_DRESS_neg      3          /* MRG-07 -- derived below              */
+    rt_RM_START_to_INCISION_neg 3
+    rt_RM_START_to_RM_END_neg   3
     ;
 
   merge
@@ -414,6 +417,38 @@ data g.master_data_merged;
               and rt_RM_START_to_INCISION_mins > rt_RM_START_to_RM_END_mins) ) );
   label rt_envelope_flag = 'Operative sub-interval exceeds room interval (1=yes)';
 
+  /* ---- MRG-07 / PREP-08 REVISED: negative operative intervals ----
+     These were NULLED in Phase 3 until 2026-08-27. They are now RETAINED and
+     flagged here, for consistency with PCM-D-08 and because the clinical
+     assumption behind nulling was never measured.
+
+     rt_RM_START_to_INCISION_mins (15 negatives) belongs to the rt_RM_START_to_*
+     family, and rt_RM_START_to_AN_START_mins in that same family is negative on
+     50-62% of rows in every source -- anesthesia routinely begins before OR
+     entry. The family behaves as OFFSETS FROM ROOM START rather than durations,
+     so a negative may be meaningful. Nulling on an unmeasured assumption
+     destroyed real data.
+
+     rt_INCISE_to_DRESS_mins (52 negatives) is a true duration between two
+     procedure events -- dressing cannot precede incision in any setting -- so
+     these are far more likely genuine errors. They are still flagged rather than
+     nulled, so the analyst makes that call with the values in hand.
+
+     One flag per variable, so the two cases stay distinguishable. The analyst can
+     exclude the dress flag and keep the incision flag, or neither, or both.
+
+     Guards on both sides (PCM-T-11): missing < 0 is TRUE in SAS.               */
+  rt_INCISE_to_DRESS_neg =
+     (not missing(rt_INCISE_to_DRESS_mins) and rt_INCISE_to_DRESS_mins < 0);
+  rt_RM_START_to_INCISION_neg =
+     (not missing(rt_RM_START_to_INCISION_mins) and rt_RM_START_to_INCISION_mins < 0);
+  rt_RM_START_to_RM_END_neg =
+     (not missing(rt_RM_START_to_RM_END_mins) and rt_RM_START_to_RM_END_mins < 0);
+
+  label rt_INCISE_to_DRESS_neg      = 'Negative incision-to-dressing interval (1=yes, value retained)'
+        rt_RM_START_to_INCISION_neg = 'Negative room-start-to-incision offset (1=yes, value retained)'
+        rt_RM_START_to_RM_END_neg   = 'Negative room-start-to-room-end interval (1=yes, value retained)';
+
   /* ---- MRG-06 / PCM-D-11: fill md3s blanks from md8 ----------------------
      Direction is one-way and explicit: md3s value is NEVER overwritten. Only a
      MISSING md3 value is filled, and only from md8, and only for these five.
@@ -451,6 +486,20 @@ proc sql noprint;
   select sum(rt_envelope_flag) into :n_env_flag trimmed from g.master_data_merged;
 quit;
 %put NOTE: MRG-05 -- &n_env_flag rows carry rt_envelope_flag=1 (expected 9, PCM-D-08).;
+
+/* MRG-07: report the negative-interval flag counts. Reported, not asserted --
+   these are retained values, not defects to gate on.                          */
+proc sql noprint;
+  select sum(rt_INCISE_to_DRESS_neg),
+         sum(rt_RM_START_to_INCISION_neg),
+         sum(rt_RM_START_to_RM_END_neg)
+    into :n_neg_dress trimmed, :n_neg_incis trimmed, :n_neg_room trimmed
+  from g.master_data_merged;
+quit;
+%put NOTE: MRG-07 -- negative operative intervals RETAINED and flagged:;
+%put NOTE-   rt_INCISE_to_DRESS_neg      = &n_neg_dress (expected 52);
+%put NOTE-   rt_RM_START_to_INCISION_neg = &n_neg_incis (expected 15);
+%put NOTE-   rt_RM_START_to_RM_END_neg   = &n_neg_room (expected 0);
 
 /* MRG-06: report post-coalesce coverage. Reported, not asserted here -- Phase 7
    asserts the two score Ns, which is where the expectation is established.     */
@@ -677,7 +726,9 @@ proc sql noprint;
     and upcase(name) not in (select upcase(varname) from work.ownership_resolved)
     and upcase(name) not in ('PRECEDE_STUDY_ID','IN_MD1','IN_MD2','IN_MD3','IN_MD4',
                              'IN_MD5','IN_MD6','IN_MD7','IN_MD8','N_SOURCES',
-                             'RT_ENVELOPE_FLAG');
+                             'RT_ENVELOPE_FLAG',
+                             'RT_INCISE_TO_DRESS_NEG','RT_RM_START_TO_INCISION_NEG',
+                             'RT_RM_START_TO_RM_END_NEG');
     /* RT_ENVELOPE_FLAG is derived in SECTION 3 (MRG-05), not read from a source, so it
        is legitimately absent from the ownership map. Omitting it here would make MRG-04
        fail on the merges own derived column.                                         */

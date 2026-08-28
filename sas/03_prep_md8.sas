@@ -3,11 +3,11 @@
   Phase      : Phase 3 -- Per-Source Normalization
   Purpose    : md8 NULL sentinel clear + forced-char-to-numeric conversion.
                md8 is the only source that (a) stores the literal string
-               NULL where SAS would store missing, and (b) had eight
+               'NULL' where SAS would store missing, and (b) had eight
                numeric variables forced to CHAR ($4 or $11) during a prior
                Excel export. This program:
                  1. Scans for non-parseable values BEFORE conversion (PREP-02)
-                 2. Clears every NULL sentinel to blank (PREP-03)
+                 2. Clears every 'NULL' sentinel to blank (PREP-03)
                  3. Converts the eight forced-char numerics to numeric via
                     INPUT() (PREP-03)
                  4. Logs conversion counts to logs/ (PREP-06)
@@ -34,7 +34,7 @@ libname g   "&g_path";
 %let mdnum        = 8;        /* PREP-09 builds its dictionary.columns lookup and its
                                  logs/03_negtime_mdN.txt filename from &mdnum. Present in
                                  md1-md7; without it here &mdnum is unresolved, the lookup
-                                 returns nothing, and md8s report is written as
+                                 returns nothing, and md8's report is written as
                                  03_negtime_md.txt or not at all.                        */
 
 
@@ -197,7 +197,7 @@ filename excfile clear;
 ==========================================================================*/
 
 /* Step 1: Clear NULL sentinels across ALL character variables.
-   Done BEFORE INPUT() so the conversion never receives the literal NULL.
+   Done BEFORE INPUT() so the conversion never receives the literal 'NULL'.
    Reading _CHARACTER_ here is safe because no temp _c variables exist yet
    (two-step approach isolates the rename, Pitfall 3).                       */
 data work.prep_md8_s1;
@@ -238,7 +238,7 @@ data work.prep_md8_s1;
 
   /* Clear NULL sentinel in ALL character variables (Pitfall 2 prevention).
      _CHARACTER_ expands to every character variable in the PDV at this point.
-     After Step 1 sentinel clear, INPUT() never receives the literal NULL. */
+     After Step 1 sentinel clear, INPUT() never receives the literal 'NULL'. */
   array _charv {*} _CHARACTER_;
   do _i = 1 to dim(_charv);
     if strip(upcase(_charv{_i})) = 'NULL' then _charv{_i} = ' ';
@@ -285,7 +285,7 @@ data g.prep_md8;
              rt_RM_START_to_RM_END_mins=rt3_c));
 
   /* INPUT(STRIP(var), best12.) handles blanks (now missing after sentinel
-     clear) cleanly: INPUT(, best12.) = . (numeric missing). Correct.      */
+     clear) cleanly: INPUT('', best12.) = . (numeric missing). Correct.      */
   Admit_BMI                    = input(strip(Admit_BMI_c), best12.);
   ASA__Anesth_Record_          = input(strip(ASA_c),       best12.);
   Age_at_Encounter             = input(strip(Age_c),       best12.);
@@ -297,23 +297,35 @@ data g.prep_md8;
 
   drop Admit_BMI_c ASA_c Age_c Cog_c Frailty_c rt1_c rt2_c rt3_c;
 
-  /* PREP-08: a negative elapsed time is invalid at any threshold. Set to missing.
-     Evidence: AMENDMENT-01 section 2 (PCM-F-13, PCM-F-14). 52 rows in
-     rt_INCISE_to_DRESS_mins and 15 in rt_RM_START_to_INCISION_mins, disjoint sets.
-     Max negative is -1 and 75% sit between -6.5 and -1 -- consistent with the two
-     timestamps being charted out of order, concentrated in percutaneous services
-     (EP/interventional cardiology, 46% neurosurgery) where there is no incision or
-     dressing in the surgical sense. Missing is more honest there than a number.
-     IS NOT MISSING guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.
-     ORDERING NOTE (md8 only): this block MUST follow the input() conversions above.
-     Before this point the three variables are still character (rt1_c..rt3_c) and the
-     numeric comparison is meaningless. After INPUT() they are numeric in the PDV.     */
-  if not missing(rt_INCISE_to_DRESS_mins)
-     and rt_INCISE_to_DRESS_mins < 0      then rt_INCISE_to_DRESS_mins = .;
-  if not missing(rt_RM_START_to_INCISION_mins)
-     and rt_RM_START_to_INCISION_mins < 0 then rt_RM_START_to_INCISION_mins = .;
-  if not missing(rt_RM_START_to_RM_END_mins)
-     and rt_RM_START_to_RM_END_mins < 0   then rt_RM_START_to_RM_END_mins = .;
+  /* PREP-08 (REVISED 2026-08-27): COUNT the negatives, do NOT null them.
+
+     Original behaviour set them to missing. That was inconsistent with PCM-D-08,
+     which established flag-dont-null for the 9 envelope violations on the grounds
+     that you cannot tell WHICH of several timestamps is wrong, so nulling picks a
+     victim arbitrarily. The same argument applies here, and more strongly to
+     rt_RM_START_to_INCISION_mins:
+
+       rt_RM_START_to_INCISION_mins is one of the rt_RM_START_to_* family, and
+       rt_RM_START_to_AN_START_mins in that same family is NEGATIVE on 50-62% of
+       rows in every source -- because anesthesia routinely begins before OR entry.
+       The family behaves as OFFSETS FROM ROOM START, not durations. Negative may
+       therefore be meaningful rather than erroneous, and nulling 15 rows on a
+       clinical assumption that was never measured destroys real data.
+
+       rt_INCISE_to_DRESS_mins is a genuine duration between two procedure events
+       (dressing before incision is impossible in any setting), so its 52 are far
+       more likely to be true errors -- but flagging preserves that judgement for
+       the analyst instead of pre-empting it, and keeps the two treatments
+       consistent.
+
+     The flags themselves are derived in Phase 4 (see MRG-07). A flag created here
+     would be a column absent from the Phase 2 ownership map, and MRG-04 asserts
+     zero unmapped columns in the merged file.
+
+     Guard is mandatory (PCM-T-11): missing < 0 is TRUE in SAS.
+     SYNTAX NOTE: this is a DATA step, so the guard is `not missing(x)`. The
+     `x IS NOT MISSING` operator is PROC SQL / WHERE-clause syntax ONLY and is a
+     syntax error in a DATA step IF.                                              */
 run;
 
 
@@ -321,7 +333,7 @@ run;
   SECTION 4: Conversion count log (PREP-06)
   Written to logs/ (not qc/ -- different artifact semantics, RESEARCH
   anti-pattern). Count per variable: successful conversions (numeric non-
-  missing in g.prep_md8) and sentinels cleared (strip(upcase)=NULL in
+  missing in g.prep_md8) and sentinels cleared (strip(upcase)='NULL' in
   the original src.master_data_8). Never use &SQLOBS -- always SELECT
   COUNT(*) INTO :n TRIMMED (Phases 1-2 established rule).
 ==========================================================================*/
@@ -366,8 +378,8 @@ filename convlog clear;
 /*==========================================================================
   SECTION 5: Post-conversion assertions (PREP-03, PREP-05)
   Three assertions:
-    1. Zero surviving NULL strings in any character variable of g.prep_md8
-    2. The eight converted variables are NUMERIC (type=1 / type ne char)
+    1. Zero surviving 'NULL' strings in any character variable of g.prep_md8
+    2. The eight converted variables are NUMERIC (type=1 / type ne 'char')
     3. Row count preserved: g.prep_md8 = &expected_nobs (22,473)
   All %abort cancel calls inside macro definitions (PCM-R-05).
 ==========================================================================*/
@@ -392,13 +404,13 @@ proc sql noprint;
      or strip(upcase(Base_Procedure_1)) = 'NULL'
   /* TODO: add all remaining character variables from qc/03_charvars_all.txt,
      one OR clause per variable. Pattern:
-       or strip(upcase(VarName)) = NULL                                    */
+       or strip(upcase(VarName)) = 'NULL'                                    */
   ;
 quit;
 %assert_zero(n=&n_null_surv, msg=surviving NULL sentinel strings in g.prep_md8);
 
 /* 5b: The eight converted variables are NUMERIC in g.prep_md8.
-   dictionary.columns type=char means still character -- assert zero.       */
+   dictionary.columns type='char' means still character -- assert zero.       */
 proc sql noprint;
   select count(*) into :n_stillchar trimmed from dictionary.columns
   where libname='G' and memname='PREP_MD8'
@@ -429,14 +441,18 @@ proc sql noprint;
          into :n_negsurv trimmed
   from g.prep_md8;
 quit;
-%macro assert_no_negtime(n=, dsn=);
+/* PREP-08 (REVISED): REPORT the count, do NOT abort on it. Negatives are now
+   RETAINED and flagged in Phase 4 (MRG-07), so a non-zero count here is the
+   expected state, not a violation. Aborting would stop the pipeline on data the
+   revised design deliberately keeps.                                          */
+%macro report_negtime(n=, dsn=);
   %if &n > 0 %then %do;
-    %put ERROR: PREP-08 VIOLATION -- &n negative operative intervals survived in &dsn;
-    %abort cancel;
+    %put NOTE: PREP-08 -- &n negative operative interval values retained in &dsn;
+    %put NOTE- Flagged in Phase 4 as rt_*_neg. Not nulled -- see MRG-07 and PCM-D-08.;
   %end;
-  %else %put NOTE: PREP-08 OK -- no negative operative intervals in &dsn;
-%mend assert_no_negtime;
-%assert_no_negtime(n=&n_negsurv, dsn=g.prep_md8);
+  %else %put NOTE: PREP-08 -- no negative operative intervals in &dsn;
+%mend report_negtime;
+%report_negtime(n=&n_negsurv, dsn=g.prep_md8);
 
 /* 5e: PREP-09 -- report-only negative scan of every rt_* numeric variable.
    This section modifies NOTHING. It derives the variable list at run time so that

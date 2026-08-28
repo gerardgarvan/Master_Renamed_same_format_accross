@@ -6,8 +6,13 @@
 
   Requirements addressed
     CON-05  Only rows marked CONFIRMED=YES are acted on
-    CON-06  No source column is ever modified or dropped. Harmonized values land
-            in NEW h_ prefixed columns; every original survives untouched
+    CON-06  No source column is ever MODIFIED. Harmonized values land in NEW h_
+            prefixed columns. A source column is DROPPED from the harmonized
+            output only when this program has PROVEN, in this run and on this
+            data, that it is redundant: a strict subset of a higher-priority
+            source AND in complete agreement with it wherever both are present.
+            g.master_data_merged is untouched, so any drop is reversible by
+            re-running. Set DROP_REDUNDANT=0 to keep everything.
     CON-07  Every mapping is value-level and explicit. An unmapped source value,
             a duplicate rule, or a conflicting target is a HARD FAILURE
     CON-08  Provenance: h_*_src records which source supplied the value per row
@@ -148,29 +153,54 @@ run;
 /* Required headers must be present BEFORE the RENAME= below touches them. A
    reviewer who deletes or renames a column would otherwise get SAS complaining
    about an unknown variable in a RENAME clause -- accurate, but it does not say
-   which column is missing or that the decision file is the cause.            */
+   which column is missing or that the decision file is the cause.
+
+   The required list is built in a DATA step, NOT as SELECT literals joined by
+   UNION ALL: SAS PROC SQL requires a FROM clause, so a bare SELECT of constants
+   is a syntax error. That error is also why this gate silently did nothing on
+   the first run -- the query failed, n_hdr_missing never resolved, and the %IF
+   testing it errored out INSIDE the macro, so %fail_out was never reached and
+   the program carried on past a broken gate.                                  */
+data work.req_hdr;
+  length hdr $20;
+  infile datalines truncover;
+  input hdr $20.;
+  datalines;
+CONCEPT
+VARNAME
+VALUE_TXT
+TARGET_VALUE
+CONFIRMED
+HARMONIZED_NAME
+;
+run;
+
 proc sql noprint;
   create table work.hdr_missing as
-  select hdr from
-    (select 'CONCEPT'         as hdr length=20 union all
-     select 'VARNAME'                  union all
-     select 'VALUE_TXT'                union all
-     select 'TARGET_VALUE'             union all
-     select 'CONFIRMED'                union all
-     select 'HARMONIZED_NAME') as req
+  select hdr from work.req_hdr
   where hdr not in (select upcase(name) from dictionary.columns
                     where libname='WORK' and upcase(memname)='DEC_RAW');
   select count(*) into :n_hdr_missing trimmed from work.hdr_missing;
-  select hdr into :hdr_list separated by ', ' from work.hdr_missing;
 quit;
 
 %macro check_headers;
-  %if &n_hdr_missing > 0 %then %do;
+  /* %LENGTH first. If the query above ever fails again, n_hdr_missing is unset
+     and `%if &n_hdr_missing > 0` is a macro error rather than a clean failure --
+     which is exactly how this gate came to be skipped without anyone noticing. */
+  %if %length(&n_hdr_missing) = 0 %then %do;
+    %fail_out(msg=Header check did not run -- n_hdr_missing is unset);
+  %end;
+  %else %if &n_hdr_missing > 0 %then %do;
+    %local hdr_list;
+    proc sql noprint;
+      select hdr into :hdr_list separated by ', ' from work.hdr_missing;
+    quit;
     %put ERROR: concept_decisions.csv is missing required columns: &hdr_list;
     %put ERROR- Re-export the template from 10_concept_profile.sas and complete it;
     %put ERROR- without removing or renaming any header.;
     %fail_out(msg=Decision file is missing required columns);
   %end;
+  %put NOTE: [10b] all six required headers present.;
 %mend check_headers;
 %check_headers;
 
@@ -570,6 +600,135 @@ quit;
 
 
 /* =========================================================================
+   SECTION 4b: PROVE redundancy before dropping anything
+   -------------------------------------------------------------------------
+   Phase 10 profiling found that for every confirmed concept the lower-priority
+   source is a STRICT SUBSET of the higher-priority one and agrees with it
+   completely -- so it carries no information its partner lacks, and the _src
+   columns confirmed it never once supplied a value.
+
+   Those columns are dropped from the harmonized output. But NOT on the strength
+   of that finding: redundancy is re-proven here, on this data, in this run. A
+   column is droppable only when BOTH hold:
+
+     (a) rows where it is populated and the priority-1 source is NOT  =  0
+     (b) rows where both are populated and their MAPPED values differ =  0
+
+   Test (b) compares mapped values, not raw ones. Feels_Exausted holds YES/NO and
+   Feels_Exausted_Value holds 1/0 -- comparing those raw would report total
+   disagreement between two columns that agree perfectly.
+
+   A column failing either test is KEPT and reported. Nothing is dropped on trust.
+   ========================================================================= */
+
+/* Set to 0 to keep every source column in the harmonized output. */
+%let drop_redundant = 1;
+
+proc sql;
+  create table work.redundancy
+    (harmonized_name char(32), varname char(32), primary_var char(32),
+     n_would_add num, n_disagree num, verdict char(12));
+quit;
+
+%macro prove_redundancy;
+  %local i h p np nadd ndis;
+
+  proc sql noprint;
+    /* the priority-1 source for each harmonized column */
+    create table work.primary_src as
+    select harmonized_name, varname as primary_var, min(priority) as pri
+    from work.rules group by harmonized_name, varname
+    having pri = (select min(priority) from work.rules as r2
+                  where r2.harmonized_name = work.rules.harmonized_name);
+
+    /* every lower-priority source, paired with its primary */
+    create table work.secondary as
+    select distinct r.harmonized_name, r.varname, p.primary_var
+    from work.rules as r
+    inner join work.primary_src as p on r.harmonized_name = p.harmonized_name
+    where r.varname ne p.primary_var;
+
+    select count(*) into :n_sec trimmed from work.secondary;
+  quit;
+
+  %if &n_sec = 0 %then %do;
+    %put NOTE: [10b] no secondary sources -- nothing is a drop candidate.;
+    %return;
+  %end;
+
+  %do i = 1 %to &n_sec;
+    %local sv pv hn;
+    data _null_;
+      set work.secondary point=&i;
+      call symputx('hn', harmonized_name, 'L');
+      call symputx('sv', varname, 'L');
+      call symputx('pv', primary_var, 'L');
+      stop;
+    run;
+
+    /* (a) would this column ever contribute a row the primary lacks? */
+    proc sql noprint;
+      select count(*) into :nadd trimmed
+      from g.master_data_merged
+      where not missing(&sv) and missing(&pv);
+
+      /* (b) mapped-value disagreement where both are present */
+      select count(*) into :ndis trimmed
+      from g.master_data_merged as d
+      where not missing(d.&sv) and not missing(d.&pv)
+        and (select max(target_value) from work.rules as r
+             where r.harmonized_name = "&hn" and r.varname = "&sv"
+               and r.value_txt = strip(vvalue(d.&sv)))
+         ne (select max(target_value) from work.rules as r
+             where r.harmonized_name = "&hn" and r.varname = "&pv"
+               and r.value_txt = strip(vvalue(d.&pv)));
+
+      insert into work.redundancy values
+        ("&hn", "&sv", "&pv", &nadd, &ndis,
+         %if &nadd = 0 and &ndis = 0 %then %do; 'REDUNDANT' %end;
+         %else %do; 'KEEP' %end;);
+    quit;
+
+    %put NOTE: [10b] &sv vs &pv -- would add &nadd rows%str(,) &ndis disagreements.;
+  %end;
+%mend prove_redundancy;
+%prove_redundancy;
+
+proc sql noprint;
+  select count(*) into :n_redundant trimmed from work.redundancy where verdict='REDUNDANT';
+  select count(*) into :n_keepsec   trimmed from work.redundancy where verdict='KEEP';
+quit;
+
+%macro report_redundancy;
+  %if &n_keepsec > 0 %then %do;
+    %put WARNING: [10b] &n_keepsec secondary sources are NOT redundant and are KEPT.;
+    %put WARNING- They either add rows the primary lacks or disagree with it. That;
+    %put WARNING- contradicts the Phase 10 profiling and is worth investigating.;
+    %put WARNING- See work.redundancy.;
+  %end;
+  %put NOTE: [10b] &n_redundant secondary sources proven redundant.;
+%mend report_redundancy;
+%report_redundancy;
+
+%global droplist;
+%let droplist = ;
+%macro build_droplist;
+  %if &drop_redundant = 1 and &n_redundant > 0 %then %do;
+    proc sql noprint;
+      select distinct varname into :droplist separated by ' '
+      from work.redundancy where verdict='REDUNDANT';
+    quit;
+    %put NOTE: [10b] dropping from the harmonized output: &droplist;
+    %put NOTE- g.master_data_merged is untouched, so this is reversible.;
+  %end;
+  %else %do;
+    %put NOTE: [10b] no columns dropped (drop_redundant=&drop_redundant).;
+  %end;
+%mend build_droplist;
+%build_droplist;
+
+
+/* =========================================================================
    SECTION 5: Build the harmonized dataset -- NO procedure inside this step
    ========================================================================= */
 
@@ -577,6 +736,12 @@ quit;
   %local i k h;
   data g.master_data_harmonized;
     set g.master_data_merged;
+    /* Proven-redundant sources dropped here, AFTER the rules below have read
+       them -- the DROP statement removes them from the OUTPUT, not the PDV, so
+       priority-2 rules still evaluate correctly even for a dropped column.   */
+  %if %length(&droplist) > 0 %then %do;
+    drop &droplist;
+  %end;
 
     length
     %do i = 1 %to &n_h;
@@ -622,16 +787,31 @@ proc sql noprint;
 
   /* CON-09: source columns unchanged in TYPE and LENGTH, not merely present.
      The old version claimed this in a comment and only checked names.       */
+  /* A column may legitimately be ABSENT from the harmonized file only if it was
+     proven redundant in SECTION 4b. Any other absence, or any change of type or
+     length, is a defect: harmonization must never alter a column it keeps.   */
   create table work.src_changed as
   select a.name, a.type as t_before, b.type as t_after,
-         a.length as l_before, b.length as l_after
+         a.length as l_before, b.length as l_after,
+         case when b.name is null then 'DROPPED' else 'ALTERED' end as issue length=8
   from (select upcase(name) as name, type, length from dictionary.columns
         where libname='G' and memname='MASTER_DATA_MERGED') as a
   left join (select upcase(name) as name, type, length from dictionary.columns
              where libname='G' and memname='MASTER_DATA_HARMONIZED') as b
     on a.name = b.name
-  where b.name is null or a.type ne b.type or a.length ne b.length;
+  where (b.name is null or a.type ne b.type or a.length ne b.length)
+    and a.name not in (select upcase(varname) from work.redundancy
+                       where verdict='REDUNDANT')
+  ;
   select count(*) into :n_changed trimmed from work.src_changed;
+
+  /* And every column we DID intend to drop must actually be gone */
+  create table work.drop_failed as
+  select varname from work.redundancy
+  where verdict='REDUNDANT'
+    and upcase(varname) in (select upcase(name) from dictionary.columns
+                            where libname='G' and memname='MASTER_DATA_HARMONIZED');
+  select count(*) into :n_dropfail trimmed from work.drop_failed;
 quit;
 
 %macro assert_all;
@@ -642,12 +822,18 @@ quit;
     %fail_out(msg=PRECEDE_STUDY_ID has &n_key distinct values in &n_out rows -- key not unique);
   %end;
   %if &n_changed > 0 %then %do;
-    %put ERROR: &n_changed original columns changed type or length%str(,) or vanished.;
-    %put ERROR- Harmonization is additive and must leave every source untouched.;
-    %put ERROR- See work.src_changed.;
-    %fail_out(msg=Original columns were altered);
+    %put ERROR: &n_changed columns vanished or changed type/length WITHOUT being;
+    %put ERROR- proven redundant. Only a column proven redundant in SECTION 4b may;
+    %put ERROR- be absent, and no kept column may be altered. See work.src_changed.;
+    %fail_out(msg=Columns were altered or dropped without proof);
   %end;
-  %put NOTE: [10b] CON-06 and CON-09 OK -- &n_out rows%str(,) key unique%str(,) every original intact.;
+  %if &drop_redundant = 1 and &n_dropfail > 0 %then %do;
+    %put ERROR: &n_dropfail columns were marked redundant but are still present.;
+    %put ERROR- The DROP statement did not take. See work.drop_failed.;
+    %fail_out(msg=Redundant columns were not dropped);
+  %end;
+  %put NOTE: [10b] CON-06 and CON-09 OK -- &n_out rows%str(,) key unique.;
+  %put NOTE- &n_redundant proven-redundant columns dropped%str(,) every other original intact.;
 %mend assert_all;
 %assert_all;
 
@@ -670,7 +856,11 @@ quit;
     put "concepts_confirmed=&n_con_yes";
     put "rules_applied=&n_rules";
     put " ";
-    put "Every source column is RETAINED, unchanged in type and length (asserted).";
+    put "Proven-redundant source columns were DROPPED: &n_redundant";
+    put "  A column is dropped ONLY when this run proved it adds no rows the";
+    put "  primary lacks AND disagrees with it nowhere. g.master_data_merged is";
+    put "  untouched, so re-running restores anything dropped.";
+    put "Every other source column is RETAINED, unchanged in type and length.";
     put "Harmonized values are additive, in new h_ prefixed columns, each with an";
     put "h_*_src companion naming which source supplied the value on that row.";
     put " ";

@@ -147,6 +147,50 @@ proc import datafile="&docs_path.\precede_dictionary.csv"
   guessingrows=max;
 run;
 
+/* Required headers must be present BEFORE the RENAME= below references them.
+   Without this the DATA step fails on an unknown variable in a RENAME clause --
+   accurate, but it never says the dictionary CSV is the cause. Built in a DATA
+   step, not as SELECT literals: PROC SQL requires a FROM clause, so a bare
+   SELECT of constants is a syntax error.                                    */
+data work.req_dict_hdr;
+  length hdr $20;
+  infile datalines truncover;
+  input hdr $20.;
+  datalines;
+SHEET
+DICT_NAME
+DICT_TYPE
+DESCRIPTION
+SOURCE
+NOTE
+SAS_NAME
+;
+run;
+
+proc sql noprint;
+  create table work.dict_hdr_missing as
+  select hdr from work.req_dict_hdr
+  where hdr not in (select upcase(name) from dictionary.columns
+                    where libname='WORK' and upcase(memname)='DICT_RAW');
+  select count(*) into :n_dhdr trimmed from work.dict_hdr_missing;
+quit;
+
+%macro check_dict_headers;
+  %if %length(&n_dhdr) = 0 %then %do;
+    %fail_out(msg=Dictionary header check did not run -- n_dhdr is unset);
+  %end;
+  %else %if &n_dhdr > 0 %then %do;
+    %local dh;
+    proc sql noprint;
+      select hdr into :dh separated by ', ' from work.dict_hdr_missing;
+    quit;
+    %put ERROR: precede_dictionary.csv is missing required columns: &dh;
+    %fail_out(msg=Dictionary CSV is missing required columns);
+  %end;
+  %put NOTE: [11_dict] all seven dictionary headers present.;
+%mend check_dict_headers;
+%check_dict_headers;
+
 /* LENGTH before SET so PROC IMPORT never decides a type or truncates a
    description. Every field is renamed on the way in.                       */
 data work.dict;
@@ -162,6 +206,13 @@ data work.dict;
   note        = strip(cats(_e));
   sas_name    = strip(cats(_a));
   key_u       = upcase(sas_name);
+  /* A rename map entry is applied downstream as RENAME old=new, so an invalid
+     name would break whatever consumes it. Blank the key rather than matching
+     on something unusable -- it then reports under No SAS Name.             */
+  if not missing(sas_name) and nvalid(sas_name, 'V7') = 0 then do;
+    put "WARNING: dictionary name is not a valid SAS V7 name: " dict_name=;
+    key_u = "";
+  end;
   if missing(dict_name) then delete;
   keep sheet dict_name dict_type description source note sas_name key_u;
 run;
@@ -176,6 +227,28 @@ data work.dict_ranked;
   else if sheet = 'DERIVED_VARIABLES_MASTER' then sheet_rank = 2;
   else                                            sheet_rank = 3;
 run;
+
+/* A blank sas_name gives a blank key_u, and the dedup below keeps only the FIRST
+   row per key -- so several documented variables with no derivable SAS name
+   would silently collapse into one. Separate them out and report them instead. */
+data work.dict_ranked work.dict_nokey;
+  set work.dict_ranked;
+  if missing(key_u) then output work.dict_nokey;
+  else output work.dict_ranked;
+run;
+
+proc sql noprint;
+  select count(*) into :n_nokey trimmed from work.dict_nokey;
+quit;
+
+%macro report_nokey;
+  %if &n_nokey > 0 %then %do;
+    %put WARNING: [11_dict] &n_nokey dictionary rows have no derivable SAS name.;
+    %put WARNING- They cannot be matched and are excluded from the comparison rather;
+    %put WARNING- than collapsed into one blank key. See the No SAS Name sheet.;
+  %end;
+%mend report_nokey;
+%report_nokey;
 
 proc sort data=work.dict_ranked; by key_u sheet_rank sheet; run;
 
@@ -221,6 +294,7 @@ proc sql;
   create table work.matched as
   select a.varnum, a.act_name, a.act_u, a.act_type, a.act_len,
          d.dict_name, d.sas_name, d.dict_type, d.description, d.sheet,
+         d.key_u as dict_key_u length=32,
          case
            when a.act_name = d.sas_name                         then 'EXACT'
            when a.act_u    = d.key_u                            then 'CASE'
@@ -232,18 +306,33 @@ proc sql;
        or %squash(a.act_name) = %squash(d.sas_name);
 quit;
 
-/* A single actual column must not match several dictionary entries */
 proc sql noprint;
+  /* forward: one actual column matching several dictionary entries */
   create table work.ambiguous as
   select act_name, count(*) as n_matches
   from work.matched group by act_name having calculated n_matches > 1;
   select count(*) into :n_ambig trimmed from work.ambiguous;
+
+  /* REVERSE: several actual columns matching ONE dictionary entry. Under squash
+     matching this is entirely possible, and it matters more than the forward
+     case -- the rename map would propose renaming two columns to the SAME
+     canonical name, which collides on application.                          */
+  create table work.ambiguous_dict as
+  select dict_key_u, sas_name, count(distinct act_u) as n_actual
+  from work.matched
+  group by dict_key_u, sas_name having calculated n_actual > 1;
+  select count(*) into :n_ambig_rev trimmed from work.ambiguous_dict;
 quit;
 
 %macro report_ambig;
   %if &n_ambig > 0 %then %do;
     %put WARNING: [11_dict] &n_ambig columns match more than one dictionary entry.;
     %put WARNING- Listed on the Ambiguous sheet. Resolve before applying any rename.;
+  %end;
+  %if &n_ambig_rev > 0 %then %do;
+    %put WARNING: [11_dict] &n_ambig_rev dictionary entries match more than one column.;
+    %put WARNING- The rename map would propose the SAME target name for two columns%str(,);
+    %put WARNING- which collides on application. See the Ambiguous sheet.;
   %end;
 %mend report_ambig;
 %report_ambig;
@@ -265,18 +354,23 @@ data work.match_best;
 run;
 
 proc sql;
-  /* documented but absent from the merged file */
+  /* Documented but absent. Judged on the DICTIONARY key that actually matched,
+     not on the actual column name. Under a SQUASH match the two differ by
+     definition -- Death_Date_Y_N against DeathDateYN -- so keying on act_u
+     listed every squash-matched dictionary entry as ABSENT even though it had
+     matched. NOT EXISTS rather than NOT IN, which mishandles a missing key. */
   create table work.doc_not_present as
   select d.sheet, d.dict_name, d.sas_name, d.dict_type, d.description
   from work.dict_u as d
-  where d.key_u not in (select act_u from work.match_best)
+  where not exists (select 1 from work.match_best as m
+                    where m.dict_key_u = d.key_u)
   order by sheet, dict_name;
 
   /* present but undocumented */
   create table work.present_not_doc as
   select a.varnum, a.act_name, a.act_type, a.act_len
   from work.actual as a
-  where a.act_u not in (select act_u from work.match_best)
+  where not exists (select 1 from work.match_best as m where m.act_u = a.act_u)
   order by varnum;
 
   select count(*) into :n_match  trimmed from work.match_best;
@@ -378,29 +472,47 @@ quit;
    %sysfunc(varnum(%sysfunc(open(...)))). The open() form leaks a dataset handle
    -- nothing ever calls close() -- and three of them would sit open for the rest
    of the session.                                                            */
+/* Sets the GLOBAL macro variable col_found. It cannot be used inside a %IF
+   condition, because it GENERATES SAS STATEMENTS as well as producing a value:
+   called as `%if %col_exists(col=X) = 0`, the proc sql text is pushed into the
+   macro expression instead of being executed, and the condition cannot evaluate.
+   Call it as a statement first, then test &col_found.                        */
+%global col_found;
 %macro col_exists(col=);
-  %local n;
-  %let n = 0;
+  %let col_found = 0;
   proc sql noprint;
-    select count(*) into :n trimmed from dictionary.columns
+    select count(*) into :col_found trimmed from dictionary.columns
     where libname='G' and memname='MASTER_DATA_MERGED' and upcase(name)=%upcase("&col");
   quit;
-  &n
+  %if %length(&col_found) = 0 %then %let col_found = 0;
 %mend col_exists;
 
 /* RULE 1 -- Age_at_Encounter: "changed to 90 if age is 90 or above" */
 %macro test_age;
   %local n_over amax;
-  %if %col_exists(col=Age_at_Encounter) = 0 %then %do;
+  %col_exists(col=Age_at_Encounter);
+  %if &col_found = 0 %then %do;
     proc sql; insert into work.rule_tests values
       ('AGE-TOPCODE','Age_at_Encounter','top-coded at 90','column not present','SKIPPED'); quit;
     %return;
   %end;
+  %let n_over = ;
+  %let amax   = ;
   proc sql noprint;
     select count(*) into :n_over trimmed from g.master_data_merged
       where Age_at_Encounter is not missing and Age_at_Encounter > 90;
     select max(Age_at_Encounter) into :amax trimmed from g.master_data_merged;
   quit;
+  /* Check before use. Both feed an INSERT and a %IF below; an unset value would
+     make the INSERT malformed and the %IF error out INSIDE this macro, so the
+     rule would be skipped while looking as though it had been tested.        */
+  %if %length(&n_over) = 0 or %length(&amax) = 0 %then %do;
+    proc sql; insert into work.rule_tests values
+      ('AGE-TOPCODE','Age_at_Encounter','changed to 90 if age is 90 or above',
+       'count query failed','NOT TESTED'); quit;
+    %put WARNING: [11_dict] AGE-TOPCODE could not be tested -- a count query failed.;
+    %return;
+  %end;
   proc sql;
     insert into work.rule_tests values
       ('AGE-TOPCODE','Age_at_Encounter',
@@ -415,25 +527,39 @@ quit;
 /* RULE 2 -- Emergent: "1 is emergent; otherwise is missing" */
 %macro test_emergent;
   %local n_one n_y n_n n_other;
-  %if %col_exists(col=Emergent) = 0 %then %do;
+  %let n_one = ; %let n_y = ; %let n_n = ; %let n_other = ;
+  %col_exists(col=Emergent);
+  %if &col_found = 0 %then %do;
     proc sql; insert into work.rule_tests values
       ('EMERGENT-CODE','Emergent','1 is emergent','column not present','SKIPPED'); quit;
     %return;
   %end;
   proc sql noprint;
-    select count(*) into :n_one   trimmed from g.master_data_merged where strip(Emergent) = '1';
-    select count(*) into :n_y     trimmed from g.master_data_merged where upcase(strip(Emergent)) = 'Y';
-    select count(*) into :n_n     trimmed from g.master_data_merged where upcase(strip(Emergent)) = 'N';
+    select count(*) into :n_one   trimmed from g.master_data_merged where cats(Emergent) = '1';
+    select count(*) into :n_y     trimmed from g.master_data_merged where upcase(cats(Emergent)) = 'Y';
+    select count(*) into :n_n     trimmed from g.master_data_merged where upcase(cats(Emergent)) = 'N';
     select count(*) into :n_other trimmed from g.master_data_merged
-      where not missing(Emergent) and strip(Emergent) not in ('1') and upcase(strip(Emergent)) not in ('Y','N');
+      where not missing(Emergent) and cats(Emergent) not in ('1') and upcase(cats(Emergent)) not in ('Y','N');
   quit;
+  %if %length(&n_one) = 0 or %length(&n_y) = 0
+      or %length(&n_n) = 0 or %length(&n_other) = 0 %then %do;
+    proc sql; insert into work.rule_tests values
+      ('EMERGENT-CODE','Emergent','1 is emergent, otherwise missing',
+       'count query failed','NOT TESTED'); quit;
+    %put WARNING: [11_dict] EMERGENT-CODE could not be tested -- a count query failed.;
+    %return;
+  %end;
   proc sql;
     insert into work.rule_tests values
       ('EMERGENT-CODE','Emergent',
        '1 is emergent, otherwise missing',
        "1=&n_one, Y=&n_y, N=&n_n, other=&n_other",
-       %if &n_one > 0 and &n_y = 0 %then %do; 'HOLDS' %end;
-       %else %if &n_y > 0 and &n_one = 0 %then %do; 'CONTRADICTED' %end;
+       /* The rule is "1 is emergent, OTHERWISE MISSING". An earlier version tested
+          only n_one > 0 and n_y = 0, so a column holding 1 and N would report
+          HOLDS -- but N contradicts "otherwise missing" just as Y does. Any
+          populated value other than 1 contradicts the documented rule.      */
+       %if &n_one > 0 and &n_y = 0 and &n_n = 0 and &n_other = 0 %then %do; 'HOLDS' %end;
+       %else %if &n_y > 0 or &n_n > 0 or &n_other > 0 %then %do; 'CONTRADICTED' %end;
        %else %do; 'REVIEW' %end;);
   quit;
   %put NOTE: [11_dict] EMERGENT-CODE -- 1=&n_one Y=&n_y N=&n_n other=&n_other.;
@@ -446,7 +572,9 @@ quit;
 /* RULE 3 -- Weekend_Indicator: "Y is weekend; N is weekdays" */
 %macro test_weekend;
   %local n_bad;
-  %if %col_exists(col=Weekend_Indicator) = 0 %then %do;
+  %let n_bad = ;
+  %col_exists(col=Weekend_Indicator);
+  %if &col_found = 0 %then %do;
     proc sql; insert into work.rule_tests values
       ('WEEKEND-YN','Weekend_Indicator','Y or N','column not present','SKIPPED'); quit;
     %return;
@@ -454,8 +582,15 @@ quit;
   proc sql noprint;
     select count(*) into :n_bad trimmed from g.master_data_merged
       where not missing(Weekend_Indicator)
-        and upcase(strip(Weekend_Indicator)) not in ('Y','N');
+        and upcase(cats(Weekend_Indicator)) not in ('Y','N');
   quit;
+  %if %length(&n_bad) = 0 %then %do;
+    proc sql; insert into work.rule_tests values
+      ('WEEKEND-YN','Weekend_Indicator','Y is weekend, N is weekdays',
+       'count query failed','NOT TESTED'); quit;
+    %put WARNING: [11_dict] WEEKEND-YN could not be tested -- a count query failed.;
+    %return;
+  %end;
   proc sql;
     insert into work.rule_tests values
       ('WEEKEND-YN','Weekend_Indicator','Y is weekend, N is weekdays',
@@ -540,6 +675,18 @@ proc print data=work.present_not_doc noobs label;
   label varnum="Order" act_name="Column" act_type="Type" act_len="Length";
 run;
 
+%macro nokey_sheet;
+  %if &n_nokey > 0 %then %do;
+    ods excel options(sheet_name="No SAS Name");
+    proc print data=work.dict_nokey noobs label;
+      var sheet dict_name dict_type description;
+      label sheet="Dict Sheet" dict_name="Documented Name" dict_type="Doc Type"
+            description="Description";
+    run;
+  %end;
+%mend nokey_sheet;
+%nokey_sheet;
+
 ods excel options(sheet_name="Documented, Absent");
 proc print data=work.doc_not_present noobs label;
   var sheet dict_name sas_name dict_type description;
@@ -565,12 +712,23 @@ proc print data=work.match_best noobs label;
 run;
 
 %macro amb_sheet;
-  %if &n_ambig > 0 %then %do;
+  %if &n_ambig > 0 or &n_ambig_rev > 0 %then %do;
     ods excel options(sheet_name="Ambiguous");
-    proc print data=work.ambiguous noobs label;
-      var act_name n_matches;
-      label act_name="Column" n_matches="Dictionary Entries Matched";
-    run;
+    %if &n_ambig > 0 %then %do;
+      proc print data=work.ambiguous noobs label;
+        var act_name n_matches;
+        label act_name="Column" n_matches="Dictionary Entries Matched";
+        title3 "One column matching several dictionary entries";
+      run;
+    %end;
+    %if &n_ambig_rev > 0 %then %do;
+      proc print data=work.ambiguous_dict noobs label;
+        var sas_name n_actual;
+        label sas_name="Documented Name" n_actual="Columns Matching It";
+        title3 "One dictionary entry matching several columns -- a rename would collide";
+      run;
+    %end;
+    title3;
   %end;
 %mend amb_sheet;
 %amb_sheet;
@@ -605,7 +763,9 @@ data _null_;
   put "present_but_undocumented=&n_undoc";
   put "renames_proposed=&n_rename";
   put "type_mismatches=&n_typebad";
-  put "ambiguous_matches=&n_ambig";
+  put "ambiguous_matches_forward=&n_ambig";
+  put "ambiguous_matches_reverse=&n_ambig_rev";
+  put "dictionary_rows_with_no_sas_name=&n_nokey";
   put "rules_contradicted=&n_contra";
   put " ";
   put "NOTHING WAS RENAMED OR CHANGED. A rename touches every downstream";

@@ -197,7 +197,15 @@ proc sql;
      values sharing their first 60 characters would appear as duplicate rows
      with the same text -- which looks like a data problem rather than a
      storage one. was_truncated marks any value still longer than the target. */
-  create table g.value_profile_long
+  /* Built in WORK, promoted to g ONCE at the end.
+
+     An earlier version inserted straight into the permanent table -- hundreds of
+     separate PROC SQL INSERTs, each opening and closing a file on a network
+     drive. That produced "A lock is not available for G.VALUE_PROFILE_LONG",
+     and when an insert failed mid-run SAS deleted the permanent copy. Building
+     in WORK is faster, cannot contend for a lock, and leaves any existing
+     permanent copy untouched until the run has actually succeeded.          */
+  create table work.value_profile_long
     (ds_name char(32), varname char(32), vtype char(4),
      value_txt char(200), n_rows num, pct_of_ds num, n_ds_rows num,
      was_truncated num);
@@ -295,7 +303,7 @@ quit;
                10 and 11 exactly, so the same value reads the same way
                everywhere and is comparable across datasets.               */
             proc sql;
-              insert into g.value_profile_long
+              insert into work.value_profile_long
               select %upcase("&d"), "&v", "&t",
                      %if %upcase(&t) = CHAR %then %do;
                        case when missing(&v) then "(missing)" else strip(&v) end
@@ -337,11 +345,11 @@ quit;
 %mend profile_all;
 %profile_all;
 
-proc sort data=g.value_profile_long; by varname ds_name descending n_rows; run;
+proc sort data=work.value_profile_long; by varname ds_name descending n_rows; run;
 
 proc sql noprint;
-  select count(*)                into :n_out    trimmed from g.value_profile_long;
-  select count(distinct varname) into :n_vars   trimmed from g.value_profile_long;
+  select count(*)                into :n_out    trimmed from work.value_profile_long;
+  select count(distinct varname) into :n_vars   trimmed from work.value_profile_long;
   select count(*)                into :n_skip   trimmed from work.skipped;
   select count(distinct varname) into :n_skipv  trimmed from work.skipped;
 quit;
@@ -373,7 +381,7 @@ quit;
    the two produces noise.                                                    */
 proc sql;
   create table work.var_in_ds as
-  select distinct varname, ds_name from g.value_profile_long;
+  select distinct varname, ds_name from work.value_profile_long;
 
   create table work.var_ds_count as
   select varname, count(distinct ds_name) as n_ds_with_var
@@ -383,7 +391,7 @@ proc sql;
      seen for a variable, crossed with every dataset carrying that variable. */
   create table work.expected as
   select distinct v.varname, v.value_txt, d.ds_name
-  from (select distinct varname, value_txt from g.value_profile_long) as v
+  from (select distinct varname, value_txt from work.value_profile_long) as v
   inner join work.var_in_ds as d on d.varname = v.varname;
 
   /* VALUE ABSENT: expected but not observed. This is the question the program
@@ -392,10 +400,10 @@ proc sql;
      when it appeared in exactly ONE dataset, so a value present in two of three
      and missing from the third went unreported, which is precisely the case
      that matters after a cohort restriction.                                */
-  create table g.value_profile_absent as
+  create table work.value_profile_absent as
   select e.varname, e.value_txt, e.ds_name as absent_from
   from work.expected as e
-  where not exists (select 1 from g.value_profile_long as o
+  where not exists (select 1 from work.value_profile_long as o
                     where o.varname = e.varname
                       and o.value_txt = e.value_txt
                       and o.ds_name = e.ds_name)
@@ -405,24 +413,62 @@ proc sql;
      different row counts by design -- 41,150 merged against 13,890 admitted --
      so a count comparison flags essentially every value and tells you nothing.
      Both counts and percents are kept in the output; only the FILTER changed. */
-  create table g.value_profile_delta as
+  create table work.value_profile_delta as
   select a.varname, a.value_txt,
          a.ds_name as ds_a, a.n_rows as n_a, a.pct_of_ds as pct_a,
          b.ds_name as ds_b, b.n_rows as n_b, b.pct_of_ds as pct_b,
          abs(a.pct_of_ds - b.pct_of_ds) as pct_shift
-  from g.value_profile_long as a
-  inner join g.value_profile_long as b
+  from work.value_profile_long as a
+  inner join work.value_profile_long as b
     on a.varname = b.varname and a.value_txt = b.value_txt
    and a.ds_name < b.ds_name
   where abs(a.pct_of_ds - b.pct_of_ds) > &pct_tol
   order by pct_shift desc, varname, value_txt;
 
-  select count(*) into :n_delta  trimmed from g.value_profile_delta;
-  select count(*) into :n_absent trimmed from g.value_profile_absent;
+  select count(*) into :n_delta  trimmed from work.value_profile_delta;
+  select count(*) into :n_absent trimmed from work.value_profile_absent;
 quit;
 
 %put NOTE: [13_vp] &n_delta value shares differ by more than &pct_tol percentage points.;
 %put NOTE: [13_vp] &n_absent value-dataset combinations are absent where the variable exists.;
+
+
+/* =========================================================================
+   SECTION 2b: Promote to the permanent library
+   -------------------------------------------------------------------------
+   Three plain DATA steps, run only once every count above has succeeded. If
+   anything failed earlier the program has already aborted, and whatever
+   permanent copy existed before is still intact -- which is the point of
+   building in WORK.
+   ========================================================================= */
+
+data g.value_profile_long;
+  set work.value_profile_long;
+run;
+
+data g.value_profile_delta;
+  set work.value_profile_delta;
+run;
+
+data g.value_profile_absent;
+  set work.value_profile_absent;
+run;
+
+%macro verify_promotion;
+  %local n_perm;
+  %let n_perm = ;
+  proc sql noprint;
+    select count(*) into :n_perm trimmed from g.value_profile_long;
+  quit;
+  %if %length(&n_perm) = 0 %then %do;
+    %fail_out(msg=Could not read g.value_profile_long after promotion);
+  %end;
+  %if &n_perm ne &n_out %then %do;
+    %fail_out(msg=Promoted &n_perm rows but work held &n_out);
+  %end;
+  %put NOTE: [13_vp] promoted &n_perm rows to g.value_profile_long.;
+%mend verify_promotion;
+%verify_promotion;
 
 
 /* =========================================================================

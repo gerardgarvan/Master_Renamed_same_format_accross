@@ -51,7 +51,7 @@ a 1:1 merge onto the md3 spine, not a stack.
 - [ ] Eight prep programs with clean exception reports; NULL sentinel cleared; conversion counts logged
 - [ ] `g.master_data_merged` — 41,150 rows, 41,150 distinct IDs, provenance flags present, no truncation
 - [ ] Merge QC: no surviving NULL strings; md8-OWNED variables non-missing only within md8 rows (QC-04 — the old "exactly 22,473" target was wrong, within-md8 population varies from ~16% to 100% by design); type-converted vars in range
-- [ ] Death and frailty naming resolved with Erin's sign-off (PCM-D-01, PCM-D-02)
+- [ ] Death and frailty naming resolved with Price's sign-off (PCM-D-01, PCM-D-02)
 - [ ] Analytic cohort defined; missingness profile documented; complete-case Ns stated (PCM-F-11, PCM-D-05). NOTE: the original rationale for restricting to INPATIENT/OBSERVATION no longer holds — see PCM-F-19
 - [ ] Data dictionary, DECISIONS.md complete, `99_run_all.sas` verified from clean session
 
@@ -71,7 +71,7 @@ a 1:1 merge onto the md3 spine, not a stack.
 | No PROC SQL UPDATE | Silent truncation trap (PCM-T-01); all mutations in DATA steps with explicit length | ✓ Established |
 | No `data X; set X;` | Destroys dataset on completion with no undo (PCM-T-02) | ✓ Established |
 | Single ownership per variable | Prevents silent last-wins overwrite (PCM-T-05) | ✓ Established, map needed |
-| PCM-D-01 Death variables | Three names for one flag across sources | Pending — Erin |
+| PCM-D-01 Death variables | Three names for one flag across sources | Pending — Price |
 | PCM-D-02 Frailty components | Char Y/N vs numeric encodings of same five items | Pending |
 | PCM-D-03 ISO_SEV naming | md4/md8 naming differs from others | Pending |
 | PCM-D-04 Emergent usability | Near-zero positives; likely clinician non-completion | Pending |

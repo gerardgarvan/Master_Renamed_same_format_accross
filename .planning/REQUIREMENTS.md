@@ -49,8 +49,8 @@
 
 ### Variable Reconciliation
 
-- [x] **REC-01** — User can see the `Death_Date_Y_N`, `IsDead_Y_N`, and `Death` naming discrepancy RESOLVED — the resolution (with Erin's sign-off, 2026-08-27) is keep-separate with documented rationale: three source-specific columns are retained because nothing verifies they measure the same thing (PCM-D-01). "Resolved" means the decision is made and attributed, not that the columns are collapsed into one.
-- [x] **REC-02** — User can see the frailty component variables (`Feels_Exausted` etc.) encoding discrepancy RESOLVED — the resolution (with Erin's sign-off, 2026-08-27) is keep-separate: both the char Y/N and numeric `_Value` encodings are retained for all five items because the width signal ($3 md7 vs $1 md6) shows they are not interchangeable (PCM-D-02). "Resolved" means the decision is made and attributed, not that one canonical encoding is chosen.
+- [x] **REC-01** — User can see the `Death_Date_Y_N`, `IsDead_Y_N`, and `Death` naming discrepancy RESOLVED — the resolution (with Price's sign-off, 2026-08-27) is keep-separate with documented rationale: three source-specific columns are retained because nothing verifies they measure the same thing (PCM-D-01). "Resolved" means the decision is made and attributed, not that the columns are collapsed into one.
+- [x] **REC-02** — User can see the frailty component variables (`Feels_Exausted` etc.) encoding discrepancy RESOLVED — the resolution (with Price's sign-off, 2026-08-27) is keep-separate: both the char Y/N and numeric `_Value` encodings are retained for all five items because the width signal ($3 md7 vs $1 md6) shows they are not interchangeable (PCM-D-02). "Resolved" means the decision is made and attributed, not that one canonical encoding is chosen.
 - [x] **REC-03** — User can see `ISO_SEV` naming discrepancies across md4 and md8 resolved or explicitly deferred with rationale (PCM-D-03)
 - [x] **REC-04** — User can see `Emergent` usability decision recorded in DECISIONS.md (PCM-D-04)
 - [ ] **REC-05** — User can see `Age_at_Encounter` floor investigation recorded (PCM-D-07)

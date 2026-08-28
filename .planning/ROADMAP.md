@@ -98,7 +98,7 @@ Plans:
 - [x] 05-03-PLAN.md -- AMENDMENT-01: QC-06 unflagged-containment assertion, QC-07 ceiling removal, distribution report retained as the PCM-D-09 record (QC-06, QC-07)
 
 ### Phase 6: Variable Reconciliation
-**Goal**: The variable-naming conflicts deliberately carried through unreconciled are resolved with Erin's sign-off, so the merged file has one column per measured concept rather than three
+**Goal**: The variable-naming conflicts deliberately carried through unreconciled are resolved with Price's sign-off, so the merged file has one column per measured concept rather than three
 **Depends on**: Phase 5
 **Requirements**: PCM-D-10 (the only open item); D-01, D-02, D-03, D-04, D-07, D-08, D-09, D-11 resolved 2026-08-27
 **Success Criteria** (what must be TRUE):
@@ -118,7 +118,7 @@ Plans:
 **Depends on**: Phase 6
 **Requirements**: PCM-D-05, PCM-F-11, PCM-F-19 (supersedes PCM-F-12)
 **Success Criteria** (what must be TRUE):
- 1. Cohort inclusion criterion defined and justified. **The original justification is void** -- PCM-F-12 said ambulatory patients were never eligible for the geriatric assessments, but after MRG-06 most cognitive and frailty scores belong to patients OUTSIDE the admitted cohort (PCM-F-19). `Admit_BMI` is what actually forces the restriction: all 12,726 values are inside the admitted cohort, zero outside. Re-decide PCM-D-05 on that basis, with Erin
+ 1. Cohort inclusion criterion defined and justified. **The original justification is void** -- PCM-F-12 said ambulatory patients were never eligible for the geriatric assessments, but after MRG-06 most cognitive and frailty scores belong to patients OUTSIDE the admitted cohort (PCM-F-19). `Admit_BMI` is what actually forces the restriction: all 12,726 values are inside the admitted cohort, zero outside. Re-decide PCM-D-05 on that basis, with Price
  2. Missingness profile documented per analysis variable
  3. Complete-case Ns stated, including the ~53% gap within the admitted population
  4. The md3-owns missingness trade-off recorded -- free for `Admit_BMI` (PCM-F-07), unchecked elsewhere

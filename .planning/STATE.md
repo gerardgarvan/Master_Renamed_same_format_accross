@@ -203,12 +203,12 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   **`Admit_BMI` is what actually forces the restriction**: all 12,726 values are inside the
   admitted cohort, 91.6% coverage there and zero outside. So a cognitive/frailty analysis
   may not want the admitted restriction at all, while anything using BMI has no choice.
-  This is a question for Erin, not a settled default.
+  This is a question for Price, not a settled default.
 
 - **PCM-D-10** — Negatives in other `rt_*` variables: needs the PREP-09 report from 03-06.
   `rt_ANCHOR_to_*_days` CAN legitimately be negative — offsets, not durations
 
-**Phase 6 is no longer blocked on Erin.** D-01 and D-02 were its entry conditions and both are
+**Phase 6 is no longer blocked on Price.** D-01 and D-02 were its entry conditions and both are
 resolved as keep-separate, which is a valid resolution. Phase 6 is now largely a documentation
 exercise: record the three multi-column concepts in the data dictionary.
 

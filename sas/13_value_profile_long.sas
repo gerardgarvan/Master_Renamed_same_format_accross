@@ -75,9 +75,20 @@ options mprint nofmterr nodate nonumber ps=max ls=200;
 %let ds_list = master_data_merged master_data_harmonized analytic_cohort;
 
 /* Variables with more distinct values than this are skipped. The point is to
-   compare CATEGORIES across datasets, and a column with hundreds of values
-   produces noise rather than an answer -- and may be identifying.          */
-%let max_levels = 50;
+   compare CATEGORIES across datasets; a column with thousands of values
+   produces noise rather than an answer, and may be identifying.
+
+   RAISED FROM 50 TO 200 on 2026-08-28. At 50 the only genuinely CATEGORICAL
+   variables excluded were CPT1_CLASS and CPT1_LABEL, both at 159 distinct --
+   procedure classifications worth comparing across datasets. Everything between
+   159 and 176 is a count, so 200 is a clean cut: it captures both without
+   admitting a single continuous measure.
+
+   The identifier protection does NOT rest on this number. Identifier-named
+   columns are excluded before any value is read, and a true identifier has
+   thousands of distinct values -- SORT_ID has 7,695, ENCRYPTED_MRN has 41,150 --
+   so raising the ceiling to 200 does not bring one into range.             */
+%let max_levels = 200;
 
 /* Percentage-point tolerance for calling a distribution shifted. The datasets
    have different row counts by design, so counts always differ and only the
@@ -454,12 +465,26 @@ data g.value_profile_absent;
   set work.value_profile_absent;
 run;
 
+/* work.skipped explains why a variable is ABSENT from the deliverable, so it is
+   the last thing that should vanish with the session. Promoted with the rest. */
+data g.value_profile_skipped;
+  set work.skipped;
+run;
+
 %macro verify_promotion;
-  %local n_perm;
+  %local n_perm n_skip_perm;
   %let n_perm = ;
+  %let n_skip_perm = ;
   proc sql noprint;
-    select count(*) into :n_perm trimmed from g.value_profile_long;
+    select count(*) into :n_perm      trimmed from g.value_profile_long;
+    select count(*) into :n_skip_perm trimmed from g.value_profile_skipped;
   quit;
+  %if %length(&n_skip_perm) = 0 %then %do;
+    %fail_out(msg=Could not read g.value_profile_skipped after promotion);
+  %end;
+  %if &n_skip_perm ne &n_skip %then %do;
+    %fail_out(msg=Promoted &n_skip_perm skipped rows but work held &n_skip);
+  %end;
   %if %length(&n_perm) = 0 %then %do;
     %fail_out(msg=Could not read g.value_profile_long after promotion);
   %end;
@@ -467,6 +492,7 @@ run;
     %fail_out(msg=Promoted &n_perm rows but work held &n_out);
   %end;
   %put NOTE: [13_vp] promoted &n_perm rows to g.value_profile_long.;
+  %put NOTE- and &n_skip_perm rows to g.value_profile_skipped.;
 %mend verify_promotion;
 %verify_promotion;
 
@@ -508,6 +534,12 @@ data _null_;
   put "                            Compared on percent, not count: the datasets have";
   put "                            different row counts by design, so a count";
   put "                            comparison flags nearly everything.";
+  put "  g.value_profile_skipped -- every column NOT profiled, with the reason and";
+  put "                            its distinct count. A variable absent from the";
+  put "                            profile is distinguishable from one never";
+  put "                            considered. Query it ascending by n_distinct:";
+  put "                            anything just above the ceiling is a categorical";
+  put "                            that nearly made it.";
   put "  g.value_profile_absent -- a value seen for a variable in one dataset and";
   put "                            NOT present in another that carries that same";
   put "                            variable. This is the did-it-disappear question.";
@@ -522,7 +554,7 @@ run;
 
 %put NOTE: ==== Phase 13 complete ====;
 %put NOTE- Output: g.value_profile_long (&n_out rows);
-%put NOTE- Also  : g.value_profile_delta%str(,) g.value_profile_absent;
+%put NOTE- Also  : g.value_profile_delta%str(,) g.value_profile_absent%str(,) g.value_profile_skipped;
 %put NOTE- Report: qc/13_value_profile.txt;
 
 %restore_log;

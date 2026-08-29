@@ -1,20 +1,21 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: Variable Harmonization
-status: planning
-last_updated: "2026-08-29T00:00:00.000Z"
+milestone_name: — Variable Harmonization
+status: executing
+last_updated: "2026-08-29T19:11:31.929Z"
+last_activity: 2026-08-29
 progress:
-  total_phases: 8
+  total_phases: 11
   completed_phases: 5
-  total_plans: 23
-  completed_plans: 19
-  percent: 83
+  total_plans: 25
+  completed_plans: 20
+  percent: 80
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-27T19:44:08.770Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-29T19:11:31.923Z
 
 ---
 
@@ -22,16 +23,16 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 08 — documentation-handoff
+**Current Focus:** Phase 14 — label-similarity-sweep
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-29 — Milestone v1.1 rescoped and renumbered to Phases 14-16.
+Phase: 14 (label-similarity-sweep) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-29
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
   redundant), and summary statistics already cover every variable. What remains open is the
@@ -40,6 +41,7 @@ Last activity: 2026-08-29 — Milestone v1.1 rescoped and renumbered to Phases 1
   rebuilding g.analytic_cohort, which is still 176 columns from before harmonisation.
 
 ### v1.0 Position (preserved)
+
 Phase: 08 (documentation-handoff) — EXECUTING
 Plan: 2 of 3
 | Field | Value |
@@ -49,7 +51,7 @@ Plan: 2 of 3
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [████████░░] 83%
+**Progress:** [████████░░] 80%
 
 **Phase status at a glance:**
 
@@ -107,6 +109,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 | Phase 06 P01 | 15 | 2 tasks | 1 files |
 | Phase 07 P01 | 30 | 1 tasks | 1 files |
 | Phase 08 P01 | 30 | 1 tasks | 2 files |
+| Phase 14 P01 | 15 | 1 tasks | 1 files |
 
 ## Accumulated Context
 

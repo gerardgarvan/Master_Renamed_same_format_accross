@@ -100,7 +100,7 @@ should show they were considered, not that they were never raised.
 
 ### Open — the work this milestone actually adds
 
-- [ ] **HARM-02** — Canonical names are sourced from `docs/precede_dictionary.csv`, the
+- [x] **HARM-02** — Canonical names are sourced from `docs/precede_dictionary.csv`, the
       310-variable PRECEDE data dictionary, read programmatically.
       **CORRECTED**: an earlier draft named `VARIABLE_RECTIFICATION.xlsx` as the crosswalk.
       That workbook is a REGISTER OF OPEN QUESTIONS -- its columns are Variable, Status,
@@ -108,7 +108,7 @@ should show they were considered, not that they were never raised.
       cannot serve as a mapping. The dictionary can, and already has: it settled
       `ISO_SEV_IntraOp_MAC_Average` as canonical and established that only the `_YN`
       comorbidity forms are documented
-- [ ] **HARM-03** — A LABEL-similarity sweep over all variable labels reports same-concept
+- [x] **HARM-03** — A LABEL-similarity sweep over all variable labels reports same-concept
       aliases whose NAMES share nothing. **This is the one genuinely new capability in the
       milestone.** Every sweep to date has matched on names, so a pair with unrelated names
       and near-identical labels is structurally invisible -- the class that hid
@@ -121,7 +121,7 @@ should show they were considered, not that they were never raised.
       Note `in_md3` is constant (md3 is the spine) and the eleven `h_*_src` columns each
       hold a single repeated value -- all twelve carry no information, and the rule should
       say so explicitly rather than carrying them by default
-- [ ] **HARM-09** — Concept groups the profiler has never seen are added and profiled:
+- [x] **HARM-09** — Concept groups the profiler has never seen are added and profiled:
       the SSDI death family (`SSDI_DEATH_DATE_Y_N`, `SSDI_DEATH_Y_N`, `SSDI_DEATH` --
       the same three-variant shape as the death flags already harmonised), and
       `CPT1_CLASS` / `CPT1_LABEL` (a code/label pair, both 159 distinct)
@@ -193,8 +193,8 @@ should show they were considered, not that they were never raised.
 | DOC-03 | Phase 8 — Documentation & Handoff | Pending |
 | DOC-04 | Phase 8 — Documentation & Handoff | Pending |
 | HARM-01 | Phase 9 — Variable Harmonization | Pending |
-| HARM-02 | Phase 9 — Variable Harmonization | Pending |
-| HARM-03 | Phase 9 — Variable Harmonization | Pending |
+| HARM-02 | Phase 9 — Variable Harmonization | Complete |
+| HARM-03 | Phase 9 — Variable Harmonization | Complete |
 | HARM-04 | Phase 9 — Variable Harmonization | Pending |
 | HARM-05 | Phase 10 — Harmonized Dataset | Pending |
 | HARM-06 | Phase 10 — Harmonized Dataset | Pending |

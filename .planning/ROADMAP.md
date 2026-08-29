@@ -201,7 +201,7 @@ stale cohort file.
 **Plans**: 2 plans
 Plans:
 - [x] 14-01-PLAN.md -- Write sas/14_label_similarity.sas Section A: extract labels from g.master_data_harmonized, join precede_dictionary.csv for best-label enrichment, COMPGED pairwise sweep, exclude known pairs, write docs/label_similarity_candidates.csv and evidence workbook (HARM-02, HARM-03)
-- [ ] 14-02-PLAN.md -- Implement Section B: SSDI death family and CPT1 concept group profiling, write docs/concept_decisions_EXT_TEMPLATE.csv and docs/CONCEPT_EVIDENCE_EXT.xlsx; human-verify SAS run (HARM-09)
+- [x] 14-02-PLAN.md -- Implement Section B: SSDI death family and CPT1 concept group profiling, write docs/concept_decisions_EXT_TEMPLATE.csv and docs/CONCEPT_EVIDENCE_EXT.xlsx; human-verify SAS run (HARM-09)
 
 ### Phase 15: Extend the Harmonized Dataset
 **Goal**: Concepts confirmed in Phase 14 are harmonised into `g.master_data_harmonized` by the existing `10b` machinery, and a stated rule governs the pipeline-derived columns

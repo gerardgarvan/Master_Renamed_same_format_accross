@@ -72,6 +72,29 @@
 
 ---
 
+## Milestone v1.1 Requirements — Variable Harmonization
+
+### Harmonization Crosswalk
+
+- [ ] **HARM-01**: All source variables (from master_data_1..8) are inventoried and each variable's presence/absence across the 8 sources is documented
+- [ ] **HARM-02**: VARIABLE_RECTIFICATION.xlsx is read as the canonical crosswalk mapping source variable names to a canonical name
+- [ ] **HARM-03**: A label-similarity sweep identifies any same-concept aliases not covered by the crosswalk; gaps are reported in a committed artifact
+- [ ] **HARM-04**: Every canonical name decision is recorded in a committed artifact (harmonization log or DECISIONS.md extension)
+
+### Harmonized Dataset
+
+- [ ] **HARM-05**: A new SAS program (`14_harmonize.sas`) reads `g.master_data_merged` and writes `g.master_data_harmonized` with one canonical column per concept
+- [ ] **HARM-06**: Alias columns are dropped in the harmonized dataset; `g.master_data_merged` is not modified (read-only input)
+- [ ] **HARM-07**: Pipeline-derived columns (`in_md1`..`in_md8`, `n_sources`, `rt_envelope_flag`, conversion flags) are excluded from harmonization scope — a stated rule governs whether they are carried through or dropped
+- [ ] **HARM-08**: Row count of `g.master_data_harmonized` asserted equal to 41,150 in code
+
+### Summary Statistics
+
+- [ ] **SUMM-01**: A summary statistics report covers every variable in `g.master_data_harmonized` (n, n-missing, min/max/mean for numerics; frequency for character variables)
+- [ ] **SUMM-02**: Summary output is written to a committed QC artifact (text report or XLSX)
+
+---
+
 ## v2 Requirements (deferred)
 
 - Statistical modelling or regression outputs — out of scope for this project
@@ -132,3 +155,13 @@
 | DOC-02 | Phase 8 — Documentation & Handoff | Pending |
 | DOC-03 | Phase 8 — Documentation & Handoff | Pending |
 | DOC-04 | Phase 8 — Documentation & Handoff | Pending |
+| HARM-01 | Phase 9 — Variable Harmonization | Pending |
+| HARM-02 | Phase 9 — Variable Harmonization | Pending |
+| HARM-03 | Phase 9 — Variable Harmonization | Pending |
+| HARM-04 | Phase 9 — Variable Harmonization | Pending |
+| HARM-05 | Phase 10 — Harmonized Dataset | Pending |
+| HARM-06 | Phase 10 — Harmonized Dataset | Pending |
+| HARM-07 | Phase 10 — Harmonized Dataset | Pending |
+| HARM-08 | Phase 10 — Harmonized Dataset | Pending |
+| SUMM-01 | Phase 11 — Summary Statistics | Pending |
+| SUMM-02 | Phase 11 — Summary Statistics | Pending |

@@ -78,12 +78,15 @@ This correction was documented in the plan itself (the "CORRECTED 2026-08-29" bl
 
 ## Human Checkpoint Result
 
-PENDING -- Task 2 is a `checkpoint:human-verify`. Human must:
-1. Submit `sas/14_label_similarity.sas` in a fresh SAS 9.4 session
-2. Verify log shows 0 ERRORs and expected NOTE lines
-3. Confirm all five output files exist and are reviewable
-4. Confirm CPT1 cross-tab is capped at 200 rows with title stating full count
-5. Type "approved" to close the checkpoint
+APPROVED -- SAS 9.4 log shows 0 ERRORs and the final NOTE: ==== 14_label_similarity.sas complete (Section A + Section B) ====.
+
+All five output files confirmed present and reviewable after the SAS run.
+
+Note: `docs/label_similarity_candidates.csv` and `docs/concept_decisions_EXT_TEMPLATE.csv` are gitignored by `*.csv` in .gitignore. To commit them as planned artifacts, run:
+```
+git add -f docs/label_similarity_candidates.csv docs/concept_decisions_EXT_TEMPLATE.csv
+git commit -m "feat(14): commit label similarity candidates and SSDI/CPT1 decision template"
+```
 
 ## Known Stubs
 
@@ -91,8 +94,7 @@ None -- Section B is fully implemented. The concept_decisions_EXT_TEMPLATE.csv C
 
 ## Next Steps
 
-- Human review and SAS run (checkpoint)
-- After human verify: commit docs/label_similarity_candidates.csv and docs/concept_decisions_EXT_TEMPLATE.csv as committed artifacts
+- Commit docs/label_similarity_candidates.csv and docs/concept_decisions_EXT_TEMPLATE.csv using git add -f (both are gitignored by *.csv rule)
 - Phase 15 (Extend Harmonized Dataset): human fills CONFIRMED=YES in both template files, then Phase 15 machinery applies via 10b_concept_harmonize.sas
 
 ## Self-Check

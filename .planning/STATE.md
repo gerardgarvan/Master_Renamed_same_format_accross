@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-last_updated: "2026-08-27T19:44:08.775Z"
+milestone: v1.1
+milestone_name: Variable Harmonization
+status: planning
+last_updated: "2026-08-29T00:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 5
@@ -28,6 +28,12 @@ progress:
 
 ## Current Position
 
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-29 — Milestone v1.1 Variable Harmonization started
+
+### v1.0 Position (preserved)
 Phase: 08 (documentation-handoff) — EXECUTING
 Plan: 2 of 3
 | Field | Value |

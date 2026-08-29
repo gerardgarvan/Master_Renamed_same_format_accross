@@ -142,4 +142,17 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-25 after initialization*
+
+## Current Milestone: v1.1 Variable Harmonization
+
+**Goal:** Produce a new analysis-ready dataset where every source variable that represents the same concept across master_data_1..8 has one canonical name and one unified summary statistic.
+
+**Target features:**
+- Systematic sweep of all source variables to identify same-concept aliases (pipeline-derived columns excluded)
+- VARIABLE_RECTIFICATION.xlsx as the primary crosswalk; label-similarity sweep for gaps
+- Single canonical column per concept in a new output dataset (`g.master_data_harmonized`)
+- `14_harmonize.sas` reads `g.master_data_merged` and writes the harmonized output
+- Summary statistics for every variable in the harmonized dataset
+
+---
+*Last updated: 2026-08-29 — v1.1 milestone started*

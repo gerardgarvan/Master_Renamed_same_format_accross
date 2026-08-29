@@ -298,8 +298,36 @@ MOVEMENT_DISORDER|MOVEMENTDISORDER_YN
 COGNITIVE_DISORDER|COGNITIVE_DISORDER
 COGNITIVE_DISORDER|COGNITIVEDISORDER_YN
 ISO_SEV_AVERAGE|ISO_SEV_EXP_INTRAOP_MAC_AVERAGE
+ISO_SEV_AVERAGE|ISO_SEV_INTRAOP_MAC_AVERAGE
+FRAILTY_EXHAUST|FEELS_EXAUSTED
+FRAILTY_EXHAUST|FEELS_EXAUSTED_VALUE
+FRAILTY_ACTIVITY|LOW_PHYSICAL_ACTIVITY
+FRAILTY_ACTIVITY|LOW_PHYSICAL_ACTIVITY_VALUE
+FRAILTY_WALKING|SLOW_WALKING_SPEED
+FRAILTY_WALKING|SLOW_WALKING_SPEED_VALUE
+FRAILTY_WEIGHT|UNINTENDED_WEIGHT_LOSS
+FRAILTY_WEIGHT|UNINTENDED_WEIGHT_LOSS_VALUE
+FRAILTY_GRIP|WEEK_GRIP_STRENGTH
+FRAILTY_GRIP|WEEK_GRIP_STRENGTH_VALUE
+COGNITIVE_GRAIN|COGNITIVE_SCORE
+COGNITIVE_GRAIN|COGNITIVE_CATEGORY
+FRAILTY_GRAIN|FRAILTY_SCORE
+FRAILTY_GRAIN|FRAILTY_CATEGORY
 ;
 run;
+
+/* COMPLETED 2026-08-29. The list above was truncated at ISO_SEV_AVERAGE and
+   omitted five frailty char/value pairs, the second ISO average source, and both
+   Score/Category groups -- so those pairs would have surfaced as NEW candidates
+   and a reviewer would have been asked to decide something Phase 10 settled.
+
+   NOTE HONESTLY: this is a SECOND COPY of the Phase 10 concept list, not a
+   derivation from it. The comment claiming it cannot fall out of step was wrong;
+   it already had. It is kept in this form only because 10_concept_profile.sas
+   declares its groups the same way, so there is no shared table to read. If the
+   two ever diverge again, the symptom is a settled pair reappearing as a
+   candidate. The durable fix is to move the concept list into one file that both
+   programs %include -- worth doing when Phase 15 touches 10b.               */
 
 /* Generate all intra-group pairs for exclusion */
 proc sql noprint;
@@ -338,7 +366,10 @@ data work.label_words;
   do _i = 1 to countw(working_label, ' -_/(),.');
     word = upcase(strip(scan(working_label, _i, ' -_/(),.')));
     /* Single characters and pure noise words carry no signal */
-    if length(word) >= 3 then output;
+    /* Floor of 2, not 3. Clinical labels are full of two-letter acronyms --
+       AF, MI, BP, HR -- and a floor of 3 discards every word of such a label,
+       leaving it with no word set and no Jaccard score at all.             */
+    if length(word) >= 2 then output;
   end;
 run;
 
@@ -373,11 +404,15 @@ proc sql;
            inner join work.label_words as wb
              on wa.word = wb.word
           where wa.varname = a.varname and wb.varname = b.varname)
-         as n_shared_words,
+         as n_shared_words,   /* count(*) of an empty match set is 0, not missing */
 
-         (select n_words from work.word_counts where varname = a.varname)
+         /* COALESCE to 0. A label whose every word is under the length floor has
+            NO row in word_counts, so the lookup returns missing -- and missing
+            propagates through the sum below, making score_jaccard missing rather
+            than the correct 0.                                              */
+         coalesce((select n_words from work.word_counts where varname = a.varname), 0)
          as n_words_a,
-         (select n_words from work.word_counts where varname = b.varname)
+         coalesce((select n_words from work.word_counts where varname = b.varname), 0)
          as n_words_b
 
   from work.best_labels as a, work.best_labels as b
@@ -427,13 +462,39 @@ quit;
 /* Calibration pair -- Death_Date_Y_N vs IsDead_Y_N proved identical by
    Phase 10 on all 8,730 overlapping rows. Record their scores so the
    calibration is visible rather than assumed.                             */
+/* Initialise, then count the pair BEFORE reading its scores. If the calibration
+   pair is absent -- both labels fell back to VARNAME and were excluded, say --
+   the macro variables keep whatever a previous session left in them, and the QC
+   artifact reports a stale number as though it were this run.              */
+%let cal_edit    = NA;
+%let cal_jaccard = NA;
+%let n_cal       = 0;
+
 proc sql noprint;
+  select count(*) into :n_cal trimmed
+  from work.all_pairs
+  where upcase(varname_a) = 'DEATH_DATE_Y_N' and upcase(varname_b) = 'ISDEAD_Y_N';
+quit;
+
+%macro read_calibration;
+  %if %length(&n_cal) = 0 %then %do;
+    %put WARNING: [14] calibration count query failed -- scores reported as NA.;
+    %return;
+  %end;
+  %if &n_cal ne 1 %then %do;
+    %put WARNING: [14] calibration pair not found among the scored pairs.;
+    %put WARNING- Thresholds cannot be validated against a known-good pair this run.;
+    %return;
+  %end;
+  proc sql noprint;
   select score_edit, score_jaccard
     into :cal_edit trimmed, :cal_jaccard trimmed
   from work.all_pairs
   where (varname_a='DEATH_DATE_Y_N' and varname_b='ISDEAD_Y_N')
      or (varname_a='ISDEAD_Y_N'     and varname_b='DEATH_DATE_Y_N');
 quit;
+%mend read_calibration;
+%read_calibration;
 
 %put NOTE: [14] CALIBRATION PAIR Death_Date_Y_N vs IsDead_Y_N:;
 %put NOTE: [14]   score_edit=&cal_edit score_jaccard=&cal_jaccard;
@@ -522,36 +583,39 @@ run;
 ods excel file="&docs_path.\LABEL_SIMILARITY_EVIDENCE.xlsx"
   style=minimal
   options(sheet_name='KEY'
-          frozen_headers='yes'
-          autofilter='yes');
+          frozen_headers="1"
+          autofilter="all");
 
-/* KEY sheet: summary metadata */
+/* KEY sheet: summary metadata.
+
+   ASSIGNMENTS AND OUTPUT, NOT DATALINES. Macro references inside raw DATALINES
+   are read as DATA, not scanned by the macro processor -- the sheet would carry
+   the literal text &run_dt, &threshold, &n_vars. Nothing errors; the workbook is
+   just silently wrong, which is worse than a failure. Section B already builds
+   its tables this way.                                                       */
 data work.key_sheet;
   length item $80 value $200;
-  infile datalines dsd dlm='|' truncover;
-  input item $ value $;
-  datalines;
-Program|14_label_similarity.sas
-Run date|&run_dt
-Dataset|g.master_data_harmonized (187 cols, 41150 rows)
-Edit threshold (normalized COMPLEV)|&threshold
-Jaccard threshold|&jaccard_threshold
-Similarity measure (edit)|1 - complev(upcase(a), upcase(b)) / max(lengthn(a), lengthn(b))
-Similarity measure (Jaccard)|shared_words / (words_a + words_b - shared_words)
-Qualifies on|EITHER measure (edit OR Jaccard)
-Variables in sweep|&n_vars
-Labels from PRECEDE dictionary|&n_dict_label
-Labels from SAS label attribute|&n_sas_label
-Labels using variable name (fallback)|&n_varname_fallback
-Total pairs scored|&n_all_pairs
-Pairs above threshold (edit or Jaccard)|&n_above_threshold
-Known concept pairs excluded|&n_excluded
-Candidate pairs for review|&n_candidates
-Calibration pair score_edit|&cal_edit
-Calibration pair score_jaccard|&cal_jaccard
-Calibration note|Death_Date_Y_N vs IsDead_Y_N (proved same concept by Phase 10)
-Human action required|Fill CONFIRMED column in label_similarity_candidates.csv
-;
+  item='Program';                              value="14_label_similarity.sas";              output;
+  item='Run date';                             value="&run_dt";                              output;
+  item='Dataset';                              value="g.&src_ds";                            output;
+  item='Edit threshold (normalised COMPLEV)';  value="&threshold";                           output;
+  item='Jaccard threshold';                    value="&jaccard_threshold";                   output;
+  item='Similarity measure (edit)';            value="1 - complev(a,b) / max(lengthn(a), lengthn(b))"; output;
+  item='Similarity measure (Jaccard)';         value="shared_words / (words_a + words_b - shared_words)"; output;
+  item='Qualifies on';                         value="EITHER measure";                       output;
+  item='Variables in sweep';                   value="&n_vars";                              output;
+  item='Labels from PRECEDE dictionary';       value="&n_dict_label";                        output;
+  item='Labels from SAS label attribute';      value="&n_sas_label";                         output;
+  item='Labels using variable name (fallback)';value="&n_varname_fallback";                  output;
+  item='Total pairs scored';                   value="&n_all_pairs";                         output;
+  item='Pairs above either threshold';         value="&n_above_threshold";                   output;
+  item='Excluded as known or pipeline-derived';value="&n_excluded";                          output;
+  item='Candidate pairs for review';           value="&n_candidates";                        output;
+  item='Calibration pair';                     value="Death_Date_Y_N vs IsDead_Y_N -- proved same concept in Phase 10"; output;
+  item='Calibration score_edit';               value="&cal_edit";                            output;
+  item='Calibration score_jaccard';            value="&cal_jaccard";                         output;
+  item='Calibration reading';                  value="If the calibration pair scores below BOTH thresholds, the thresholds are wrong -- not the data. A sweep returning nothing otherwise reads as a clean result."; output;
+  item='Human action required';                value="Complete the CONFIRMED column in docs/label_similarity_candidates.csv"; output;
 run;
 
 proc print data=work.key_sheet noobs label; run;
@@ -589,7 +653,7 @@ data _null_;
   put "similarity_measure_edit=COMPLEV_normalized_by_max_label_length";
   put "similarity_measure_jaccard=word_overlap_over_word_union";
   put "pairs_above_threshold=&n_above_threshold";
-  put "known_concept_pairs_excluded=&n_excluded";
+  put "known_or_pipeline_derived_pairs_excluded=&n_excluded";
   put "candidate_pairs_written=&n_candidates";
   put " ";
   put "CALIBRATION (Death_Date_Y_N vs IsDead_Y_N):";
@@ -811,7 +875,10 @@ proc sql noprint;
   select count(*) into :n_cpt1_xtab_full trimmed from work.cpt1_xtab;
   select count(*) into :n_cpt1_xtab_cap  trimmed from work.cpt1_xtab_capped;
 quit;
-%put NOTE: [14] CPT1 cross-tab full rows: &n_cpt1_xtab_full; displayed rows (cap 200): &n_cpt1_xtab_cap.;
+/* Two statements. A %PUT ends at its FIRST semicolon, so the text after it
+   became an orphan statement and threw ERROR 180-322 on every run.         */
+%put NOTE: [14] CPT1 cross-tab full rows: &n_cpt1_xtab_full;
+%put NOTE- displayed rows (cap 200): &n_cpt1_xtab_cap.;
 
 /* B-7: Write concept_decisions_EXT_TEMPLATE.csv.
         Schema matches 10b_concept_harmonize.sas EXACTLY:
@@ -920,8 +987,8 @@ run;
 ods excel file="&docs_path.\CONCEPT_EVIDENCE_EXT.xlsx"
   style=minimal
   options(sheet_name='KEY'
-          frozen_headers='yes'
-          autofilter='yes');
+          frozen_headers="1"
+          autofilter="all");
 
 proc print data=work.key_b noobs label; run;
 

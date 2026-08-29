@@ -74,24 +74,61 @@
 
 ## Milestone v1.1 Requirements — Variable Harmonization
 
-### Harmonization Crosswalk
+**Phases 14-16** (renumbered from 9-11, which are taken by existing programs).
 
-- [ ] **HARM-01**: All source variables (from master_data_1..8) are inventoried and each variable's presence/absence across the 8 sources is documented
-- [ ] **HARM-02**: VARIABLE_RECTIFICATION.xlsx is read as the canonical crosswalk mapping source variable names to a canonical name
-- [ ] **HARM-03**: A label-similarity sweep identifies any same-concept aliases not covered by the crosswalk; gaps are reported in a committed artifact
-- [ ] **HARM-04**: Every canonical name decision is recorded in a committed artifact (harmonization log or DECISIONS.md extension)
+**Scope corrected 2026-08-29.** As first written, this milestone re-specified work that
+Phases 9-11 had already delivered. The harmonized dataset exists; what does NOT exist is a
+sweep on variable LABELS, and that is where the remaining risk lives. Requirements already
+met are marked Complete with the program that met them, rather than deleted -- the record
+should show they were considered, not that they were never raised.
 
-### Harmonized Dataset
+### Already delivered (verified, not re-specified)
 
-- [ ] **HARM-05**: A new SAS program (`14_harmonize.sas`) reads `g.master_data_merged` and writes `g.master_data_harmonized` with one canonical column per concept
-- [ ] **HARM-06**: Alias columns are dropped in the harmonized dataset; `g.master_data_merged` is not modified (read-only input)
-- [ ] **HARM-07**: Pipeline-derived columns (`in_md1`..`in_md8`, `n_sources`, `rt_envelope_flag`, conversion flags) are excluded from harmonization scope — a stated rule governs whether they are carried through or dropped
-- [ ] **HARM-08**: Row count of `g.master_data_harmonized` asserted equal to 41,150 in code
+- [x] **HARM-01** — Every variable's presence across master_data_1..8 is inventoried.
+      Delivered by Phase 2 (`qclib.ownership_map`, 163 variables with `sources_present`)
+- [x] **HARM-05** — `g.master_data_harmonized` exists with one canonical column per
+      confirmed concept. Delivered by `10b_concept_harmonize.sas` (11 `h_` columns).
+      NOTE: the program is `10b_concept_harmonize.sas`, not `14_harmonize.sas`
+- [x] **HARM-06** — Eleven alias columns dropped, each PROVEN redundant in the run itself
+      (0 rows added, 0 disagreements) rather than assumed. `g.master_data_merged` verified
+      unmodified: 176 columns before and after
+- [x] **HARM-08** — Row count asserted at 41,150 in code, and the key asserted still unique
+- [x] **SUMM-01** — Every variable summarised: n, n-missing, coverage %, distinct count;
+      min/P25/median/mean/P75/max/std for numerics; observed lengths for characters.
+      Delivered by `09_summary_stats.sas`
+- [x] **SUMM-02** — Written to `docs/SUMMARY_STATS_HARMONIZED.xlsx`, not the log
 
-### Summary Statistics
+### Open — the work this milestone actually adds
 
-- [ ] **SUMM-01**: A summary statistics report covers every variable in `g.master_data_harmonized` (n, n-missing, min/max/mean for numerics; frequency for character variables)
-- [ ] **SUMM-02**: Summary output is written to a committed QC artifact (text report or XLSX)
+- [ ] **HARM-02** — Canonical names are sourced from `docs/precede_dictionary.csv`, the
+      310-variable PRECEDE data dictionary, read programmatically.
+      **CORRECTED**: an earlier draft named `VARIABLE_RECTIFICATION.xlsx` as the crosswalk.
+      That workbook is a REGISTER OF OPEN QUESTIONS -- its columns are Variable, Status,
+      Priority, Issue, Evidence, Action. It holds no source-to-canonical name pairs and
+      cannot serve as a mapping. The dictionary can, and already has: it settled
+      `ISO_SEV_IntraOp_MAC_Average` as canonical and established that only the `_YN`
+      comorbidity forms are documented
+- [ ] **HARM-03** — A LABEL-similarity sweep over all variable labels reports same-concept
+      aliases whose NAMES share nothing. **This is the one genuinely new capability in the
+      milestone.** Every sweep to date has matched on names, so a pair with unrelated names
+      and near-identical labels is structurally invisible -- the class that hid
+      `Cognitive_Category` until a full sweep ran
+- [ ] **HARM-04** — Every canonical-name decision recorded in a committed artifact,
+      attributed and dated. `concept_decisions.csv` is the existing pattern: a human
+      confirms, the program applies exactly that and fails on anything unmapped
+- [ ] **HARM-07** — A stated rule governs pipeline-derived columns (`in_md1`..`in_md8`,
+      `n_sources`, `rt_envelope_flag`, `rt_*_neg`, `h_*_src`), enforced in code.
+      Note `in_md3` is constant (md3 is the spine) and the eleven `h_*_src` columns each
+      hold a single repeated value -- all twelve carry no information, and the rule should
+      say so explicitly rather than carrying them by default
+- [ ] **HARM-09** — Concept groups the profiler has never seen are added and profiled:
+      the SSDI death family (`SSDI_DEATH_DATE_Y_N`, `SSDI_DEATH_Y_N`, `SSDI_DEATH` --
+      the same three-variant shape as the death flags already harmonised), and
+      `CPT1_CLASS` / `CPT1_LABEL` (a code/label pair, both 159 distinct)
+- [ ] **HARM-10** — `g.analytic_cohort` is rebuilt from `g.master_data_harmonized`.
+      It is currently 176 columns, built in Phase 7 before harmonisation existed, so it
+      carries the eleven dropped aliases and none of the `h_` columns. Any analysis using
+      it gets pre-harmonisation encodings
 
 ---
 

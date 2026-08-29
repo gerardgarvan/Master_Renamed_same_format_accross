@@ -31,7 +31,13 @@ progress:
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
-Last activity: 2026-08-29 — Milestone v1.1 Variable Harmonization started
+Last activity: 2026-08-29 — Milestone v1.1 rescoped and renumbered to Phases 14-16.
+  As first written it re-specified delivered work: g.master_data_harmonized already exists
+  (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
+  redundant), and summary statistics already cover every variable. What remains open is the
+  LABEL-similarity sweep -- the one alias class name matching cannot reach -- plus three
+  unprofiled concept groups, a rule for the 12 no-information pipeline columns, and
+  rebuilding g.analytic_cohort, which is still 176 columns from before harmonisation.
 
 ### v1.0 Position (preserved)
 Phase: 08 (documentation-handoff) — EXECUTING

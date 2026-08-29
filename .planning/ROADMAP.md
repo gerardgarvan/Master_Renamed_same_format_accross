@@ -161,3 +161,63 @@ passes, logging 9 rows flagged. The merged file gains one column, `rt_envelope_f
 
 An earlier version predicted QC-06 failing at 9 -- correct under the null-or-block reading of
 PCM-D-08, superseded by the flag resolution.
+
+---
+
+## Milestone v1.1 — Variable Harmonization
+
+**Goal:** Close the gap that name-based matching structurally cannot reach -- same-concept
+variables whose NAMES share nothing -- and bring the analytic cohort onto the harmonized
+file.
+
+**Phases:** 14-16
+**Added:** 2026-08-29
+**Rescoped:** 2026-08-29
+
+**RENUMBERED FROM 9-11.** Those numbers are taken: `09_summary_stats.sas`,
+`10_concept_profile.sas` / `10b_concept_harmonize.sas`, `11_dictionary_reconcile.sas`,
+`12_column_redundancy.sas` and `13_value_profile_long.sas` all exist and have run. 14-16
+matches the `14_harmonize.sas` naming already chosen.
+
+**RESCOPED.** As first written this milestone re-specified delivered work.
+`g.master_data_harmonized` already exists -- 187 columns, 41,150 rows, eleven harmonized
+columns, eleven aliases dropped after being PROVEN redundant in the run rather than assumed.
+HARM-01, 05, 06, 08 and SUMM-01, 02 are met; see REQUIREMENTS.md, where they are marked
+Complete with the program that met them rather than deleted.
+
+What remains genuinely open is the label sweep, three concept groups never profiled, and the
+stale cohort file.
+
+### Phase 14: Label-Similarity Sweep
+**Goal**: Same-concept variables whose NAMES share nothing are found by comparing LABELS, and every gap is reported -- the one class of alias that name matching cannot reach
+**Depends on**: Phase 13
+**Requirements**: HARM-02, HARM-03, HARM-09
+**Success Criteria** (what must be TRUE):
+  1. Every variable label in `g.master_data_harmonized` is compared against every other by a stated similarity measure; the measure and its threshold are recorded, not left implicit (HARM-03)
+  2. Candidate pairs are written to a committed artifact with their labels side by side, so a human judges the match rather than the program asserting it (HARM-03)
+  3. Canonical names come from `docs/precede_dictionary.csv`, read programmatically. `VARIABLE_RECTIFICATION.xlsx` is NOT used as a crosswalk -- it is a register of open questions and holds no name mapping (HARM-02)
+  4. The SSDI death family and the `CPT1_CLASS`/`CPT1_LABEL` pair are added to the concept list and profiled (HARM-09)
+  5. A pair the sweep proposes is never harmonised without human confirmation -- the `concept_decisions.csv` pattern, where the program applies exactly what is confirmed and FAILS on any unmapped value
+**Plans**: TBD
+
+### Phase 15: Extend the Harmonized Dataset
+**Goal**: Concepts confirmed in Phase 14 are harmonised into `g.master_data_harmonized` by the existing `10b` machinery, and a stated rule governs the pipeline-derived columns
+**Depends on**: Phase 14
+**Requirements**: HARM-04, HARM-07
+**Success Criteria** (what must be TRUE):
+  1. Every canonical-name decision is recorded in `concept_decisions.csv`, attributed and dated, and applied by program rather than by hand (HARM-04)
+  2. A written rule states which pipeline-derived columns are carried and which dropped, and the rule is enforced in code. It must address the twelve columns that carry no information: `in_md3` (constant -- md3 is the spine) and the eleven `h_*_src` companions (each a single repeated value, because the redundancy proof showed no secondary source ever fires) (HARM-07)
+  3. `g.master_data_merged` is confirmed unmodified after the run -- 176 columns, 41,150 rows
+  4. Any newly dropped alias is PROVEN redundant in the run, not assumed: zero rows added and zero disagreements where both are populated
+**Plans**: TBD
+
+### Phase 16: Rebuild the Analytic Cohort
+**Goal**: `g.analytic_cohort` is rebuilt from `g.master_data_harmonized` so all three datasets are in step, and the cohort decision itself is settled
+**Depends on**: Phase 15
+**Requirements**: HARM-10, PCM-D-05
+**Success Criteria** (what must be TRUE):
+  1. `g.analytic_cohort` derives from `g.master_data_harmonized`, carries the `h_` columns, and carries no dropped alias (HARM-10)
+  2. PCM-D-05 is resolved and recorded with attribution. Its ORIGINAL rationale is void: PCM-F-12 held that ambulatory patients were never eligible for the geriatric assessments, and PCM-F-19 disproved it -- most cognitive and frailty scores belong to patients OUTSIDE the admitted cohort
+  3. The decision record states what the restriction actually does. Phase 13 measured it: the admitted cohort is a different clinical population, not a subset. Charlson 0 falls from 60.8% to 34.5%, general anaesthesia rises from 57.6% to 84.2%, and the excluded group is largely ambulatory endoscopy -- GI service 18.4% to 1.7%, colonoscopy 8.5% to 0.4%
+  4. The racial composition shift is recorded in the decision and carried into any methods section: RACE=WHITE is 79.8% in the full file and 87.1% in the cohort, a 7.3-point difference that bears directly on generalisability
+**Plans**: TBD

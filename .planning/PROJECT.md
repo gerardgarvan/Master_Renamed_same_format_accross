@@ -145,14 +145,36 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Current Milestone: v1.1 Variable Harmonization
 
-**Goal:** Produce a new analysis-ready dataset where every source variable that represents the same concept across master_data_1..8 has one canonical name and one unified summary statistic.
+**Goal:** Close the one gap name-based matching structurally cannot reach -- same-concept
+variables whose NAMES share nothing -- and bring the analytic cohort onto the harmonized
+file.
+
+**Phases:** 14-16 (renumbered from 9-11, which are taken)
+
+**Rescoped 2026-08-29.** As first written this milestone re-specified work already
+delivered. `g.master_data_harmonized` exists: 187 columns, 41,150 rows, eleven harmonized
+columns with `_src` provenance, eleven aliases dropped after being proven redundant in the
+run itself. Summary statistics cover every variable. HARM-01, 05, 06, 08 and SUMM-01, 02
+are met and are marked Complete in REQUIREMENTS.md against the program that met them.
 
 **Target features:**
-- Systematic sweep of all source variables to identify same-concept aliases (pipeline-derived columns excluded)
-- VARIABLE_RECTIFICATION.xlsx as the primary crosswalk; label-similarity sweep for gaps
-- Single canonical column per concept in a new output dataset (`g.master_data_harmonized`)
-- `14_harmonize.sas` reads `g.master_data_merged` and writes the harmonized output
-- Summary statistics for every variable in the harmonized dataset
+- A LABEL-similarity sweep across all variable labels. Every sweep so far has matched on
+  NAMES, so a pair with unrelated names and near-identical labels is structurally
+  invisible. This is the genuinely new capability
+- Canonical names read from `docs/precede_dictionary.csv`, the 310-variable PRECEDE data
+  dictionary. NOT from `VARIABLE_RECTIFICATION.xlsx` -- an earlier draft named it as the
+  crosswalk, but that workbook is a register of open questions (Variable, Status, Priority,
+  Issue, Evidence, Action) and holds no name mapping
+- Three concept groups the profiler has never seen: the SSDI death family, and the
+  `CPT1_CLASS` / `CPT1_LABEL` code-label pair
+- A stated rule for the twelve pipeline-derived columns that carry no information --
+  `in_md3` is constant, and each of the eleven `h_*_src` companions holds one repeated value
+- `g.analytic_cohort` rebuilt from the harmonized file. It is currently 176 columns, built
+  before harmonisation existed, so it carries the dropped aliases and none of the `h_`
+  columns
+- PCM-D-05 resolved with the evidence now in hand: the admitted restriction produces a
+  different clinical population rather than a subset, and shifts racial composition by 7.3
+  percentage points
 
 ---
-*Last updated: 2026-08-29 — v1.1 milestone started*
+*Last updated: 2026-08-29 — v1.1 milestone rescoped after review*

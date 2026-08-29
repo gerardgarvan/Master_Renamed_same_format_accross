@@ -610,12 +610,361 @@ data _null_;
 run;
 
 
-/* ==========================================================================
+/* =========================================================================
    SECTION B: SSDI Death Family + CPT1 Concept Group Profiling (HARM-09)
-   Implemented in Phase 14 Plan 02.
-   ========================================================================== */
-%put NOTE: [14] Section B placeholder -- implement in Plan 02.;
+   ========================================================================= */
 
+%put NOTE: [14] Section B starting -- SSDI and CPT1 concept profiling.;
+
+/* B-0: Confirm all five target variables exist in g.master_data_harmonized.
+        Program aborts if any is missing (HARM-09 requirement).
+        Uses dictionary.columns.TYPE which is 'char' or 'num' (NOT 1/2 --
+        see PCM-T-13).                                                       */
+
+%macro check_var_present(var=);
+  %local _chk;
+  %let _chk = ;
+  proc sql noprint;
+    select count(*) into :_chk trimmed
+    from dictionary.columns
+    where libname='G' and memname='MASTER_DATA_HARMONIZED'
+      and upcase(name) = upcase("&var");
+  quit;
+  /* CHECK LENGTH BEFORE USE. If the query fails, _chk is unset and a bare
+     %if &_chk = 0 would be a macro error INSIDE the macro -- the gate would
+     be skipped while appearing to have run. That shape has cost this
+     pipeline multiple debugging rounds.                                      */
+  %if %length(&_chk) = 0 %then %do;
+    %fail_out(msg=Column presence query failed for &var);
+  %end;
+  %else %if &_chk = 0 %then %do;
+    %fail_out(msg=Variable &var not found in g.master_data_harmonized -- HARM-09 requires it);
+  %end;
+  %put NOTE: [14] CONFIRMED: &var present in g.master_data_harmonized.;
+%mend check_var_present;
+
+%check_var_present(var=SSDI_DEATH_DATE_Y_N);
+%check_var_present(var=SSDI_DEATH_Y_N);
+%check_var_present(var=SSDI_DEATH);
+%check_var_present(var=CPT1_CLASS);
+%check_var_present(var=CPT1_LABEL);
+
+/* Summary flags for QC artifact (fail_out above guarantees we reach here
+   only if all five are present)                                             */
+%let ssdi_present = YES;
+%let cpt1_present = YES;
+
+/* B-1: Determine variable types from dictionary.columns.
+        TYPE is 'char' or 'num' (PCM-T-13 -- NOT the numeric 1/2 that
+        PROC CONTENTS OUT= uses).                                            */
+proc sql noprint;
+  select type into :ssdi_date_type  trimmed
+    from dictionary.columns where libname='G' and memname='MASTER_DATA_HARMONIZED'
+      and upcase(name) = 'SSDI_DEATH_DATE_Y_N';
+  select type into :ssdi_yn_type    trimmed
+    from dictionary.columns where libname='G' and memname='MASTER_DATA_HARMONIZED'
+      and upcase(name) = 'SSDI_DEATH_Y_N';
+  select type into :ssdi_death_type trimmed
+    from dictionary.columns where libname='G' and memname='MASTER_DATA_HARMONIZED'
+      and upcase(name) = 'SSDI_DEATH';
+  select type into :cpt1_class_type trimmed
+    from dictionary.columns where libname='G' and memname='MASTER_DATA_HARMONIZED'
+      and upcase(name) = 'CPT1_CLASS';
+  select type into :cpt1_label_type trimmed
+    from dictionary.columns where libname='G' and memname='MASTER_DATA_HARMONIZED'
+      and upcase(name) = 'CPT1_LABEL';
+quit;
+
+%put NOTE: [14] SSDI_DEATH_DATE_Y_N type: &ssdi_date_type;
+%put NOTE: [14] SSDI_DEATH_Y_N type: &ssdi_yn_type;
+%put NOTE: [14] SSDI_DEATH type: &ssdi_death_type;
+%put NOTE: [14] CPT1_CLASS type: &cpt1_class_type;
+%put NOTE: [14] CPT1_LABEL type: &cpt1_label_type;
+
+/* Macro to emit the correct CASE expression based on type.
+   Uses best32. for numeric (not $32. -- that is a character format and
+   would fail on a numeric variable).                                         */
+%macro fmt_col(v=, t=);
+  %if %upcase(&t) = CHAR %then %do;
+    case when missing(&v) then '(missing)' else strip(&v) end
+  %end;
+  %else %do;
+    case when missing(&v) then '(missing)' else strip(put(&v, best32.)) end
+  %end;
+%mend fmt_col;
+
+/* B-2: New concept group table (same structure as work.concepts in Plan A) */
+data work.new_concepts;
+  length concept $32 varname $32 note $80;
+  infile datalines dsd dlm='|' truncover;
+  input concept $ varname $ note $;
+  datalines;
+SSDI_DEATH_FLAG|SSDI_DEATH_DATE_Y_N|SSDI variant -- date presence Y/N
+SSDI_DEATH_FLAG|SSDI_DEATH_Y_N|SSDI variant -- death Y/N
+SSDI_DEATH_FLAG|SSDI_DEATH|SSDI variant -- plain form
+CPT1_CODE_LABEL|CPT1_CLASS|CPT code classification (159 distinct)
+CPT1_CODE_LABEL|CPT1_LABEL|CPT code label (159 distinct)
+;
+run;
+
+proc sql noprint;
+  select count(distinct concept) into :n_new_concepts trimmed from work.new_concepts;
+quit;
+%put NOTE: [14] New concept groups to profile: &n_new_concepts (SSDI_DEATH_FLAG and CPT1_CODE_LABEL).;
+
+/* B-3: SSDI value inventory.
+        Uses type-driven CASE expressions via %fmt_col to handle char/num
+        correctly without knowing the types at write time.                   */
+proc sql noprint;
+  create table work.ssdi_inv as
+  select 'SSDI_DEATH_DATE_Y_N' as varname length=32,
+         %fmt_col(v=SSDI_DEATH_DATE_Y_N, t=&ssdi_date_type)  as value length=100,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  group by SSDI_DEATH_DATE_Y_N
+  UNION ALL
+  select 'SSDI_DEATH_Y_N' as varname,
+         %fmt_col(v=SSDI_DEATH_Y_N, t=&ssdi_yn_type)         as value,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  group by SSDI_DEATH_Y_N
+  UNION ALL
+  select 'SSDI_DEATH' as varname,
+         %fmt_col(v=SSDI_DEATH, t=&ssdi_death_type)          as value,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  group by SSDI_DEATH
+  order by varname, n_rows desc;
+quit;
+
+/* B-4: CPT1 value inventory (159 distinct values each -- inventory is not capped) */
+proc sql noprint;
+  create table work.cpt1_inv as
+  select 'CPT1_CLASS' as varname length=32,
+         %fmt_col(v=CPT1_CLASS, t=&cpt1_class_type) as value length=200,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  where not missing(CPT1_CLASS)
+  group by CPT1_CLASS
+  UNION ALL
+  select 'CPT1_LABEL' as varname,
+         %fmt_col(v=CPT1_LABEL, t=&cpt1_label_type) as value,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  where not missing(CPT1_LABEL)
+  group by CPT1_LABEL
+  order by varname, n_rows desc;
+quit;
+
+/* B-5: SSDI pairwise cross-tabulation -- three pairs (binary so small) */
+proc sql noprint;
+  create table work.ssdi_xtab as
+  select 'SSDI_DEATH_DATE_Y_N' as varname_a length=32,
+         'SSDI_DEATH_Y_N'      as varname_b length=32,
+         %fmt_col(v=SSDI_DEATH_DATE_Y_N, t=&ssdi_date_type) as value_a length=100,
+         %fmt_col(v=SSDI_DEATH_Y_N,      t=&ssdi_yn_type)   as value_b length=100,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  group by SSDI_DEATH_DATE_Y_N, SSDI_DEATH_Y_N
+  UNION ALL
+  select 'SSDI_DEATH_DATE_Y_N', 'SSDI_DEATH',
+         %fmt_col(v=SSDI_DEATH_DATE_Y_N, t=&ssdi_date_type),
+         %fmt_col(v=SSDI_DEATH,          t=&ssdi_death_type),
+         count(*)
+  from g.master_data_harmonized
+  group by SSDI_DEATH_DATE_Y_N, SSDI_DEATH
+  UNION ALL
+  select 'SSDI_DEATH_Y_N', 'SSDI_DEATH',
+         %fmt_col(v=SSDI_DEATH_Y_N, t=&ssdi_yn_type),
+         %fmt_col(v=SSDI_DEATH,     t=&ssdi_death_type),
+         count(*)
+  from g.master_data_harmonized
+  group by SSDI_DEATH_Y_N, SSDI_DEATH
+  order by varname_a, varname_b, n_rows desc;
+
+  select count(*) into :n_ssdi_xtab trimmed from work.ssdi_xtab;
+quit;
+
+%put NOTE: [14] SSDI cross-tab rows: &n_ssdi_xtab.;
+
+/* B-6: CPT1 cross-tabulation.
+        Capped at 200 rows by n_rows descending (CPT1 x CPT1 can be 159x159).
+        Pitfall 5 in RESEARCH.md: the cap must be explicit and documented.   */
+proc sql noprint;
+  create table work.cpt1_xtab as
+  select %fmt_col(v=CPT1_CLASS, t=&cpt1_class_type) as value_a length=200,
+         %fmt_col(v=CPT1_LABEL, t=&cpt1_label_type) as value_b length=200,
+         count(*) as n_rows
+  from g.master_data_harmonized
+  where not missing(CPT1_CLASS) and not missing(CPT1_LABEL)
+  group by CPT1_CLASS, CPT1_LABEL
+  order by n_rows desc;
+quit;
+
+/* Keep top 200 rows; _n_ <= 200 is the cap */
+data work.cpt1_xtab_capped;
+  set work.cpt1_xtab;
+  if _n_ <= 200;
+run;
+
+proc sql noprint;
+  select count(*) into :n_cpt1_xtab_full trimmed from work.cpt1_xtab;
+  select count(*) into :n_cpt1_xtab_cap  trimmed from work.cpt1_xtab_capped;
+quit;
+%put NOTE: [14] CPT1 cross-tab full rows: &n_cpt1_xtab_full; displayed rows (cap 200): &n_cpt1_xtab_cap.;
+
+/* B-7: Write concept_decisions_EXT_TEMPLATE.csv.
+        Schema matches 10b_concept_harmonize.sas EXACTLY:
+          concept, varname, value_txt, target_value, confirmed, harmonized_name, priority
+
+        VALUE-LEVEL: one row per source variable per observed non-missing value.
+        Cross-tab combinations are EVIDENCE (in the workbook) not mapping input.
+
+        10b rules this template must respect:
+          1. Every observed non-missing value must have a row (10b fails on unmapped)
+          2. Confirmation is concept-level (every row of a confirmed concept is marked)
+          3. Two source columns in one concept need DIFFERENT priorities (tie aborts)
+
+        NOT capped -- 10b fails on unmapped values if CPT1 rows are cut.    */
+
+data work.ext_ssdi;
+  length concept $32 varname $32 value_txt $100
+         target_value $100 confirmed $3 harmonized_name $32 priority 8;
+  set work.ssdi_inv;
+  where value ne '(missing)';
+  concept         = 'SSDI_DEATH_FLAG';
+  value_txt       = strip(value);
+  target_value    = '';   /* human fills: the standard value this maps to   */
+  confirmed       = '';   /* human fills: YES only when concept confirmed    */
+  harmonized_name = '';   /* human fills: must start h_ and be <=28 chars   */
+  /* Different priorities required -- tie aborts 10b */
+  if      varname = 'SSDI_DEATH_DATE_Y_N' then priority = 1;
+  else if varname = 'SSDI_DEATH_Y_N'      then priority = 2;
+  else                                         priority = 3;
+  keep concept varname value_txt target_value confirmed harmonized_name priority;
+run;
+
+data work.ext_cpt1;
+  length concept $32 varname $32 value_txt $200
+         target_value $200 confirmed $3 harmonized_name $32 priority 8;
+  set work.cpt1_inv;
+  where value ne '(missing)';
+  concept         = 'CPT1_CODE_LABEL';
+  value_txt       = strip(value);
+  target_value    = '';
+  confirmed       = '';
+  harmonized_name = '';
+  if varname = 'CPT1_CLASS' then priority = 1;
+  else                           priority = 2;
+  keep concept varname value_txt target_value confirmed harmonized_name priority;
+run;
+
+data work.ext_template;
+  length concept $32 varname $32 value_txt $200
+         target_value $200 confirmed $3 harmonized_name $32 priority 8;
+  set work.ext_ssdi work.ext_cpt1;
+run;
+
+proc export data=work.ext_template
+    outfile="&docs_path.\concept_decisions_EXT_TEMPLATE.csv"
+    dbms=csv replace;
+run;
+
+proc sql noprint;
+  select count(*) into :n_ext_template trimmed from work.ext_template;
+quit;
+
+%macro check_ext_csv;
+  %if %sysfunc(fileexist(&docs_path.\concept_decisions_EXT_TEMPLATE.csv)) = 0 %then %do;
+    %fail_out(msg=concept_decisions_EXT_TEMPLATE.csv was not written);
+  %end;
+  %put NOTE: [14] CONFIRMED: docs/concept_decisions_EXT_TEMPLATE.csv written.;
+%mend check_ext_csv;
+%check_ext_csv;
+
+%put NOTE: [14] concept_decisions_EXT_TEMPLATE.csv rows: &n_ext_template.;
+
+/* B-8: Write docs/CONCEPT_EVIDENCE_EXT.xlsx.
+        SEPARATE file from CONCEPT_EVIDENCE.xlsx (Pitfall 6 in RESEARCH.md).
+        KEY sheet is leftmost (CLAUDE.md requirement).
+        UF colors via ODS EXCEL style=minimal.                               */
+
+%macro drop_stale_ext;
+  %local rc;
+  %if %sysfunc(fileexist(%bquote(&docs_path.\CONCEPT_EVIDENCE_EXT.xlsx))) %then %do;
+    filename _oldex "&docs_path.\CONCEPT_EVIDENCE_EXT.xlsx";
+    %let rc = %sysfunc(fdelete(_oldex));
+    filename _oldex clear;
+    %if &rc ne 0 %then %do;
+      %fail_out(msg=Could not delete previous CONCEPT_EVIDENCE_EXT.xlsx -- rc=&rc. It may be open in Excel.);
+    %end;
+  %end;
+%mend drop_stale_ext;
+%drop_stale_ext;
+
+%let run_dt_b = %sysfunc(date(), worddate.);
+
+data work.key_b;
+  length item $80 value $200;
+  item = 'Program';              value = '14_label_similarity.sas Section B';               output;
+  item = 'Run date';             value = "&run_dt_b";                                        output;
+  item = 'Phase 10 evidence';    value = 'Preserved in CONCEPT_EVIDENCE.xlsx -- this file is extension only'; output;
+  item = 'Concept groups';       value = 'SSDI_DEATH_FLAG (3 vars) and CPT1_CODE_LABEL (2 vars)'; output;
+  item = 'SSDI variables';       value = 'SSDI_DEATH_DATE_Y_N  SSDI_DEATH_Y_N  SSDI_DEATH'; output;
+  item = 'CPT1 variables';       value = 'CPT1_CLASS  CPT1_LABEL (159 distinct values each)'; output;
+  item = 'CPT1 cross-tab cap';   value = "200 rows by n_rows descending (full count: &n_cpt1_xtab_full)"; output;
+  item = 'Decision template';    value = 'docs/concept_decisions_EXT_TEMPLATE.csv -- human fills CONFIRMED=YES'; output;
+  item = 'Next step';            value = 'Add CONFIRMED=YES rows to concept_decisions.csv and run Phase 15'; output;
+run;
+
+ods excel file="&docs_path.\CONCEPT_EVIDENCE_EXT.xlsx"
+  style=minimal
+  options(sheet_name='KEY'
+          frozen_headers='yes'
+          autofilter='yes');
+
+proc print data=work.key_b noobs label; run;
+
+ods excel options(sheet_name='SSDI_VALUE_INVENTORY');
+proc print data=work.ssdi_inv noobs; run;
+
+ods excel options(sheet_name='SSDI_CROSSTAB');
+proc print data=work.ssdi_xtab noobs; run;
+
+ods excel options(sheet_name='CPT1_VALUE_INVENTORY');
+proc print data=work.cpt1_inv noobs; run;
+
+ods excel options(sheet_name='CPT1_CROSSTAB_TOP200');
+title "CPT1_CLASS x CPT1_LABEL cross-tabulation: top &n_cpt1_xtab_cap of &n_cpt1_xtab_full rows shown (capped at 200 by n_rows desc)";
+proc print data=work.cpt1_xtab_capped noobs; run;
+title;
+
+ods excel close;
+ods listing;
+
+/* B-9: Append Section B counts to QC artifact (mod = append, not overwrite) */
+data _null_;
+  file "&qc_path.\14_label_similarity.txt" mod;
+  put " ";
+  put "=== Section B: SSDI and CPT1 Concept Profiling (HARM-09) ===";
+  put "ssdi_present=&ssdi_present";
+  put "cpt1_present=&cpt1_present";
+  put "ssdi_xtab_rows=&n_ssdi_xtab";
+  put "cpt1_xtab_full_rows=&n_cpt1_xtab_full";
+  put "cpt1_xtab_displayed_rows=&n_cpt1_xtab_cap";
+  put "ext_template_rows=&n_ext_template";
+  put "decisions_template=docs/concept_decisions_EXT_TEMPLATE.csv";
+  put "evidence_workbook=docs/CONCEPT_EVIDENCE_EXT.xlsx (not committed)";
+  put " ";
+  put "Section B complete.";
+run;
+
+%put NOTE: [14] Section B complete.;
+
+
+/* =========================================================================
+   END OF PROGRAM
+   ========================================================================= */
 
 %restore_log;
-%put NOTE: ==== 14_label_similarity.sas Section A complete ====;
+%put NOTE: ==== 14_label_similarity.sas complete (Section A + Section B) ====;

@@ -43,8 +43,16 @@
       not licensed, set XLSXENGINE=EXCELCS or convert the workbooks first.
 =============================================================================*/
 
+/*-----------------------------------------------------------------------------
+  MPRINT/MLOGIC/SYMBOLGEN make the log enormous. They are on for the first
+  debugging run; comment them out once the program runs clean.
+
+  DLCREATEDIR lets the EDAOUT libname create the output folder if it does not
+  exist yet. Without it, LIBNAME quietly notes "Library does not exist" and the
+  ODS RTF destination then fails with "Physical file does not exist".
+-----------------------------------------------------------------------------*/
 options ls=132 ps=60 nodate number mprint mlogic symbolgen nofmterr
-        validvarname=v7 msglevel=i;
+        validvarname=v7 msglevel=i dlcreatedir;
 ods graphics on / width=6.5in height=4in;
 
 
@@ -66,6 +74,50 @@ libname aux  "&auxpath";
 libname c1   "&proppath"  access=readonly;
 libname c2   "&newprog"   access=readonly;
 libname edaout "&outpath";
+
+/*-----------------------------------------------------------------------------
+  PREFLIGHT - stop here rather than 1,000 lines later.
+
+  If Z: is not mapped on this machine, LIBNAME issues only a NOTE, not an ERROR.
+  Every later step then runs against an empty data set and the log fills with
+  downstream damage that hides the one real problem. This check fails loudly
+  and immediately instead.
+
+  If it fires: map the drive, or repoint %let proppath / %let newprog at
+  wherever the Propensity Paper folders actually live on this machine.
+-----------------------------------------------------------------------------*/
+%macro preflight;
+  %local bad;
+  %let bad = 0;
+
+  %if %sysfunc(libref(aux)) %then %do;
+    %put ERROR: AUX not assigned. Check &auxpath..;
+    %let bad = 1;
+  %end;
+  %if %sysfunc(libref(c1)) %then %do;
+    %put ERROR: C1 not assigned. Check &proppath..;
+    %let bad = 1;
+  %end;
+  %if %sysfunc(libref(c2)) %then %do;
+    %put ERROR: C2 not assigned. Check &newprog..;
+    %let bad = 1;
+  %end;
+  %if %sysfunc(libref(edaout)) %then %do;
+    %put ERROR: EDAOUT not assigned. Check &outpath and the DLCREATEDIR option.;
+    %let bad = 1;
+  %end;
+
+  %if &bad %then %do;
+    %put ERROR: ==========================================================;
+    %put ERROR: One or more libraries are unavailable. Stopping before the;
+    %put ERROR: program produces a log full of downstream damage.;
+    %put ERROR: ==========================================================;
+    %abort cancel;
+  %end;
+  %else %put NOTE: Preflight passed - all four libraries assigned.;
+%mend preflight;
+
+%preflight
 
 /* --- master data set names ---------------------------------------------- */
 %let MASTER   = c1.cognitive_clock_sa_7_22_FINAL;   /* PeCAN master          */
@@ -170,12 +222,39 @@ proc import out = raw_icdfind
   guessingrows = max;
 run;
 
-proc import out = raw_precede
-            datafile = "&auxpath\2018_2019_Precede_Database.xlsx"
-            dbms = xlsx replace;
-  getnames = yes;
-  sheet = "2018_2019_Precede_Database";
-run;
+/*-----------------------------------------------------------------------------
+  The Precede workbook is 14,807 rows x 3,988 columns and PROC IMPORT takes
+  close to three minutes on it. The pipeline only ever uses two of those
+  columns - studyid and Clock_Data - so the default here reads just those two
+  through the XLSX engine, which is near-instant.
+
+  Set PRECEDE_FULL = Y when you want Section 4 to profile the whole workbook.
+  Expect the long import and a 3,988-row missingness table (capped in the RTF
+  by MISS_PROFILE's PRINTMAX; the full detail still lands in EDAOUT).
+-----------------------------------------------------------------------------*/
+%let precede_full = N;
+
+%macro get_precede;
+  %if %upcase(&precede_full) = Y %then %do;
+    proc import out = raw_precede
+                datafile = "&auxpath\2018_2019_Precede_Database.xlsx"
+                dbms = xlsx replace;
+      getnames = yes;
+      sheet = "2018_2019_Precede_Database";
+    run;
+  %end;
+  %else %do;
+    libname pxl xlsx "&auxpath\2018_2019_Precede_Database.xlsx";
+    data raw_precede;
+      set pxl."2018_2019_Precede_Database"n (keep = studyid Clock_Data);
+    run;
+    libname pxl clear;
+    %put NOTE: Precede workbook read in narrow mode (studyid, Clock_Data only). ;
+    %put NOTE: Set precede_full = Y to profile all 3,988 columns.;
+  %end;
+%mend get_precede;
+
+%get_precede
 
 proc import out = raw_transfuse
             datafile = "&auxpath\2018_2019_INTAOP_Blood_Loss_Transfused_20210816.xlsx"
@@ -245,9 +324,21 @@ run;
   SECTION 4 - PER-FILE PROFILING
 =============================================================================*/
 
-/* ---- reusable missingness profiler ------------------------------------- */
-%macro miss_profile(lib=WORK, ds=, label=);
-  %local nv nobs;
+/*-----------------------------------------------------------------------------
+  REUSABLE MISSINGNESS PROFILER
+
+  Builds one sum(missing(var)) expression per column. A macro variable caps at
+  32,767 characters, which the Precede workbook (3,988 columns) blows past
+  around column 743 - the SELECT then truncates mid-expression and PROC SQL
+  fails with a syntax error. So the expressions are built and run in chunks of
+  CHUNK columns and stacked afterward.
+
+  PRINTMAX caps the per-file table in the RTF. Every column still lands in
+  eda_missing_all and in the EDAOUT copy; only the printed extract is trimmed,
+  sorted worst-first, so a 3,988-row table does not swamp the report.
+-----------------------------------------------------------------------------*/
+%macro miss_profile(lib=WORK, ds=, label=, chunk=100, printmax=50);
+  %local nv nobs i nchunks lo hi;
 
   proc sql noprint;
     create table _vars as
@@ -267,32 +358,47 @@ run;
     %return;
   %end;
 
-  data _null_;
-    set _vars end=eof;
-    length s $32000;
-    retain s '';
-    s = catx(', ', s,
-             cats('sum(missing(', nliteral(name), ')) as _M', put(_n_, z4.)));
-    if eof then call symputx('_msel', s);
-  run;
-
   proc sql noprint;
-    create table _mwide as
-      select count(*) as _NOBS, &_msel from &lib..&ds;
-    select _NOBS into :nobs trimmed from _mwide;
+    select count(*) into :nobs trimmed from &lib..&ds;
   quit;
 
-  proc transpose data=_mwide(drop=_NOBS)
-                 out=_mlong(rename=(col1=N_Missing)) name=_pos;
-    var _M:;
-  run;
+  proc datasets lib=work nolist; delete _mlong; quit;
 
+  %let nchunks = %sysfunc(ceil(%sysevalf(&nv / &chunk)));
+
+  %do i = 1 %to &nchunks;
+    %let lo = %eval((&i - 1) * &chunk + 1);
+    %let hi = %sysfunc(min(%eval(&i * &chunk), &nv));
+
+    data _null_;
+      set _vars(firstobs=&lo obs=&hi) end=eof;
+      length s $30000;
+      retain s '';
+      s = catx(', ', s,
+               cats('sum(missing(', nliteral(name), ')) as _M', put(_n_, z4.)));
+      if eof then call symputx('_msel', s);
+    run;
+
+    proc sql noprint;
+      create table _mwide as select &_msel from &lib..&ds;
+    quit;
+
+    proc transpose data=_mwide out=_ml(rename=(col1=N_Missing)) name=_pos;
+      var _M:;
+    run;
+
+    proc append base=_mlong data=_ml force; run;
+    proc datasets lib=work nolist; delete _mwide _ml; quit;
+  %end;
+
+  /* _vars is ordered by varnum and _mlong was appended in that same order,
+     so a positional merge lines the two up correctly.                      */
   data _mrep;
     merge _vars(rename=(name=Variable)) _mlong(keep=N_Missing);
     length Data_Set $32 Source_Label $60 Var_Type $9;
     Data_Set     = "&ds";
     Source_Label = "&label";
-    Var_Type     = ifc(lowcase(type)='num', 'Numeric', 'Character');
+    Var_Type     = ifc(lowcase(type) = 'num', 'Numeric', 'Character');
     N_Obs        = &nobs;
     N_Present    = N_Obs - N_Missing;
     Pct_Missing  = 100 * N_Missing / max(N_Obs, 1);
@@ -302,8 +408,14 @@ run;
 
   proc append base=eda_missing_all data=_mrep force; run;
 
+  proc sort data=_mrep out=_mshow; by descending Pct_Missing varnum; run;
+
   title2 "Missingness by variable";
-  proc print data=_mrep noobs label;
+  %if &nv > &printmax %then %do;
+    title3 "&nv columns in this file - showing the &printmax most incomplete. "
+           "Full detail is in EDAOUT.EDA_MISSING_ALL.";
+  %end;
+  proc print data=_mshow(obs=&printmax) noobs label;
     var varnum Variable Var_Type Var_Length N_Obs N_Present N_Missing Pct_Missing;
     label varnum      = "#"
           Var_Type    = "Type"
@@ -314,9 +426,10 @@ run;
           Pct_Missing = "% Missing";
     format Pct_Missing 6.1 N_Obs N_Present N_Missing comma10.;
   run;
+  title3;
 
   proc datasets lib=work nolist;
-    delete _vars _mwide _mlong _mrep;
+    delete _vars _mlong _mrep _mshow;
   quit;
 %mend miss_profile;
 
@@ -358,14 +471,44 @@ run;
 
   %miss_profile(lib=WORK, ds=&ds, label=&label)
 
-  title2 "Numeric variable distributions";
-  proc means data=&ds n nmiss mean std min p25 median p75 max maxdec=3;
-  run;
+  /*---------------------------------------------------------------------------
+    PROC MEANS with no VAR statement and no numeric columns is an ERROR, not a
+    no-op ("Statistics requested for printing, but no VAR statement has been
+    specified"). Several of these files are entirely character - ADI_data and
+    the ICD file store their numbers as text - so the type counts get checked
+    first. Same guard on PROC FREQ for the character side.
+  ---------------------------------------------------------------------------*/
+  %local nnum nchar;
+  proc sql noprint;
+    select sum(type = 'num'), sum(type = 'char')
+      into :nnum trimmed, :nchar trimmed
+      from dictionary.columns
+     where libname = 'WORK' and memname = upcase("&ds");
+  quit;
 
-  title2 "Character variable levels";
-  proc freq data=&ds nlevels;
-    tables _character_ / noprint;
-  run;
+  %if &nnum > 0 %then %do;
+    title2 "Numeric variable distributions";
+    proc means data=&ds n nmiss mean std min p25 median p75 max maxdec=3;
+    run;
+  %end;
+  %else %do;
+    data _nonum;
+      length Result $120;
+      Result = "No numeric columns in this file - "
+            || "every value is stored as text. PROC MEANS skipped.";
+    run;
+    title2 "Numeric variable distributions";
+    proc print data=_nonum noobs label; label Result = "Result"; run;
+    proc datasets lib=work nolist; delete _nonum; quit;
+    %put NOTE: &ds has no numeric columns - PROC MEANS skipped.;
+  %end;
+
+  %if &nchar > 0 %then %do;
+    title2 "Character variable levels";
+    proc freq data=&ds nlevels;
+      tables _character_ / noprint;
+    run;
+  %end;
 
   proc datasets lib=work nolist; delete _dups _note; quit;
   title;
@@ -391,7 +534,14 @@ proc datasets lib=work nolist; delete eda_missing_all; quit;
   is unexpectedly missing.
 =============================================================================*/
 
+/*-----------------------------------------------------------------------------
+  LENGTH before SET pins the key as character $25. Without it, if the SET ever
+  fails the key defaults to numeric and every join below dies with "Expression
+  using equals (=) has components that are of different data types" - which
+  looks like a join bug but is really an upstream read failure.
+-----------------------------------------------------------------------------*/
 data anal_ids;
+  length &KEY $25;
   set &ANALYSIS (keep = &KEY insample);
   if not missing(&KEY);
 run;
@@ -483,10 +633,25 @@ title;
   does mean the create_data comparison does not, on its own, exercise the
   relocated ADI file. adi_new_aux carries the auxiliary value through under its
   own name so Section 9e can test the two copies against each other directly.
+
+  ADI_data stores adi_new as TEXT, not as a number - which is why the original
+  program writes "adi_new2 = adi_new + 0" rather than a plain assignment.
+  Carrying the auxiliary column through under the name adi_new would therefore
+  collide with the master's own adi_new and stop the merge with "Variable
+  adi_new has been defined as both character and numeric". It is renamed and
+  converted here instead.
+
+  Consequence worth naming: the original merge lets ADI_data's adi_new
+  overwrite the master's copy after the bands are already built. Dropping the
+  overwrite changes nothing the program compares, since adi_quan is derived
+  before the merge either way and adi_new itself is not in &CREATEVARS. Both
+  copies stay available - adi_new from the master, adi_new_aux from P: - and
+  Section 9e tests them against each other.
 -----------------------------------------------------------------------------*/
 data rd_adi;
-  set aux_adi (keep = &KEY adi_new);
-  adi_new_aux = adi_new;      /* survives the merge under its own name */
+  set aux_adi (keep = &KEY adi_new rename=(adi_new = _adi_new_txt));
+  adi_new_aux = input(cats(_adi_new_txt), ?? best32.);
+  drop _adi_new_txt;
 run;
 proc sort data=rd_adi; by &KEY; run;
 
@@ -509,12 +674,28 @@ run;
 proc sort data=rd_miss; by &KEY; run;
 
 /* ---- ICU time, summed to one row per subject ---------------------------- */
+/*-----------------------------------------------------------------------------
+  TIME_IN_MINUTES is stored as text in the ICU extract. "+ 0" works but logs a
+  conversion note on every one of the 15,445 rows' worth of columns; INPUT with
+  the ?? modifier converts explicitly and turns unparseable values into missing
+  without flooding the log. Anything unparseable shows up as a missing
+  TIME_ICU in the check below.
+-----------------------------------------------------------------------------*/
 data rd_icu_detail;
   set aux_icu;
-  TIME_ICU  = TIME_IN_MINUTES + 0;
+  TIME_ICU  = input(cats(TIME_IN_MINUTES), ?? best32.);
   TIME_ICU2 = TIME_ICU;
   if TIME_ICU > 15013 then TIME_ICU2 = 15013;   /* top-code, per original */
 run;
+
+proc sql;
+  select count(*)                                        as N_Rows      format=comma10.,
+         sum(missing(TIME_ICU))                          as N_Unparsed  format=comma10.,
+         100 * sum(missing(TIME_ICU)) / max(count(*), 1) as Pct_Unparsed format=6.1
+    from rd_icu_detail;
+  title1 "Section 6b. ICU minutes that would not convert to a number";
+quit;
+title;
 proc sort data=rd_icu_detail; by &KEY; run;
 
 data rd_icu_total;
@@ -534,9 +715,12 @@ data rd_one;
   set &MASTER;
   &KEY = cats(studyid);
 
-  adi_new_master = adi_new;   /* captured before the merge overwrites adi_new */
-
   adi_new2 = adi_new + 0;
+
+  /* numeric copy of the MASTER's ADI, for the Section 9e comparison. Taken
+     from adi_new2 rather than adi_new so it is numeric whether the master
+     stores adi_new as text (as ADI_data does) or as a number.              */
+  adi_new_master = adi_new2;
 
   length adi_quan $ 25;
   adi_quan = "";
@@ -603,19 +787,25 @@ proc sort data=rd_one; by &KEY; run;
   can legitimately appear more than once in the raw extracts.
 -----------------------------------------------------------------------------*/
 %macro assert_unique(ds=, label=);
-  %local ndup;
+  %local ndup nrow;
   proc sql noprint;
+    select count(*) into :nrow trimmed from &ds;
     select count(*) into :ndup trimmed
       from (select &KEY from &ds where not missing(&KEY)
             group by &KEY having count(*) > 1);
   quit;
 
+  /* N_Rows matters: a data set that failed to read is empty, and an empty data
+     set trivially has no duplicate keys. Reporting only the duplicate count
+     would label that "OK" and hide the real failure.                        */
   data _a;
     length Input_Data_Set $32 Status $60;
     Input_Data_Set = "&ds";
+    N_Rows = &nrow;
     N_Duplicated_IDs = &ndup;
-    Status = ifc(&ndup = 0, "OK - one row per study ID",
-                            "DUPLICATES - merge result is not trustworthy");
+    if      N_Rows = 0 then Status = "EMPTY - upstream step produced no rows";
+    else if &ndup = 0  then Status = "OK - one row per study ID";
+    else                    Status = "DUPLICATES - merge result is not trustworthy";
   run;
   proc append base=eda_merge_check data=_a force; run;
   proc datasets lib=work nolist; delete _a; quit;
@@ -635,10 +825,12 @@ proc datasets lib=work nolist; delete eda_merge_check; quit;
 
 title1 "Section 6a. Merge cardinality check";
 proc print data=eda_merge_check noobs label;
-  var Input_Data_Set N_Duplicated_IDs Status;
+  var Input_Data_Set N_Rows N_Duplicated_IDs Status;
   label Input_Data_Set   = "Merge input"
+        N_Rows           = "Rows"
         N_Duplicated_IDs = "IDs on >1 row"
         Status           = "Assessment";
+  format N_Rows N_Duplicated_IDs comma10.;
 run;
 title2 "More than one input flagged DUPLICATES means the merge below is unsafe. "
        "Collapse the offending source to one row per ID before continuing.";

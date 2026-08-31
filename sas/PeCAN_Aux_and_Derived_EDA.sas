@@ -47,12 +47,14 @@
   MPRINT/MLOGIC/SYMBOLGEN make the log enormous. They are on for the first
   debugging run; comment them out once the program runs clean.
 
-  DLCREATEDIR lets the EDAOUT libname create the output folder if it does not
-  exist yet. Without it, LIBNAME quietly notes "Library does not exist" and the
-  ODS RTF destination then fails with "Physical file does not exist".
+  DLCREATEDIR is deliberately NOT set globally. It is switched on for the one
+  LIBNAME that should create its folder (EDAOUT) and switched straight off
+  again. Left on globally it applies to every LIBNAME, so a mistyped master
+  path would be silently CREATED as an empty folder and assigned successfully,
+  and the failure would surface much later as "data set does not exist".
 -----------------------------------------------------------------------------*/
 options ls=132 ps=60 nodate number mprint mlogic symbolgen nofmterr
-        validvarname=v7 msglevel=i dlcreatedir;
+        validvarname=v7 msglevel=i;
 ods graphics on / width=6.5in height=4in;
 
 
@@ -60,69 +62,135 @@ ods graphics on / width=6.5in height=4in;
   SECTION 0 - PATHS, LIBRARIES, ODS STYLE
 =============================================================================*/
 
-/* --- auxiliary folder (the consolidated copies) ------------------------- */
-%let auxpath   = P:\PeCAN Master Data\Gerard\Auxilary Data Sets;
+/*-----------------------------------------------------------------------------
+  ONE ROOT, FOUR PATHS.
 
-/* --- original master locations ------------------------------------------ */
-%let proppath  = Z:\PeCAN Master Data\Garvan\Propensity Paper\Data;
-%let newprog   = Z:\PeCAN Master Data\Garvan\Propensity Paper\New Programs;
+  The historical programs all begin "Z:\PeCAN Master Data\...". The auxiliary
+  folder now in use is "P:\PeCAN Master Data\Gerard\Auxilary Data Sets" - same
+  "PeCAN Master Data" root, different drive letter. That strongly suggests the
+  share is simply mounted as P: on this machine rather than Z:.
+
+  ROOT is therefore set to P: and every path is derived from it. If the master
+  folders really are on a separate Z: share, set MASTERROOT back to
+  "Z:\PeCAN Master Data" and leave ROOT alone. The preflight below reports
+  exactly which folder is missing either way.
+-----------------------------------------------------------------------------*/
+%let root       = P:\PeCAN Master Data;
+%let masterroot = &root;
+
+/* --- auxiliary folder (the consolidated copies) ------------------------- */
+%let auxpath   = &root\Gerard\Auxilary Data Sets;
+
+/* --- master locations --------------------------------------------------- */
+%let proppath  = &masterroot\Garvan\Propensity Paper\Data;
+%let newprog   = &masterroot\Garvan\Propensity Paper\New Programs;
 
 /* --- where EDA output is written ---------------------------------------- */
-%let outpath   = P:\PeCAN Master Data\Gerard\Auxilary Data Sets\EDA Output;
+%let outpath   = &auxpath\EDA Output;
 
 libname aux  "&auxpath";
 libname c1   "&proppath"  access=readonly;
 libname c2   "&newprog"   access=readonly;
+
+/* DLCREATEDIR on for this one assignment, then straight back off */
+options dlcreatedir;
 libname edaout "&outpath";
-
-/*-----------------------------------------------------------------------------
-  PREFLIGHT - stop here rather than 1,000 lines later.
-
-  If Z: is not mapped on this machine, LIBNAME issues only a NOTE, not an ERROR.
-  Every later step then runs against an empty data set and the log fills with
-  downstream damage that hides the one real problem. This check fails loudly
-  and immediately instead.
-
-  If it fires: map the drive, or repoint %let proppath / %let newprog at
-  wherever the Propensity Paper folders actually live on this machine.
------------------------------------------------------------------------------*/
-%macro preflight;
-  %local bad;
-  %let bad = 0;
-
-  %if %sysfunc(libref(aux)) %then %do;
-    %put ERROR: AUX not assigned. Check &auxpath..;
-    %let bad = 1;
-  %end;
-  %if %sysfunc(libref(c1)) %then %do;
-    %put ERROR: C1 not assigned. Check &proppath..;
-    %let bad = 1;
-  %end;
-  %if %sysfunc(libref(c2)) %then %do;
-    %put ERROR: C2 not assigned. Check &newprog..;
-    %let bad = 1;
-  %end;
-  %if %sysfunc(libref(edaout)) %then %do;
-    %put ERROR: EDAOUT not assigned. Check &outpath and the DLCREATEDIR option.;
-    %let bad = 1;
-  %end;
-
-  %if &bad %then %do;
-    %put ERROR: ==========================================================;
-    %put ERROR: One or more libraries are unavailable. Stopping before the;
-    %put ERROR: program produces a log full of downstream damage.;
-    %put ERROR: ==========================================================;
-    %abort cancel;
-  %end;
-  %else %put NOTE: Preflight passed - all four libraries assigned.;
-%mend preflight;
-
-%preflight
+options nodlcreatedir;
 
 /* --- master data set names ---------------------------------------------- */
 %let MASTER   = c1.cognitive_clock_sa_7_22_FINAL;   /* PeCAN master          */
 %let ANALYSIS = c2.pecandata20230926v2;             /* analysis master       */
 %let KEY      = PRECEDE_Study_ID;                   /* merge key everywhere  */
+
+/*-----------------------------------------------------------------------------
+  PREFLIGHT - stop here rather than 1,000 lines later.
+
+  Two distinct failures get separated. A folder that does not exist is a path
+  problem (wrong drive letter, unmapped share, renamed directory). A libref
+  that failed to assign despite the folder existing is a permissions or engine
+  problem. The old version conflated them.
+
+  When a folder is missing, the subfolders of its parent are listed, so the
+  right path is usually visible in the log without hunting through Explorer.
+-----------------------------------------------------------------------------*/
+%macro listdir(path=, label=);
+  %local rc did n i;
+  %if not %sysfunc(fileexist(&path)) %then %do;
+    %put ERROR- ..... cannot list &label - "&path" does not exist either.;
+    %return;
+  %end;
+  %let rc  = %sysfunc(filename(_pfdir, &path));
+  %let did = %sysfunc(dopen(_pfdir));
+  %if &did = 0 %then %do;
+    %put ERROR- ..... cannot open &label.;
+    %return;
+  %end;
+  %let n = %sysfunc(dnum(&did));
+  %put ERROR- ..... what IS in &label (&n entries):;
+  %do i = 1 %to %sysfunc(min(&n, 25));
+    %put ERROR- .....   %sysfunc(dread(&did, &i));
+  %end;
+  %let rc = %sysfunc(dclose(&did));
+  %let rc = %sysfunc(filename(_pfdir));
+%mend listdir;
+
+%macro checkpath(path=, name=, parent=);
+  %if %sysfunc(fileexist(&path)) %then %do;
+    %put NOTE: &name folder found: &path;
+    0
+  %end;
+  %else %do;
+    %put ERROR: &name folder does NOT exist: &path;
+    %listdir(path=&parent, label=its parent)
+    1
+  %end;
+%mend checkpath;
+
+%macro preflight;
+  %local bad;
+  %let bad = 0;
+
+  /* --- do the folders exist? -------------------------------------------- */
+  %if %checkpath(path=&auxpath,  name=Auxiliary, parent=&root) %then %let bad = 1;
+  %if %checkpath(path=&proppath, name=Propensity Data,
+                 parent=&masterroot\Garvan\Propensity Paper) %then %let bad = 1;
+  %if %checkpath(path=&newprog,  name=New Programs,
+                 parent=&masterroot\Garvan\Propensity Paper) %then %let bad = 1;
+
+  /* --- did the librefs actually assign? --------------------------------- */
+  %if %sysfunc(libref(aux))    %then %do; %put ERROR: AUX libref not assigned.;    %let bad = 1; %end;
+  %if %sysfunc(libref(c1))     %then %do; %put ERROR: C1 libref not assigned.;     %let bad = 1; %end;
+  %if %sysfunc(libref(c2))     %then %do; %put ERROR: C2 libref not assigned.;     %let bad = 1; %end;
+  %if %sysfunc(libref(edaout)) %then %do; %put ERROR: EDAOUT libref not assigned.; %let bad = 1; %end;
+
+  /* --- are the two data sets we actually need there? -------------------- */
+  %if not &bad %then %do;
+    %if not %sysfunc(exist(&MASTER)) %then %do;
+      %put ERROR: Master data set &MASTER not found in &proppath..;
+      %let bad = 1;
+    %end;
+    %if not %sysfunc(exist(&ANALYSIS)) %then %do;
+      %put ERROR: Analysis master &ANALYSIS not found in &newprog..;
+      %let bad = 1;
+    %end;
+  %end;
+
+  %if &bad %then %do;
+    %put ERROR: ==========================================================;
+    %put ERROR: Stopping before the program produces a log full of;
+    %put ERROR: downstream damage. Fix the paths reported above.;
+    %put ERROR:;
+    %put ERROR: Most likely cause: the share is mounted on a different;
+    %put ERROR: drive letter than the historical programs assume. Adjust;
+    %put ERROR: %nrstr(%let root) / %nrstr(%let masterroot) at the top of Section 0.;
+    %put ERROR: ==========================================================;
+    %abort cancel;
+  %end;
+  %else %put NOTE: Preflight passed - folders, libraries and master data sets all present.;
+%mend preflight;
+
+%preflight
+
 
 /* --- UF-branded output style -------------------------------------------- */
 proc template;

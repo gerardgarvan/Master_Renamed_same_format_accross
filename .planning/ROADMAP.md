@@ -162,6 +162,24 @@ passes, logging 9 rows flagged. The merged file gains one column, `rt_envelope_f
 An earlier version predicted QC-06 failing at 9 -- correct under the null-or-block reading of
 PCM-D-08, superseded by the flag resolution.
 
+### Phase 17: Summary Statistics by Variable Domain
+
+**Goal:** Produce descriptive summary statistics for every PRECEDE-dictionary-documented
+variable, organized into five clinical domains (D1 Sociodemographics, D2 Preoperative
+assessment, D3 Cognitive assessments, D4 Intraoperative variables, D5 Outcomes), output as a
+single Excel workbook with pooled and per-year column blocks, sentinel recoding, and small-cell
+suppression (<=11). Descriptive only -- no inferential testing, no cohort restriction beyond
+g.analysis_base.
+**Requirements**: SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK
+**Depends on:** Phase 16
+**Plans:** 4 plans
+
+Plans:
+- [ ] 17-01-PLAN.md -- Wave 0 discovery: program scaffold (config, log routing, preconditions) + discover year variable, extension KEEP= list, per-year N (SUMM-DOMAIN-DISC)
+- [ ] 17-02-PLAN.md -- Wave 1: build work.analysis_base_ext (D-01 CHAR $12 join), dictionary match, domain assignment with rationale, g.var_domain_map + Checkpoint 1 human review (SUMM-DOMAIN-MAP)
+- [ ] 17-03-PLAN.md -- Wave 2: sentinel recode + log, PROC MEANS + PROC FREQ pooled and per-year, small-cell suppression (SUMM-DOMAIN-STATS)
+- [ ] 17-04-PLAN.md -- Wave 3: ODS EXCEL workbook (KEY leftmost, D1-D5, Crosswalk, QC), UF colors, QC text artifact + Checkpoint 2 review (SUMM-DOMAIN-BOOK)
+
 ---
 
 ## Milestone v1.1 — Variable Harmonization

@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: verifying
-last_updated: "2026-08-29T19:44:54.797Z"
+last_updated: "2026-09-03T15:43:25.944Z"
 last_activity: 2026-08-29
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 6
   total_plans: 25
   completed_plans: 21
@@ -15,7 +15,7 @@ progress:
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-08-29T19:44:54.792Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-03T15:43:25.939Z
 
 ---
 
@@ -121,6 +121,8 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 
 - AMENDMENT-01 raised 2026-08-26 by the QC-05 abort: adds PREP-08, PREP-09 (Phase 3) and
   QC-06 (Phase 5); plans 03-06 and 05-03
+
+- Phase 17 added: summary-stats-by-domain-CONTEXT
 
 ### Established Decisions
 

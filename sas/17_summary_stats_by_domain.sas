@@ -1,32 +1,37 @@
 /*==========================================================================
   Program : 17_summary_stats_by_domain.sas
-  Purpose : Wave 0 discovery and scaffold for five-domain descriptive
+  Purpose : Wave 0 discovery and Wave 1 domain map for five-domain descriptive
             summary statistics of every PRECEDE-dictionary-documented variable
             in g.analysis_base (extended with frailty, cognitive, and
             intraoperative-physiologic columns from g.master_data_merged).
 
-  Output  : qc\17_summary_stats_by_domain.xlsx   (Waves 2-3, after Checkpoint 1)
-            qc\17_summary_stats_by_domain.txt     (Waves 2-3, after Checkpoint 1)
-            qc\17_discovery.txt                   (Wave 0, this program)
+  SCOPE OF THIS FILE (read this before setting DOMAIN_MAP_APPROVED):
+            This file contains Sections 0, 0b, and 1 through 4 only.
+            Sections 5 through 11 (sentinel recode, PROC MEANS, PROC FREQ,
+            suppression, ODS EXCEL workbook, QC artifact) are NOT YET WRITTEN.
+            Setting DOMAIN_MAP_APPROVED to 1 will therefore not produce any
+            statistics. The %gate_stats macro is defined here for Sections
+            5 to 11 to call once they exist. It is deliberately not invoked.
+
+  Output  : qc\17_discovery.txt                 (Wave 0 plus Section 1 coverage)
+            g.var_domain_map                    (Wave 1, the ONE permanent artifact)
+            qc\17_var_domain_map_review.csv     (Wave 1, Checkpoint 1 review)
 
   Reads   : g.analysis_base            (read-only)
             g.master_data_merged       (read-only)
-            docs/precede_dictionary.csv
+            docs\precede_dictionary.csv
 
   Author  : 2026-09-03
 
-  Wave structure:
-    Section 0:  Options, config include, log routing, fail_out, preconditions
-    Section 0b: Discovery — year variable, key metadata, extension list,
-                coverage, identifiers, sentinel applicability
-    [Sections 1-11 added in Waves 1-3 after Checkpoint 1 approval]
-
   PCM compliance:
-    - No bare open-code %IF (all conditional logic inside named macros)
+    - No bare open-code %IF or %DO (all conditional logic inside named macros)
     - No apostrophes and no embedded semicolons in %PUT text
     - Every %abort cancel inside %fail_out only
     - No &SQLOBS; explicit SELECT COUNT(*) INTO :macvar TRIMMED
+    - Every SELECT INTO target is initialised with %let first, so a zero-row
+      query leaves an empty macro variable rather than an unresolved reference
     - dictionary.columns.TYPE is char/num, not 1/2
+    - ASCII only (session encoding is not UTF-8 on this project)
 ==========================================================================*/
 
 
@@ -38,17 +43,27 @@ options nodate nonumber ps=max ls=200 nofmterr;
 
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 
+/* ---- in_pipeline default if 00_config did not set it -------------------- */
+%macro init_pipeline_flag;
+  %if %symexist(in_pipeline) = 0 %then %do;
+    %global in_pipeline;
+    %let in_pipeline = 0;
+  %end;
+%mend init_pipeline_flag;
+%init_pipeline_flag;
+
 /* ---- Checkpoint 1 approval gate -----------------------------------------
    Set DOMAIN_MAP_APPROVED = 1 only after Gerard reviews and approves
-   qc\17_var_domain_map_review.csv (Wave 1 output). Sections 5-11 (statistics
-   and workbook assembly) are unreachable until the flag is 1.            */
-%let DOMAIN_MAP_APPROVED = 0;   /* set to 1 only after Gerard approves qc\17_var_domain_map_review.csv */
+   qc\17_var_domain_map_review.csv. Sections 5 to 11, once written, must open
+   with %gate_stats so they are unreachable until the flag is 1.           */
+%let DOMAIN_MAP_APPROVED = 0;
 
 /* ---- Small-cell suppression constants ------------------------------------
    SUPPRESS_MAX  : cells with n <= &SUPPRESS_MAX are suppressed.
    SUPPRESS_LABEL: the display string replacing suppressed cells.
-   NOTE: do NOT use <11 as the label. Under n <= 11, a cell of exactly 11
-   labelled <11 is a false statement. The rule here is n <= 11 with -- label. */
+   NOTE: do NOT use the string <11 as the label. Under n <= 11 a cell of
+   exactly 11 labelled <11 is a false statement. Rule here is n <= 11 with
+   the -- label.                                                            */
 %let SUPPRESS_MAX   = 11;
 %let SUPPRESS_LABEL = --;
 
@@ -76,7 +91,7 @@ options nodate nonumber ps=max ls=200 nofmterr;
   %abort cancel;
 %mend fail_out;
 
-/* ---- Checkpoint 1 gate macro ------------------------------------------- */
+/* ---- Checkpoint 1 gate macro (for Sections 5 to 11 when written) ------- */
 %macro gate_stats;
   %if &DOMAIN_MAP_APPROVED ne 1 %then %do;
     %put NOTE: Domain map awaiting Checkpoint 1 approval -- statistics sections skipped.;
@@ -91,7 +106,6 @@ libname g "&g_path";
 %put NOTE: ==== Phase 17 summary-stats-by-domain starting ====;
 %put NOTE: SUPPRESS_MAX=&SUPPRESS_MAX SUPPRESS_LABEL=&SUPPRESS_LABEL;
 
-
 /* ---- Directory preconditions ------------------------------------------- */
 %macro check_dir(path=, label=);
   %if %sysfunc(fileexist(&path)) = 0 %then %do;
@@ -104,12 +118,13 @@ libname g "&g_path";
 /* ---- Dictionary CSV precondition --------------------------------------- */
 %macro check_dict_csv;
   %if %sysfunc(fileexist(%bquote(&docs_path.\precede_dictionary.csv))) = 0 %then %do;
-    %fail_out(msg=docs/precede_dictionary.csv not found);
+    %fail_out(msg=docs precede_dictionary.csv not found);
   %end;
 %mend check_dict_csv;
 %check_dict_csv;
 
 /* ---- Source dataset existence: g.analysis_base ------------------------- */
+%let n_tab_base = 0;
 proc sql noprint;
   select count(*) into :n_tab_base trimmed
   from dictionary.tables
@@ -117,16 +132,14 @@ proc sql noprint;
 quit;
 
 %macro check_src_base;
-  %if %length(&n_tab_base) = 0 %then %do;
-    %fail_out(msg=Existence query for g.analysis_base returned no value);
-  %end;
-  %else %if &n_tab_base ne 1 %then %do;
+  %if &n_tab_base ne 1 %then %do;
     %fail_out(msg=g.analysis_base not found in g library);
   %end;
 %mend check_src_base;
 %check_src_base;
 
 /* ---- Source dataset existence: g.master_data_merged -------------------- */
+%let n_tab_merged = 0;
 proc sql noprint;
   select count(*) into :n_tab_merged trimmed
   from dictionary.tables
@@ -134,26 +147,21 @@ proc sql noprint;
 quit;
 
 %macro check_src_merged;
-  %if %length(&n_tab_merged) = 0 %then %do;
-    %fail_out(msg=Existence query for g.master_data_merged returned no value);
-  %end;
-  %else %if &n_tab_merged ne 1 %then %do;
+  %if &n_tab_merged ne 1 %then %do;
     %fail_out(msg=g.master_data_merged not found in g library);
   %end;
 %mend check_src_merged;
 %check_src_merged;
 
 /* ---- Row count: g.analysis_base ---------------------------------------- */
+%let n_base_rows = 0;
 proc sql noprint;
   select count(*) into :n_base_rows trimmed from g.analysis_base;
 quit;
 
 %macro check_rows;
-  %if %length(&n_base_rows) = 0 %then %do;
-    %fail_out(msg=Row count query for g.analysis_base returned no value);
-  %end;
-  %else %if &n_base_rows = 0 %then %do;
-    %fail_out(msg=g.analysis_base is empty);
+  %if &n_base_rows = 0 %then %do;
+    %fail_out(msg=g.analysis_base is empty or the row count query returned nothing);
   %end;
   %put NOTE: [17] &n_base_rows rows in g.analysis_base.;
 %mend check_rows;
@@ -163,10 +171,10 @@ quit;
 /* =========================================================================
    SECTION 0b: Discovery
    -------------------------------------------------------------------------
-   Answers every open question from 17-RESEARCH.md before any statistics
-   are planned. Writes results to qc\17_discovery.txt.
+   Answers every open question before any statistics are planned.
+   Writes results to qc\17_discovery.txt.
    Produces NO permanent datasets and writes NOTHING to g.
-   work.ext_candidates is left in WORK for Wave 1 to build &extension_keep_list.
+   work.ext_candidates is left in WORK for Section 1 to build the KEEP= list.
    ========================================================================= */
 
 %put NOTE: ==== Section 0b: Discovery starting ====;
@@ -189,7 +197,16 @@ proc sql;
     where libname='G' and memname='MASTER_DATA_MERGED';
 quit;
 
-/* ---- 2. KEY METADATA: type and length of PRECEDE_STUDY_ID in both datasets */
+
+/* ---- 2. KEY METADATA: type and length of PRECEDE_STUDY_ID -------------- */
+/* Every target initialised first: a zero-row query must leave the macro    */
+/* variable EMPTY, not unresolved. An unresolved reference would survive    */
+/* %length tests and then fail as a syntax error deep in a later step.      */
+%let key_type_base   = ;
+%let key_len_base    = ;
+%let key_type_merged = ;
+%let key_len_merged  = ;
+
 proc sql noprint;
   select type, length
     into :key_type_base trimmed, :key_len_base trimmed
@@ -204,75 +221,169 @@ proc sql noprint;
     and upcase(name)='PRECEDE_STUDY_ID';
 quit;
 
-/* Sample 10 non-missing key values from each dataset */
-proc sql noprint;
-  select PRECEDE_STUDY_ID into :key_sample_base separated by '|'
-  from (
-    select PRECEDE_STUDY_ID from g.analysis_base
-    where not missing(PRECEDE_STUDY_ID)
-  )
-  having monotonic() <= 10;
+%macro check_key_present;
+  %if %length(&key_type_base) = 0 %then %do;
+    %fail_out(msg=PRECEDE_STUDY_ID not found in g.analysis_base -- cannot build the D-01 join key);
+  %end;
+  %if %length(&key_type_merged) = 0 %then %do;
+    %fail_out(msg=PRECEDE_STUDY_ID not found in g.master_data_merged -- cannot build the D-01 join key);
+  %end;
+  %put NOTE: [17-discovery] key type base=&key_type_base len=&key_len_base merged=&key_type_merged len=&key_len_merged;
+%mend check_key_present;
+%check_key_present;
 
-  select PRECEDE_STUDY_ID into :key_sample_merged separated by '|'
-  from (
-    select PRECEDE_STUDY_ID from g.master_data_merged
-    where not missing(PRECEDE_STUDY_ID)
-  )
-  having monotonic() <= 10;
-quit;
+/* Normalised key length: never truncate either side. */
+%macro set_key_len;
+  %global key_norm_len;
+  %let key_norm_len = 12;
+  %if &key_type_base = char %then %do;
+    %if %eval(&key_len_base > &key_norm_len) %then %let key_norm_len = &key_len_base;
+  %end;
+  %if &key_type_merged = char %then %do;
+    %if %eval(&key_len_merged > &key_norm_len) %then %let key_norm_len = &key_len_merged;
+  %end;
+  %put NOTE: [17-discovery] normalised key length = &key_norm_len;
+%mend set_key_len;
+%set_key_len;
 
-/* ---- 3. KEY UNIQUENESS: duplicate PRECEDE_STUDY_ID in g.master_data_merged */
+/* ---- Sample 10 non-missing key values from each dataset ---------------- */
+/* MONOTONIC() removed: undocumented, unreliable in subqueries, and HAVING  */
+/* without GROUP BY forces a remerge. Dataset option (obs=) is supported.   */
+%let key_sample_base   = ;
+%let key_sample_merged = ;
+
+%macro sample_keys;
+  data work._ksb;
+    set g.analysis_base(keep=PRECEDE_STUDY_ID);
+    length k $&key_norm_len;
+    %if &key_type_base = num %then %do;
+      if missing(PRECEDE_STUDY_ID) then delete;
+      k = strip(put(PRECEDE_STUDY_ID, best12.));
+    %end;
+    %else %do;
+      if missing(PRECEDE_STUDY_ID) then delete;
+      k = strip(PRECEDE_STUDY_ID);
+    %end;
+    keep k;
+    if _n_ > 5000 then stop;
+  run;
+
+  data work._ksm;
+    set g.master_data_merged(keep=PRECEDE_STUDY_ID);
+    length k $&key_norm_len;
+    %if &key_type_merged = num %then %do;
+      if missing(PRECEDE_STUDY_ID) then delete;
+      k = strip(put(PRECEDE_STUDY_ID, best12.));
+    %end;
+    %else %do;
+      if missing(PRECEDE_STUDY_ID) then delete;
+      k = strip(PRECEDE_STUDY_ID);
+    %end;
+    keep k;
+    if _n_ > 5000 then stop;
+  run;
+
+  proc sql noprint;
+    select k into :key_sample_base separated by '|'   from work._ksb(obs=10);
+    select k into :key_sample_merged separated by '|' from work._ksm(obs=10);
+  quit;
+%mend sample_keys;
+%sample_keys;
+
+
+/* ---- 3. KEY UNIQUENESS and MISSING KEYS -------------------------------- */
+/* Missing keys must be excluded from the duplicate test. Two or more       */
+/* missing values form one group with count > 1 and would abort the run     */
+/* for the wrong reason. Missing keys are reported separately.              */
+%let n_key_dups    = 0;
+%let n_missing_key = 0;
+
 proc sql noprint;
   select count(*) into :n_key_dups trimmed
   from (
     select PRECEDE_STUDY_ID
     from g.master_data_merged
+    where not missing(PRECEDE_STUDY_ID)
     group by PRECEDE_STUDY_ID
     having count(*) > 1
   );
+
+  select count(*) into :n_missing_key trimmed
+  from g.master_data_merged
+  where missing(PRECEDE_STUDY_ID);
 quit;
 
-/* ---- 4. YEAR VARIABLE: candidate columns in g.analysis_base ------------ */
+
+/* ---- 4. YEAR VARIABLE: identify, decide, and quantify ------------------ */
+/* Discovery must produce a DECISION, not a candidate list. Downstream       */
+/* waves read &year_variable and work.year_dist as committed facts.          */
 proc sql;
   create table work.year_candidates as
     select name, vtype, sas_label
     from work.cols_base
-    where index(name,'YEAR')>0
-       or index(name,'_DATE')>0
-       or index(name,'SURG')>0
-       or index(name,'ENCOUNTER')>0;
+    where index(name,'YEAR')      > 0
+       or index(name,'_DATE')     > 0
+       or index(name,'SURG')      > 0
+       or index(name,'ENCOUNTER') > 0;
 quit;
 
-/* Run PROC FREQ with /missing on all numeric year-name candidates */
-%macro freq_year_candidates;
-  %local dsid nobs rc i vname;
-  %let dsid = %sysfunc(open(work.year_candidates));
-  %let nobs  = %sysfunc(attrn(&dsid, nobs));
-  %let rc    = %sysfunc(close(&dsid));
+%let year_cand_list = ;
+proc sql noprint;
+  select name into :year_cand_list separated by ' '
+  from work.cols_base
+  where index(name,'YEAR') > 0 and vtype = 'num';
+quit;
 
-  %do i = 1 %to &nobs;
-    %let dsid  = %sysfunc(open(work.year_candidates));
-    %let rc    = %sysfunc(fetchobs(&dsid, &i));
-    %let vname = %sysfunc(getvarc(&dsid, %sysfunc(varnum(&dsid, name))));
-    %let vtype = %sysfunc(getvarc(&dsid, %sysfunc(varnum(&dsid, vtype))));
-    %let rc    = %sysfunc(close(&dsid));
+/* (an earlier pick_year draft was removed; %pick_year_safe below is the one used) */
 
-    %if %index(&vname, YEAR) > 0 and &vtype = num %then %do;
-      %put NOTE: [17-discovery] Running PROC FREQ on year candidate: &vname;
-      proc freq data=g.analysis_base;
-        tables &vname / missing;
-        title "Year candidate: &vname";
-      run;
-      title;
-    %end;
+/* The empty-dataset branch above must not reference an undefined variable. */
+%macro pick_year_safe;
+  %global year_variable n_year_cands year_note;
+  %let n_year_cands = %sysfunc(countw(&year_cand_list));
+
+  %if &n_year_cands = 0 %then %do;
+    %let year_variable = ;
+    %let year_note = NO NUMERIC YEAR COLUMN FOUND -- per-year stratification must derive year from a surgery date column. See the candidate list below.;
+    %put WARNING: [17-discovery] &year_note;
+    data work.year_dist;
+      length year_value 8 n_rows 8 percent 8;
+      stop;
+    run;
   %end;
-%mend freq_year_candidates;
-%freq_year_candidates;
+  %else %do;
+    %let year_variable = %scan(&year_cand_list, 1);
+    %if &n_year_cands > 1 %then %do;
+      %let year_note = &n_year_cands numeric YEAR candidates found. Using &year_variable. Confirm the choice at Checkpoint 1.;
+      %put WARNING: [17-discovery] &year_note;
+    %end;
+    %else %do;
+      %let year_note = Year variable resolved to &year_variable.;
+      %put NOTE: [17-discovery] &year_note;
+    %end;
+
+    proc freq data=g.analysis_base noprint;
+      tables &year_variable / missing out=work._yd(rename=(count=n_rows));
+    run;
+
+    data work.year_dist;
+      set work._yd;
+      length year_value 8;
+      year_value = &year_variable;
+      keep year_value n_rows percent;
+    run;
+  %end;
+%mend pick_year_safe;
+%pick_year_safe;
+
 
 /* ---- 5. EXTENSION COLUMN LIST (D-01 KEEP=) ----------------------------- */
-/* Columns in g.master_data_merged NOT in g.analysis_base, filtered to
-   frailty/cognitive/intraop-physiologic concepts. MAC matched by anchored
-   pattern only -- bare index(name,'MAC') matches PHARMACY, STOMACH, etc. */
+/* Columns in g.master_data_merged NOT in g.analysis_base, filtered to      */
+/* frailty, cognitive, and intraop-physiologic concepts. MAC is matched by  */
+/* an anchored pattern only -- a bare index for MAC hits PHARMACY, STOMACH. */
+/* NOTE: this concept filter is a heuristic. A frailty, cognitive, or       */
+/* intraoperative variable whose name contains none of these fragments will */
+/* be missed. The resolved list is written to the discovery report for      */
+/* review at Checkpoint 1 -- treat it as a proposal, not an authority.      */
 proc sql;
   create table work.ext_candidates as
     select m.name, m.vtype
@@ -296,57 +407,29 @@ proc sql;
       );
 quit;
 
-/* ---- 6. EXTENSION COVERAGE: non-missing count per extension column ------ */
-/* work.ext_candidates is queried dynamically. Coverage vs. n_base_rows. */
-%macro ext_coverage;
-  %local dsid nobs rc i vname;
-  %let dsid = %sysfunc(open(work.ext_candidates));
-  %let nobs  = %sysfunc(attrn(&dsid, nobs));
-  %let rc    = %sysfunc(close(&dsid));
+%let n_ext_cols = 0;
+proc sql noprint;
+  select count(*) into :n_ext_cols trimmed from work.ext_candidates;
+quit;
 
-  /* Build coverage table */
-  data work.ext_coverage;
-    length varname $32 n_nonmissing 8 pct_of_base 8;
-    stop;
-  run;
 
-  %do i = 1 %to &nobs;
-    %let dsid  = %sysfunc(open(work.ext_candidates));
-    %let rc    = %sysfunc(fetchobs(&dsid, &i));
-    %let vname = %sysfunc(getvarc(&dsid, %sysfunc(varnum(&dsid, name))));
-    %let rc    = %sysfunc(close(&dsid));
-
-    proc sql noprint;
-      select count(*) into :n_nm trimmed
-      from g.master_data_merged
-      where not missing(&vname);
-    quit;
-
-    data work._cov_row;
-      length varname $32 n_nonmissing 8 pct_of_base 8;
-      varname      = "&vname";
-      n_nonmissing = &n_nm;
-      pct_of_base  = 100 * &n_nm / &n_base_rows;
-    run;
-
-    proc append base=work.ext_coverage data=work._cov_row force; run;
-  %end;
-%mend ext_coverage;
-%ext_coverage;
-
-/* ---- 7. IDENTIFIER CANDIDATES ----------------------------------------- */
+/* ---- 6. IDENTIFIER CANDIDATES ------------------------------------------ */
+/* Anchored pattern only. A bare index for ID_ matches COVID_STATUS,        */
+/* RAPID_TEST and VALID_FLAG. This is the SAME pattern Section 3b applies,  */
+/* so the report and the exclusion cannot disagree.                         */
 proc sql;
   create table work.id_candidates as
     select name, vtype, vlen
     from work.cols_base
-    where index(name,'_ID')    > 0
-       or index(name,'ID_')    > 0
-       or name in ('PRECEDE_STUDY_ID','ENCRYPTED_MRN','ENCRYPTED_ENCOUNTER')
-       or index(name,'MRN')    > 0
-       or index(name,'ENCOUNTER') > 0;
+    where name in ('PRECEDE_STUDY_ID','PRECEDE_STUDY_ID_1',
+                   'ENCRYPTED_MRN','ENCRYPTED_ENCOUNTER')
+       or prxmatch('/(^|_)(ID|MRN)(_|$)/', strip(name)) > 0;
 quit;
 
-/* High-cardinality character variables (>200 levels) via proc freq nlevels */
+/* ---- High-cardinality character variables: REVIEW FLAG ONLY ------------ */
+/* These are NOT excluded. CPT codes, procedure names and ZIP codes all     */
+/* exceed 200 levels and are legitimate analytic variables. Cardinality is  */
+/* reported so the reviewer can sort on it at Checkpoint 1.                 */
 proc freq data=g.analysis_base nlevels;
   tables _character_ / noprint;
   ods output nlevels=work.char_nlevels;
@@ -354,81 +437,108 @@ run;
 
 proc sql;
   create table work.hi_card_chars as
-    select tablevar as name length=32, nlevels
+    select upcase(strip(tablevar)) as name length=32, nlevels
     from work.char_nlevels
     where nlevels > 200;
 quit;
 
-/* ---- 8. SENTINEL APPLICABILITY ----------------------------------------- */
-/* For each numeric variable: count rows = -999.
-   For each character variable: count rows where upcase(strip(x))='NULL'.
-   Write only variables with a non-zero count.                              */
-%macro check_sentinels;
-  %local dsid nobs rc i vname vtype_v n_sent;
 
-  /* Numeric sentinels */
-  data work.sentinel_log;
-    length varname $32 sentinel_kind $8 n_sentinel 8;
-    stop;
-  run;
+/* ---- 7. SENTINEL APPLICABILITY ----------------------------------------- */
+/* Single pass with arrays. The previous per-variable PROC SQL loop made    */
+/* roughly one network read per column against the P: drive.               */
+/* Output name and values match what Wave 2 (Section 5) will read:          */
+/*   work.sentinel_applicable, sentinel_kind in NUM_-999 / CHAR_NULL        */
+/* Wave 2 keeps its own work.sentinel_log for recode counts -- do not       */
+/* reuse that name here.                                                    */
+%let sent_num_all = ;
+%let sent_chr_all = ;
+proc sql noprint;
+  select name into :sent_num_all separated by ' '
+  from work.cols_base where vtype = 'num';
+  select name into :sent_chr_all separated by ' '
+  from work.cols_base where vtype = 'char';
+quit;
 
-  /* numeric variables */
-  %let dsid = %sysfunc(open(work.cols_base));
-  %let nobs  = %sysfunc(attrn(&dsid, nobs));
-  %let rc    = %sysfunc(close(&dsid));
+%macro scan_sentinels;
+  %local n_num n_chr;
+  %let n_num = %sysfunc(countw(&sent_num_all));
+  %let n_chr = %sysfunc(countw(&sent_chr_all));
 
-  %do i = 1 %to &nobs;
-    %let dsid    = %sysfunc(open(work.cols_base));
-    %let rc      = %sysfunc(fetchobs(&dsid, &i));
-    %let vname   = %sysfunc(getvarc(&dsid, %sysfunc(varnum(&dsid, name))));
-    %let vtype_v = %sysfunc(getvarc(&dsid, %sysfunc(varnum(&dsid, vtype))));
-    %let rc      = %sysfunc(close(&dsid));
-
-    %if &vtype_v = num %then %do;
-      proc sql noprint;
-        select count(*) into :n_sent trimmed
-        from g.analysis_base
-        where &vname = -999;
-      quit;
-      %if &n_sent > 0 %then %do;
-        data work._sent_row;
-          length varname $32 sentinel_kind $8 n_sentinel 8;
-          varname      = "&vname";
-          sentinel_kind = '-999';
-          n_sentinel   = &n_sent;
-        run;
-        proc append base=work.sentinel_log data=work._sent_row force; run;
-      %end;
-    %end;
-
-    %if &vtype_v = char %then %do;
-      proc sql noprint;
-        select count(*) into :n_sent trimmed
-        from g.analysis_base
-        where upcase(strip(&vname)) = 'NULL';
-      quit;
-      %if &n_sent > 0 %then %do;
-        data work._sent_row;
-          length varname $32 sentinel_kind $8 n_sentinel 8;
-          varname      = "&vname";
-          sentinel_kind = 'NULL';
-          n_sentinel   = &n_sent;
-        run;
-        proc append base=work.sentinel_log data=work._sent_row force; run;
-      %end;
-    %end;
+  %if &n_num = 0 and &n_chr = 0 %then %do;
+    data work.sentinel_applicable;
+      length varname $32 sentinel_kind $10 n_sentinel 8;
+      stop;
+    run;
+    %put WARNING: [17-discovery] g.analysis_base has no columns to scan for sentinels.;
   %end;
-%mend check_sentinels;
-%check_sentinels;
+  %else %do;
+    data work.sentinel_applicable(keep=_vn _sk _ns
+                                  rename=(_vn=varname _sk=sentinel_kind _ns=n_sentinel));
+      length _vn $32 _sk $10 _ns 8;
+      set g.analysis_base end=_eof;
 
-/* ---- 9. IN-DATA-ONLY / DEFECT scan: VARnn positional names ------------- */
+      %if &n_num > 0 %then %do;
+        array _sn {*} &sent_num_all;
+        array _cn {&n_num} _temporary_;
+        do _i = 1 to dim(_sn);
+          if _sn{_i} = -999 then _cn{_i} + 1;
+        end;
+      %end;
+
+      %if &n_chr > 0 %then %do;
+        array _sc {*} &sent_chr_all;
+        array _cc {&n_chr} _temporary_;
+        do _j = 1 to dim(_sc);
+          if upcase(strip(_sc{_j})) = 'NULL' then _cc{_j} + 1;
+        end;
+      %end;
+
+      if _eof then do;
+        %if &n_num > 0 %then %do;
+          do _i = 1 to &n_num;
+            if _cn{_i} > 0 then do;
+              _vn = upcase(vname(_sn{_i}));
+              _sk = 'NUM_-999';
+              _ns = _cn{_i};
+              output;
+            end;
+          end;
+        %end;
+        %if &n_chr > 0 %then %do;
+          do _j = 1 to &n_chr;
+            if _cc{_j} > 0 then do;
+              _vn = upcase(vname(_sc{_j}));
+              _sk = 'CHAR_NULL';
+              _ns = _cc{_j};
+              output;
+            end;
+          end;
+        %end;
+      end;
+    run;
+  %end;
+%mend scan_sentinels;
+%scan_sentinels;
+
+%let n_sent_vars = 0;
+proc sql noprint;
+  select count(*) into :n_sent_vars trimmed from work.sentinel_applicable;
+quit;
+
+
+/* ---- 8. VARnn positional-name defect scan ------------------------------ */
+%let n_varnn = 0;
 proc sql noprint;
   select count(*) into :n_varnn trimmed
   from work.cols_base
   where prxmatch('/^VAR\d+$/', strip(name)) > 0;
 quit;
 
-/* ---- 10. Write qc\17_discovery.txt ------------------------------------- */
+
+/* ---- 9. Write qc\17_discovery.txt -------------------------------------- */
+/* The PROC EXPORT that previously sat between these DATA steps has been    */
+/* deleted. It rewrote the same path and destroyed everything written above */
+/* it, and the DATA step below already emits the candidate list.            */
 %macro write_discovery;
   %local dt_run;
   %let dt_run = %sysfunc(datetime(), datetime20.);
@@ -441,103 +551,88 @@ quit;
     put "Program: 17_summary_stats_by_domain.sas (Section 0b)";
     put "=================================================================";
     put " ";
-
     put "--- BASE ROW COUNT ---";
     put "g.analysis_base rows: &n_base_rows";
     put " ";
-
     put "--- KEY METADATA ---";
-    put "PRECEDE_STUDY_ID in g.analysis_base:    type=&key_type_base  length=&key_len_base";
+    put "PRECEDE_STUDY_ID in g.analysis_base:      type=&key_type_base  length=&key_len_base";
     put "PRECEDE_STUDY_ID in g.master_data_merged: type=&key_type_merged  length=&key_len_merged";
+    put "Normalised join key length: $&key_norm_len";
+    put " ";
+    put "NOTE: a SAS variable has exactly one type per dataset. The CHAR vs";
+    put "NUM8 history describes the md1 to md8 SOURCE files, not the merged";
+    put "dataset, which now holds a single resolved type.";
     put " ";
     put "Sampled key values from g.analysis_base (up to 10, pipe-separated):";
     put "&key_sample_base";
     put "Sampled key values from g.master_data_merged (up to 10, pipe-separated):";
     put "&key_sample_merged";
+    put "Inspect these for zero-padding before trusting the join format.";
+    put "Section 1 additionally tests the format empirically by match count.";
     put " ";
-
     put "--- KEY UNIQUENESS ---";
-    put "Duplicate PRECEDE_STUDY_ID count in g.master_data_merged: &n_key_dups";
-    %if &n_key_dups > 0 %then %do;
-    put "WARNING: Duplicates present -- Wave 1 must resolve before merging";
-    %end;
-    %else %do;
-    put "PRECEDE_STUDY_ID is unique in g.master_data_merged -- safe to merge";
-    %end;
+    put "Duplicate PRECEDE_STUDY_ID count in g.master_data_merged (missing excluded): &n_key_dups";
+    put "Rows with a MISSING PRECEDE_STUDY_ID in g.master_data_merged: &n_missing_key";
     put " ";
-
     put "--- VARNN DEFECT SCAN ---";
     put "Columns with positional VAR+digits names in g.analysis_base: &n_varnn";
     put " ";
   run;
 
-  /* Append year candidates */
+  /* Year variable: decision, candidates, distribution */
   data _null_;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put "--- YEAR VARIABLE CANDIDATES ---";
-  run;
-  proc export data=work.year_candidates
-    outfile="&qc_path.\17_discovery.txt"
-    dbms=dlm;
-    delimiter='|';
-    /* appending is not supported by proc export; use data step below */
+    put "--- YEAR VARIABLE ---";
+    put "Resolved year variable: &year_variable";
+    put "&year_note";
+    put " ";
+    put "Candidate columns considered:";
   run;
 
-  /* Write year candidates via data step */
   data _null_;
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put "(See PROC FREQ output in SAS log/listing for per-year N and missing counts)";
-    put "NOTE: If no YEAR candidate was found, derive year from a surgery date column.";
     set work.year_candidates;
-    put "  Candidate: " name " type=" vtype " label=" sas_label;
-    if _n_ = 1 then do;
-      /* header already written above */
-    end;
+    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put "  " name "  type=" vtype "  label=" sas_label;
   run;
 
   data _null_;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
     put " ";
+    put "Per-year row counts (missing included):";
   run;
 
-  /* Append extension columns */
+  data _null_;
+    set work.year_dist;
+    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put "  year=" year_value "  n_rows=" n_rows;
+  run;
+
+  /* Extension column list */
   data _null_;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put " ";
     put "--- EXTENSION COLUMN LIST (D-01 KEEP=) ---";
-    put "(Columns in g.master_data_merged NOT in g.analysis_base, concept-filtered)";
-    put "(PRECEDE_STUDY_ID_1 explicitly excluded -- md6 duplicate)";
+    put "Columns in g.master_data_merged NOT in g.analysis_base, concept-filtered.";
+    put "PRECEDE_STUDY_ID_1 explicitly excluded (md6 duplicate).";
+    put "Count: &n_ext_cols";
+    put "REVIEW: the concept filter is a name heuristic. A frailty, cognitive";
+    put "or intraoperative variable named outside these fragments is missed.";
+    put "Confirm this list against the dictionary at Checkpoint 1.";
     put " ";
-    put "Paste as KEEP= list:";
   run;
 
   data _null_;
     set work.ext_candidates;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put "  " name;
+    put "  " name "  type=" vtype;
   run;
 
-  /* Append extension coverage */
+  /* Identifier candidates */
   data _null_;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
     put " ";
-    put "--- EXTENSION COVERAGE (non-missing count per extension column) ---";
-    put "(Denominator: &n_base_rows rows in g.analysis_base)";
-  run;
-
-  data _null_;
-    set work.ext_coverage;
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    length flag $60;
-    if pct_of_base < 90 then flag = 'PARTIAL COVERAGE -- D3/frailty require a stated denominator';
-    else flag = '';
-    put varname '  n_nonmissing=' n_nonmissing '  pct_of_base=' pct_of_base 6.1 '  ' flag;
-  run;
-
-  /* Append identifier candidates */
-  data _null_;
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put " ";
-    put "--- IDENTIFIER CANDIDATES (mark OUT_OF_SCOPE in Wave 1) ---";
+    put "--- IDENTIFIER CANDIDATES (marked OUT_OF_SCOPE in Wave 1) ---";
+    put "Matched on the anchored pattern (^ or underscore) ID or MRN (underscore or end).";
   run;
 
   data _null_;
@@ -546,10 +641,13 @@ quit;
     put "  " name;
   run;
 
+  /* High-cardinality character variables: review flag only */
   data _null_;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
     put " ";
     put "--- HIGH-CARDINALITY CHARACTER VARIABLES (>200 levels) ---";
+    put "REVIEW FLAG ONLY -- these are NOT excluded. CPT codes, procedure";
+    put "names and ZIP codes legitimately exceed 200 levels.";
   run;
 
   data _null_;
@@ -558,161 +656,196 @@ quit;
     put "  " name "  nlevels=" nlevels;
   run;
 
-  /* Append sentinel applicability */
+  /* Sentinel applicability */
   data _null_;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
     put " ";
     put "--- SENTINEL APPLICABILITY (Wave 2 recodes ONLY these variables) ---";
-    put "  -999 sentinel (numeric variables):";
-  run;
-
-  data _null_;
-    set work.sentinel_log;
-    where sentinel_kind = '-999';
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put "    " varname "  n=" n_sentinel;
-  run;
-
-  data _null_;
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put "  NULL sentinel (character variables):";
-  run;
-
-  data _null_;
-    set work.sentinel_log;
-    where sentinel_kind = 'NULL';
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
-    put "    " varname "  n=" n_sentinel;
-  run;
-
-  data _null_;
-    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put "Variables with at least one observed sentinel value: &n_sent_vars";
+    put "A variable here that nobody expected to carry a sentinel is a finding.";
     put " ";
-    put "=================================================================";
-    put "End of Phase 17 Discovery Report";
-    put "=================================================================";
+    put "  -999 sentinel (numeric):";
+  run;
+
+  data _null_;
+    set work.sentinel_applicable;
+    where sentinel_kind = 'NUM_-999';
+    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put "    " varname "  n=" n_sentinel;
+  run;
+
+  data _null_;
+    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put "  literal NULL sentinel (character):";
+  run;
+
+  data _null_;
+    set work.sentinel_applicable;
+    where sentinel_kind = 'CHAR_NULL';
+    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+    put "    " varname "  n=" n_sentinel;
   run;
 
   %put NOTE: [17] Discovery report written to &qc_path.\17_discovery.txt;
 %mend write_discovery;
 %write_discovery;
 
-
-/* =========================================================================
-   END OF WAVE 0 (Sections 0 and 0b)
-   =========================================================================
-   Sections 1-4 (Wave 1) follow immediately below.
-   Sections 5-11 (Wave 2-3) are wrapped in %gate_stats and will abort
-   until DOMAIN_MAP_APPROVED is set to 1 after Checkpoint 1 review.
-   ========================================================================= */
-
-%put NOTE: ==== Phase 17 Wave 0 discovery complete ====;
-%put NOTE: Review qc\17_discovery.txt; Sections 1-4 (Wave 1) follow.;
+%put NOTE: ==== Section 0b complete ====;
 
 
 /* =========================================================================
    SECTION 1: Build work.analysis_base_ext (D-01 join)
    -------------------------------------------------------------------------
-   Steps:
-     1. Key uniqueness gate (before any merge)
-     2. Macro-time key type resolution from dictionary.columns
-     3. Build work.merged_ext_cols with CHAR $12 key
-     4. Sort both inputs; left merge to work.analysis_base_ext
-     5. Row-count and cognitive-score non-missing assertion
-     6. Extension coverage capture; denominator note when PARTIAL
+   1. Defensive globals
+   2. Key uniqueness gate (missing keys already excluded from the test)
+   3. Macro-time key type resolution
+   4. KEEP= list from work.ext_candidates, with a row-count check
+   5. Normalise BOTH keys to CHAR; test the numeric format empirically
+   6. Sort and left merge
+   7. Row-count and cognitive-score assertions
+   8. Per-column coverage, appended to the discovery report
    ========================================================================= */
 
 %put NOTE: ==== Section 1: build work.analysis_base_ext starting ====;
 
+/* ---- 1. Defensive globals ---------------------------------------------- */
+/* Declared and emptied here so no later step can reference an undefined    */
+/* macro variable if an upstream branch was skipped.                        */
+%global D3_DENOM_NOTE cog_col n_cog_nonmiss key_fmt extension_keep_list
+        ext_num_list ext_chr_list;
+%let D3_DENOM_NOTE     = ;
+%let cog_col           = ;
+%let n_cog_nonmiss     = .;
+%let key_fmt           = ;
+%let extension_keep_list = ;
+%let ext_num_list      = ;
+%let ext_chr_list      = ;
 
-/* ---- 1. KEY UNIQUENESS GATE (before any merge) ------------------------- */
-/* A DATA step merge silently becomes a match-merge when the extension side  */
-/* has duplicate keys. Assert BEFORE merging so the error names the cause.  */
-proc sql noprint;
-  select count(*) into :n_key_dups trimmed
-  from (
-    select PRECEDE_STUDY_ID
-    from g.master_data_merged
-    group by PRECEDE_STUDY_ID
-    having count(*) > 1
-  );
-quit;
 
+/* ---- 2. Key uniqueness gate -------------------------------------------- */
 %macro check_key_unique;
   %if &n_key_dups > 0 %then %do;
-    %fail_out(msg=&n_key_dups duplicate PRECEDE_STUDY_ID values in g.master_data_merged -- extension merge requires a unique key or an explicit collapse rule);
+    %fail_out(msg=&n_key_dups duplicate PRECEDE_STUDY_ID values in g.master_data_merged -- the extension merge requires a unique key or an explicit collapse rule);
   %end;
-  %put NOTE: [17-S1] PRECEDE_STUDY_ID uniqueness confirmed in g.master_data_merged (n_key_dups=&n_key_dups).;
+  %put NOTE: [17-S1] PRECEDE_STUDY_ID uniqueness confirmed (dups=&n_key_dups missing=&n_missing_key).;
 %mend check_key_unique;
 %check_key_unique;
 
 
-/* ---- 2. MACRO-TIME KEY TYPE RESOLUTION --------------------------------- */
-/* Read the stored TYPE of PRECEDE_STUDY_ID from dictionary.columns.         */
-/* dictionary.columns.type is 'num' or 'char' (character strings), NOT 1/2. */
-/* Do NOT write a runtime vtype() branch: SAS compiles BOTH branches of a   */
-/* DATA step IF, so put(charvar, best12.) is a compile-time error when the  */
-/* key is character. Only macro-time branching is safe.                     */
-proc sql noprint;
-  select type into :key_type_merged trimmed
-  from dictionary.columns
-  where libname='G' and memname='MASTER_DATA_MERGED'
-    and upcase(name)='PRECEDE_STUDY_ID';
-quit;
-
-%put NOTE: [17-S1] key_type_merged=&key_type_merged (resolved at macro time from dictionary.columns).;
-
-
-/* ---- 3. Build KEEP= list from work.ext_candidates left by Wave 0 ------- */
-/* Prefer building the list dynamically over hand-transcribing it.           */
-/* If Wave 0 did not run in this session, ext_candidates is not in WORK;    */
-/* the error surfaces here with a clear message.                             */
-proc sql noprint;
-  select count(*) into :n_ext_cand trimmed
-  from dictionary.tables
-  where libname='WORK' and memname='EXT_CANDIDATES';
-quit;
-
+/* ---- 3. KEEP= list from work.ext_candidates ---------------------------- */
+/* Check the ROW COUNT, not merely that the table exists. An empty table    */
+/* would leave extension_keep_list empty and break the KEEP= below.         */
 %macro check_ext_candidates;
-  %if &n_ext_cand = 0 %then %do;
-    %fail_out(msg=work.ext_candidates not found in WORK -- Wave 0 (Section 0b) must run in the same SAS session before Section 1);
+  %if &n_ext_cols = 0 %then %do;
+    %fail_out(msg=work.ext_candidates has no rows -- the concept filter matched nothing and the D-01 extension cannot be built);
   %end;
 %mend check_ext_candidates;
 %check_ext_candidates;
 
 proc sql noprint;
-  select name into :extension_keep_list separated by ' '
-  from work.ext_candidates;
+  select name into :extension_keep_list separated by ' ' from work.ext_candidates;
+  select name into :ext_num_list separated by ' ' from work.ext_candidates where vtype='num';
+  select name into :ext_chr_list separated by ' ' from work.ext_candidates where vtype='char';
 quit;
 
-%put NOTE: [17-S1] extension_keep_list (from work.ext_candidates): &extension_keep_list;
+%put NOTE: [17-S1] extension_keep_list: &extension_keep_list;
 
 
-/* ---- 4. Cast key to CHAR $12 using MACRO-TIME branch ------------------- */
-/* Format choice: best12. unless Wave 0 sampled keys show zero-padding.     */
-/* z12. pads to 12 digits; numeric 123456789 -> '000123456789' while the    */
-/* analysis_base side holds '123456789'; the merge then matches nothing and  */
-/* every extension column comes back missing (silent failure, Pitfall 1).   */
-%macro build_ext_cols;
-  data work.merged_ext_cols;
-    set g.master_data_merged (keep=PRECEDE_STUDY_ID &extension_keep_list);
-    length key_char $12;
-    %if &key_type_merged = num %then %do;
-      key_char = strip(put(PRECEDE_STUDY_ID, best12.));
+/* ---- 4. Normalise the base key ----------------------------------------- */
+%macro norm_base_key;
+  data work.base_keyed;
+    set g.analysis_base;
+    length _key_c $&key_norm_len;
+    %if &key_type_base = num %then %do;
+      _key_c = strip(put(PRECEDE_STUDY_ID, best12.));
     %end;
     %else %do;
-      key_char = strip(PRECEDE_STUDY_ID);
+      _key_c = strip(PRECEDE_STUDY_ID);
     %end;
     drop PRECEDE_STUDY_ID;
-    rename key_char = PRECEDE_STUDY_ID;
+    rename _key_c = PRECEDE_STUDY_ID;
+  run;
+%mend norm_base_key;
+%norm_base_key;
+
+
+/* ---- 5. Normalise the extension key, choosing the format empirically --- */
+/* The sampled values in the discovery report tell the reviewer what the    */
+/* keys look like, but the program must not depend on anyone eyeballing     */
+/* them. When the merged key is numeric, both candidate representations are */
+/* tested against the base keys and the one that actually matches is used.  */
+/* best12. gives 123456789 and z12. gives 000123456789 -- picking wrong     */
+/* yields a join that matches nothing while the row count still passes.     */
+%macro build_ext_cols(fmt=);
+  data work.merged_ext_cols;
+    set g.master_data_merged (keep=PRECEDE_STUDY_ID &extension_keep_list);
+    length _key_c $&key_norm_len;
+    if missing(PRECEDE_STUDY_ID) then delete;
+    %if &key_type_merged = num %then %do;
+      %if &fmt = Z %then %do;
+        _key_c = put(PRECEDE_STUDY_ID, z12.);
+      %end;
+      %else %do;
+        _key_c = strip(put(PRECEDE_STUDY_ID, best12.));
+      %end;
+    %end;
+    %else %do;
+      _key_c = strip(PRECEDE_STUDY_ID);
+    %end;
+    drop PRECEDE_STUDY_ID;
+    rename _key_c = PRECEDE_STUDY_ID;
   run;
 %mend build_ext_cols;
-%build_ext_cols;
+
+%macro count_key_overlap(into=);
+  proc sql noprint;
+    select count(*) into :&into trimmed
+    from work.merged_ext_cols
+    where PRECEDE_STUDY_ID in (select PRECEDE_STUDY_ID from work.base_keyed);
+  quit;
+%mend count_key_overlap;
+
+%macro pick_key_format;
+  %local n_best n_z;
+  %let n_best = 0;
+  %let n_z    = 0;
+
+  %if &key_type_merged = char %then %do;
+    %let key_fmt = CHAR;
+    %build_ext_cols(fmt=CHAR);
+    %count_key_overlap(into=n_best);
+    %put NOTE: [17-S1] character key: &n_best extension rows match a base key.;
+    %if &n_best = 0 %then %do;
+      %fail_out(msg=Character join key produced zero matches against g.analysis_base -- padding or case differs between the two datasets);
+    %end;
+  %end;
+  %else %do;
+    %build_ext_cols(fmt=BEST);
+    %count_key_overlap(into=n_best);
+    %put NOTE: [17-S1] best12. representation: &n_best matches.;
+
+    %if &n_best = 0 %then %do;
+      %put WARNING: [17-S1] best12. matched nothing. Testing zero-padded z12.;
+      %build_ext_cols(fmt=Z);
+      %count_key_overlap(into=n_z);
+      %put NOTE: [17-S1] z12. representation: &n_z matches.;
+      %if &n_z = 0 %then %do;
+        %fail_out(msg=Neither best12. nor z12. matched any base key -- the numeric key cannot be reconciled with the character key in g.analysis_base);
+      %end;
+      %let key_fmt = Z12;
+    %end;
+    %else %do;
+      %let key_fmt = BEST12;
+    %end;
+  %end;
+  %put NOTE: [17-S1] key format selected: &key_fmt;
+%mend pick_key_format;
+%pick_key_format;
 
 
-/* ---- 5. Sort both inputs; left merge ----------------------------------- */
+/* ---- 6. Sort and left merge -------------------------------------------- */
 proc sort data=work.merged_ext_cols; by PRECEDE_STUDY_ID; run;
-proc sort data=g.analysis_base out=work.analysis_base_sorted; by PRECEDE_STUDY_ID; run;
+proc sort data=work.base_keyed out=work.analysis_base_sorted; by PRECEDE_STUDY_ID; run;
 
 data work.analysis_base_ext;
   merge work.analysis_base_sorted (in=inbase)
@@ -721,27 +854,23 @@ data work.analysis_base_ext;
   if inbase;
 run;
 
-%put NOTE: [17-S1] work.analysis_base_ext built. Verifying row count and extension columns.;
 
-
-/* ---- 6. Row-count assertion: work.analysis_base_ext = g.analysis_base -- */
+/* ---- 7. Row-count assertion -------------------------------------------- */
+%let n_ext_rows = 0;
 proc sql noprint;
   select count(*) into :n_ext_rows trimmed from work.analysis_base_ext;
 quit;
 
 %macro check_ext_rows;
   %if &n_ext_rows ne &n_base_rows %then %do;
-    %fail_out(msg=Row count mismatch after D-01 join: work.analysis_base_ext has &n_ext_rows rows but g.analysis_base has &n_base_rows -- possible duplicate key or merge error);
+    %fail_out(msg=Row count mismatch after the D-01 join: work.analysis_base_ext has &n_ext_rows rows against &n_base_rows in g.analysis_base);
   %end;
-  %put NOTE: [17-S1] Row-count assertion passed: &n_ext_rows rows (= n_base_rows).;
+  %put NOTE: [17-S1] Row-count assertion passed: &n_ext_rows rows.;
 %mend check_ext_rows;
 %check_ext_rows;
 
 
-/* ---- 7. Cognitive-score non-missing guard ------------------------------- */
-/* A count of 0 proves the key cast silently failed (type or format mismatch */
-/* left all extension columns missing while the row count still matched).    */
-/* Identify the cognitive score column dynamically from ext_candidates.      */
+/* ---- 8. Cognitive-score non-missing guard ------------------------------ */
 proc sql noprint;
   select name into :cog_col trimmed
   from work.ext_candidates
@@ -750,95 +879,131 @@ quit;
 
 %macro check_cog_populated;
   %if %length(&cog_col) = 0 %then %do;
-    %put WARNING: [17-S1] No cognitive score column (COGNI+SCORE) found in ext_candidates. Skipping cognitive-score guard.;
+    %put WARNING: [17-S1] No cognitive score column (COGNI and SCORE) in ext_candidates. Cognitive guard skipped.;
   %end;
   %else %do;
+    %let n_cog_nonmiss = 0;
     proc sql noprint;
       select count(*) into :n_cog_nonmiss trimmed
       from work.analysis_base_ext
       where not missing(&cog_col);
     quit;
     %if &n_cog_nonmiss = 0 %then %do;
-      %fail_out(msg=Cognitive score column &cog_col is all-missing in work.analysis_base_ext -- key type or format mismatch caused a silent join failure (Pitfall 1));
+      %fail_out(msg=Cognitive score column &cog_col is all-missing in work.analysis_base_ext -- the join key silently failed to match);
     %end;
-    %put NOTE: [17-S1] Cognitive score guard passed: &cog_col has &n_cog_nonmiss non-missing values.;
+    %put NOTE: [17-S1] Cognitive guard passed: &cog_col has &n_cog_nonmiss non-missing values.;
   %end;
 %mend check_cog_populated;
 %check_cog_populated;
 
 
-/* ---- 8. Extension coverage capture ------------------------------------- */
-/* Per-column non-missing N in work.analysis_base_ext.                       */
-/* Sets denominator note macro variable when coverage is PARTIAL             */
-/* (any extension column < 90% of base). Wave 3 prints this on KEY sheet    */
-/* and affected domain sheets; without it D3 reads as ~95% missing.         */
-%macro compute_ext_coverage;
-  %local dsid nobs rc i vname n_nm;
+/* ---- 9. Per-column extension coverage ---------------------------------- */
+/* Computed on work.analysis_base_ext AFTER the join, so the denominator is */
+/* the base row count and the figure is meaningful. The previous Section 0b */
+/* version counted in g.master_data_merged but divided by the base row      */
+/* count, which could exceed 100 percent.                                   */
+/* Single pass with arrays, split by type -- a SAS array cannot mix types.  */
+%macro ext_coverage;
+  %local n_en n_ec;
+  %let n_en = %sysfunc(countw(&ext_num_list));
+  %let n_ec = %sysfunc(countw(&ext_chr_list));
 
-  /* Build per-column coverage table */
-  data work.ext_coverage_ext;
-    length varname $32 n_nonmiss 8 pct_of_base 8 coverage_flag $60;
-    stop;
+  data work.ext_coverage(keep=_vn _nm rename=(_vn=varname _nm=n_nonmiss));
+    length _vn $32 _nm 8;
+    set work.analysis_base_ext end=_eof;
+
+    %if &n_en > 0 %then %do;
+      array _en {*} &ext_num_list;
+      array _kn {&n_en} _temporary_;
+      do _i = 1 to dim(_en);
+        if not missing(_en{_i}) then _kn{_i} + 1;
+      end;
+    %end;
+
+    %if &n_ec > 0 %then %do;
+      array _ec {*} &ext_chr_list;
+      array _kc {&n_ec} _temporary_;
+      do _j = 1 to dim(_ec);
+        if not missing(_ec{_j}) then _kc{_j} + 1;
+      end;
+    %end;
+
+    if _eof then do;
+      %if &n_en > 0 %then %do;
+        do _i = 1 to &n_en;
+          _vn = upcase(vname(_en{_i}));
+          _nm = coalesce(_kn{_i}, 0);
+          output;
+        end;
+      %end;
+      %if &n_ec > 0 %then %do;
+        do _j = 1 to &n_ec;
+          _vn = upcase(vname(_ec{_j}));
+          _nm = coalesce(_kc{_j}, 0);
+          output;
+        end;
+      %end;
+    end;
   run;
 
-  %let dsid = %sysfunc(open(work.ext_candidates));
-  %let nobs  = %sysfunc(attrn(&dsid, nobs));
-  %let rc    = %sysfunc(close(&dsid));
+  data work.ext_coverage;
+    set work.ext_coverage;
+    length coverage_flag $40;
+    pct_of_base = 100 * n_nonmiss / &n_base_rows;
+    if pct_of_base < 90 then coverage_flag = 'PARTIAL';
+    else coverage_flag = 'FULL';
+  run;
+%mend ext_coverage;
+%ext_coverage;
 
-  %do i = 1 %to &nobs;
-    %let dsid  = %sysfunc(open(work.ext_candidates));
-    %let rc    = %sysfunc(fetchobs(&dsid, &i));
-    %let vname = %sysfunc(getvarc(&dsid, %sysfunc(varnum(&dsid, name))));
-    %let rc    = %sysfunc(close(&dsid));
+%let n_partial_cov = 0;
+proc sql noprint;
+  select count(*) into :n_partial_cov trimmed
+  from work.ext_coverage where coverage_flag = 'PARTIAL';
+quit;
 
-    proc sql noprint;
-      select count(*) into :n_nm trimmed
-      from work.analysis_base_ext
-      where not missing(&vname);
-    quit;
-
-    data work._cov_row_ext;
-      length varname $32 n_nonmiss 8 pct_of_base 8 coverage_flag $60;
-      varname      = "&vname";
-      n_nonmiss    = &n_nm;
-      pct_of_base  = 100 * &n_nm / &n_base_rows;
-      if pct_of_base < 90 then
-        coverage_flag = 'PARTIAL COVERAGE -- D3/frailty require a stated denominator';
-      else coverage_flag = '';
-    run;
-
-    proc append base=work.ext_coverage_ext data=work._cov_row_ext force; run;
-  %end;
-
-  /* Check for any PARTIAL coverage to set the denominator note */
-  proc sql noprint;
-    select count(*) into :n_partial_cov trimmed
-    from work.ext_coverage_ext
-    where coverage_flag ne '';
-  quit;
-
+/* Denominator note. It does NOT claim a single N for both blocks: coverage */
+/* differs by extension variable, and the cognitive-score count is not the  */
+/* frailty denominator. Per-variable N appears in the results themselves.   */
+%macro set_denom_note;
   %if &n_partial_cov > 0 %then %do;
-    %global D3_DENOM_NOTE;
-    %let D3_DENOM_NOTE = D3 and the D2 frailty block are computed on the subcohort with a non-missing assessment (n=&n_cog_nonmiss), not on the &n_base_rows base;
-    %put NOTE: [17-S1] PARTIAL coverage detected for &n_partial_cov extension columns. D3_DENOM_NOTE set.;
+    %let D3_DENOM_NOTE = Coverage varies by variable in this block. Statistics use the non-missing observations available for each variable rather than the &n_base_rows row base. See the per-variable N column and the QC sheet coverage table.;
+    %put NOTE: [17-S1] PARTIAL coverage on &n_partial_cov extension columns. Denominator note set.;
   %end;
   %else %do;
-    %global D3_DENOM_NOTE;
     %let D3_DENOM_NOTE = ;
-    %put NOTE: [17-S1] Full coverage for all extension columns. No denominator note needed.;
+    %put NOTE: [17-S1] Full coverage on all extension columns.;
   %end;
-%mend compute_ext_coverage;
-%compute_ext_coverage;
+%mend set_denom_note;
+%set_denom_note;
+
+/* Append the coverage block to the discovery report */
+data _null_;
+  file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+  put " ";
+  put "--- EXTENSION COVERAGE (post-join, denominator = &n_base_rows base rows) ---";
+  put "Columns flagged PARTIAL: &n_partial_cov";
+run;
+
+data _null_;
+  set work.ext_coverage;
+  file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+  put "  " varname "  n_nonmiss=" n_nonmiss "  pct_of_base=" pct_of_base 6.1 "  " coverage_flag;
+run;
+
+data _null_;
+  file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+  put " ";
+  put "=================================================================";
+  put "End of Phase 17 Discovery Report";
+  put "=================================================================";
+run;
 
 %put NOTE: ==== Section 1 complete: work.analysis_base_ext ready ====;
 
 
 /* =========================================================================
    SECTION 2: Import PRECEDE dictionary
-   -------------------------------------------------------------------------
-   Reads docs\precede_dictionary.csv and builds work.dict_u (one row per
-   upcased sas_name, authoritative sheet preferred).
-   Pattern copied from sas/16_summary_docx.sas lines 147-181.
    ========================================================================= */
 
 %put NOTE: ==== Section 2: import PRECEDE dictionary starting ====;
@@ -856,10 +1021,10 @@ data work.dict;
   dict_name   = strip(cats(_n));
   dict_type   = strip(cats(_t));
   description = strip(cats(_d));
-  /* UPCASE before sort — BY-group is case-sensitive */
+  /* UPCASE before sort: BY-group processing is case-sensitive */
   sas_name    = upcase(strip(cats(_a)));
   if missing(sas_name) then delete;
-  /* MASTER_DATASET first, DERIVED second, so authoritative sheet wins */
+  /* MASTER_DATASET first, DERIVED second, so the authoritative sheet wins */
   if      sheet = 'MASTER_DATASET'           then sheet_rank = 1;
   else if sheet = 'DERIVED_VARIABLES_MASTER' then sheet_rank = 2;
   else                                            sheet_rank = 3;
@@ -868,7 +1033,7 @@ run;
 
 proc sort data=work.dict; by sas_name sheet_rank sheet; run;
 
-/* One row per documented name — dictionary repeats names across sheets */
+/* One row per documented name: the dictionary repeats names across sheets */
 data work.dict_u;
   set work.dict;
   by sas_name;
@@ -881,10 +1046,9 @@ run;
 /* =========================================================================
    SECTION 3: Match dictionary against work.analysis_base_ext
    -------------------------------------------------------------------------
-   Three-tier match: exact, case-insensitive, squash (compress underscores).
-   Match against ANALYSIS_BASE_EXT (NOT ANALYSIS_BASE) — the extended dataset
-   includes extension columns that need to be documented.
-   Produces: work.var_domain_raw, work.dict_only, work.data_only
+   Two-tier match: exact then squash (underscores compressed).
+   Matched against ANALYSIS_BASE_EXT, not ANALYSIS_BASE, so the extension
+   columns are documented too.
    ========================================================================= */
 
 %put NOTE: ==== Section 3: dictionary match starting ====;
@@ -892,7 +1056,7 @@ run;
 proc sql;
   create table work.actual_ext as
     select upcase(name) as var_u     length=32,
-           name         as varname   length=32,
+           upcase(name) as varname   length=32,
            type         as vtype     length=4,
            length       as vlen,
            label        as sas_label length=256,
@@ -900,7 +1064,6 @@ proc sql;
     from dictionary.columns
     where libname='WORK' and memname='ANALYSIS_BASE_EXT';
 
-  /* OR-join: exact or squash match; rank to keep strongest */
   create table work.doc_all_ext as
     select a.varnum, a.varname, a.vtype, a.vlen, a.sas_label,
            d.dict_name, d.dict_type, d.description, d.sheet, d.sas_name,
@@ -916,14 +1079,15 @@ quit;
 
 proc sort data=work.doc_all_ext; by varname match_rank dict_name; run;
 
-/* Keep strongest match per variable */
+/* Keep the strongest match per variable */
 data work.var_domain_raw;
   set work.doc_all_ext;
   by varname;
   if first.varname;
 run;
 
-/* Match ties: two dictionary entries matching one column equally */
+/* Match ties: two dictionary entries matching one column equally well */
+%let n_ties_ext = 0;
 proc sql noprint;
   create table work.match_ties_ext as
     select a.varname, count(*) as n_at_best
@@ -941,18 +1105,23 @@ quit;
 %mend report_ties_ext;
 %report_ties_ext;
 
-/* Reconciliation buckets */
+/* Reconciliation buckets.                                                  */
+/* dict_only is derived from the dictionary names that actually MATCHED,    */
+/* not from exact uppercase membership. A dictionary entry matched by the   */
+/* squash rule would otherwise be reported as dictionary-only as well.      */
+%let n_data_only = 0;
+%let n_dict_only = 0;
+%let n_matched   = 0;
+
 proc sql noprint;
-  /* dictionary-only: in dict, not in data */
   create table work.dict_only as
     select sas_name as varname length=32
     from work.dict_u
     where upcase(sas_name) not in
-          (select var_u from work.actual_ext);
+          (select upcase(sas_name) from work.doc_all_ext);
 
-  /* data-only: in data, not in dictionary (including extension cols) */
   create table work.data_only as
-    select varname, vtype, sas_label
+    select varname, vtype, vlen, sas_label
     from work.actual_ext
     where varname not in
           (select varname from work.var_domain_raw);
@@ -966,47 +1135,46 @@ quit;
 
 
 /* =========================================================================
-   SECTION 3b: Identifier exclusion (BEFORE domain assignment)
+   SECTION 3c: NLEVELS pass for stat_route and the cardinality review flag
    -------------------------------------------------------------------------
-   Identifiers and technical keys must never reach statistics. A character ID
-   routed to PROC FREQ yields a ~41,000-level table and an unusable sheet.
-   Mark OUT_OF_SCOPE with rationale. These rows stay in the crosswalk.
-   Write excluded list to QC log.
+   Routing on vtype alone sends every numeric to PROC MEANS, which is wrong
+   for 0/1 and small-integer-coded categoricals (_30_DAY_MORTALITY, sex,
+   ASA class, emergent Y/N). Type AND cardinality decide the route.
    ========================================================================= */
-
-/* ---- SECTION 3c: NLEVELS pass for stat_route --------------------------- */
-/* Run once over work.analysis_base_ext to capture distinct level counts.   */
-/* Routing on vtype alone sends every numeric to PROC MEANS, which is wrong */
-/* for 0/1 or small-integer-coded categoricals (_30_DAY_MORTALITY, sex,     */
-/* ASA class, emergent Y/N). Type AND cardinality determine the route.      */
 
 proc freq data=work.analysis_base_ext nlevels;
   tables _all_ / noprint;
-  ods output nlevels=work.nlevels_ext;
+  ods output nlevels=work.nlevels_raw;
 run;
 
-/* Normalise variable name to UPCASE for join */
 data work.nlevels_ext;
-  set work.nlevels_ext;
+  set work.nlevels_raw;
+  length varname_u $32;
   varname_u = upcase(strip(tablevar));
   rename nlevels = n_levels;
+  keep varname_u nlevels;
 run;
 
-/* ---- Build combined domain staging table ------------------------------- */
-/* Start from matched variables + data-only variables */
-
-/* Add data-only rows with OUT_OF_SCOPE pre-set */
+/* ---- Build the staging table: matched rows plus data-only rows --------- */
 data work.data_only_oos;
+  length varname $32 vtype $4 vlen 8 sas_label $256
+         dict_name $60 dict_type $20 description $300 match_how $8
+         domain $16 domain_rationale $200 assign_rule $20
+         source_dataset $32;
   set work.data_only;
   domain           = 'OUT_OF_SCOPE';
   domain_rationale = 'not in PRECEDE dictionary';
   assign_rule      = 'data_only';
   dict_name        = '';
+  dict_type        = '';
+  description      = '';
   match_how        = 'NONE';
   source_dataset   = 'analysis_base_ext';
 run;
 
-/* Combine matched + data-only into one staging table */
+/* The previous version had an open-code %DO placeholder here. %DO is not   */
+/* valid outside a macro definition and would abort the run. It was also    */
+/* redundant: the SQL join below assigns source_dataset properly.           */
 data work.domain_staging;
   length varname $32 vtype $4 vlen 8 sas_label $256
          dict_name $60 dict_type $20 description $300 match_how $8
@@ -1016,28 +1184,20 @@ data work.domain_staging;
   set work.var_domain_raw (in=inmatched)
       work.data_only_oos  (in=indataonly);
 
-  /* source_dataset: matched vars are from analysis_base or master_data_merged */
   if inmatched then do;
-    /* Check if varname is one of the extension columns */
-    if varname in (%do _vi = 1 %to 1; /* placeholder — will use WHERE join below */ %end; '') then
-      source_dataset = 'master_data_merged';
-    else source_dataset = 'analysis_base';
-  end;
-  if indataonly then source_dataset = 'analysis_base_ext';
-
-  /* Initialize domain fields for matched rows */
-  if inmatched then do;
+    source_dataset   = 'analysis_base';
     domain           = '';
     domain_rationale = '';
     assign_rule      = '';
   end;
+  if indataonly then source_dataset = 'analysis_base_ext';
 run;
 
-/* Better source_dataset assignment using SQL join to ext_candidates */
+/* source_dataset for extension columns, by join rather than by macro loop */
 proc sql;
   create table work.domain_staging2 as
     select ds.*,
-           case when ec.name is not null then 'master_data_merged'
+           case when ec.name is not null              then 'master_data_merged'
                 when ds.source_dataset = 'analysis_base_ext' then 'analysis_base_ext'
                 else 'analysis_base' end as src_ds length=32
     from work.domain_staging as ds
@@ -1047,16 +1207,14 @@ quit;
 
 data work.domain_staging2;
   set work.domain_staging2;
-  if source_dataset ne 'analysis_base_ext' then
-    source_dataset = src_ds;
+  source_dataset = src_ds;
   drop src_ds;
 run;
 
-/* Join n_levels from the nlevels pass */
+/* Join n_levels */
 proc sql;
   create table work.domain_staging3 as
-    select ds.*,
-           coalesce(nl.n_levels, 0) as n_levels_join
+    select ds.*, nl.n_levels as n_levels_join
     from work.domain_staging2 as ds
     left join work.nlevels_ext as nl
       on upcase(ds.varname) = nl.varname_u;
@@ -1064,156 +1222,177 @@ quit;
 
 data work.domain_staging3;
   set work.domain_staging3;
-  if n_levels = . or n_levels = 0 then n_levels = n_levels_join;
+  if missing(n_levels) then n_levels = n_levels_join;
   drop n_levels_join;
 run;
 
 
-/* ---- Apply identifier exclusion --------------------------------------- */
+/* =========================================================================
+   SECTION 3b: Identifier exclusion (BEFORE domain assignment)
+   -------------------------------------------------------------------------
+   Identifiers and technical keys must never reach statistics: a character
+   ID routed to PROC FREQ yields a table with tens of thousands of levels.
+
+   CARDINALITY IS NOT AN EXCLUSION CRITERION. The previous version also
+   excluded any character variable with more than 200 levels, which silently
+   removed CPT_CODE, PROCEDURE_NAME and ZIP_CODE -- all of which are in the
+   Section 4 domain lookup. Because the lookup join is scoped to rows that
+   are not already OUT_OF_SCOPE, the domain assignment could not rescue
+   them and every guard still passed. Cardinality is now a review flag
+   carried on n_levels for Checkpoint 1.
+   ========================================================================= */
+
 data work.domain_staging3;
   set work.domain_staging3;
+  length hi_cardinality_flag $3;
 
-  /* Mark identifiers OUT_OF_SCOPE before any domain assignment */
   if domain = '' then do;
     if varname in ('PRECEDE_STUDY_ID','PRECEDE_STUDY_ID_1',
                    'ENCRYPTED_MRN','ENCRYPTED_ENCOUNTER')
        or prxmatch('/(^|_)(ID|MRN)(_|$)/', strip(upcase(varname))) > 0
-       or (vtype = 'char' and n_levels > 200)
     then do;
       domain           = 'OUT_OF_SCOPE';
       domain_rationale = 'identifier or technical key; not an analytic variable';
       assign_rule      = 'identifier_exclusion';
     end;
   end;
+
+  /* Review flag only -- never an exclusion */
+  if vtype = 'char' and n_levels > 200 then hi_cardinality_flag = 'YES';
+  else hi_cardinality_flag = 'NO';
 run;
 
-/* Log identifier-excluded variables for reviewer */
-data work.id_excluded_log;
-  set work.domain_staging3;
-  where domain = 'OUT_OF_SCOPE' and assign_rule = 'identifier_exclusion';
-  keep varname vtype n_levels domain domain_rationale;
-run;
-
+%let n_id_excluded = 0;
 proc sql noprint;
-  select count(*) into :n_id_excluded trimmed from work.id_excluded_log;
+  select count(*) into :n_id_excluded trimmed
+  from work.domain_staging3 where assign_rule = 'identifier_exclusion';
 quit;
-%put NOTE: [17-S3b] &n_id_excluded variables marked OUT_OF_SCOPE as identifiers/high-cardinality.;
+%put NOTE: [17-S3b] &n_id_excluded variables marked OUT_OF_SCOPE as identifiers.;
 
 
-/* ---- Apply stat_route (type AND cardinality) -------------------------- */
+/* ---- stat_route: type AND cardinality ---------------------------------- */
 data work.domain_staging3;
   set work.domain_staging3;
 
-  if domain ne 'OUT_OF_SCOPE' and domain ne 'data_only' then do;
+  if domain ne 'OUT_OF_SCOPE' then do;
     if vtype = 'char' then stat_route = 'FREQ';
     else if vtype = 'num' then do;
       if n_levels <= 10 then stat_route = 'FREQ';
       else                   stat_route = 'MEANS';
     end;
   end;
-  /* data-only OUT_OF_SCOPE rows get no route */
   else stat_route = '';
 run;
 
 
 /* =========================================================================
    SECTION 4: Domain assignment with rationales, g.var_domain_map, guards,
-              and crosswalk CSV export
+              and the Checkpoint 1 crosswalk export
    -------------------------------------------------------------------------
-   Build a DATA step lookup table keyed on upcased varname.
-   Rationale literals are SINGLE-quoted (prevent macro trigger resolution).
-   Three-step ordered rule: timing > analytic_role; instrument overrides both.
+   Lookup keyed on upcased varname. The quotes that previously wrapped each
+   rationale have been removed: INFILE DSD does not strip single quotes, so
+   they were being stored literally and exported into the review CSV. They
+   were never needed -- DATALINES does not resolve macro triggers, and no
+   rationale contains a comma.
+
+   assign_rule for frailty is 'timing', not 'instrument'. The locked rule
+   defines instrument membership as the override to D3 for named COGNITIVE
+   instruments. Tagging frailty the same way would mix the two in the QC
+   sheet's per-rule counts.
    ========================================================================= */
 
 %put NOTE: ==== Section 4: domain assignment starting ====;
 
-/* Domain assignment lookup — covers all matched, non-OUT_OF_SCOPE variables.
-   Variables not listed here remain with domain='' and are caught by the
-   blank-domain guard (they become OUT_OF_SCOPE / unrecognised).
-   Rationale strings use SINGLE QUOTES throughout — no macro trigger risk.    */
-
 data work.domain_lookup;
-  length varname_u $32 domain $16 domain_rationale $200 assign_rule $20;
-  infile datalines dsd;
-  input varname_u $ domain $ assign_rule $ domain_rationale $;
+  length varname_u $32 domain $16 assign_rule $20 domain_rationale $200;
+  infile datalines dsd dlm=',' truncover;
+  input varname_u :$32. domain :$16. assign_rule :$20. domain_rationale :$200.;
 datalines;
-AGE_AT_SURGERY,D1,timing,'captured at surgery registration; sociodemographic descriptor'
-AGE_AT_ENCOUNTER,D1,timing,'captured at encounter; sociodemographic descriptor'
-SEX,D1,timing,'recorded at registration; biological sex as sociodemographic variable'
-RACE,D1,timing,'recorded at registration; race as sociodemographic variable'
-ETHNICITY,D1,timing,'recorded at registration; ethnicity as sociodemographic variable'
-INSURANCE_TYPE,D1,analytic_role,'payer type known preoperatively; sociodemographic proxy'
-PAYER,D1,analytic_role,'payer type known preoperatively; sociodemographic proxy'
-MARITAL_STATUS,D1,timing,'recorded at registration; sociodemographic descriptor'
-MARITAL,D1,timing,'recorded at registration; sociodemographic descriptor'
-ZIP_CODE,D1,timing,'geographic locator recorded at registration; sociodemographic'
-ZIPCODE,D1,timing,'geographic locator recorded at registration; sociodemographic'
-STATE,D1,timing,'geographic locator recorded at registration; sociodemographic'
-ADMIT_BMI,D2,timing,'captured at preoperative admission; preoperative physiologic assessment'
-BMI,D2,timing,'measured preoperatively; standard preoperative assessment variable'
-FRAILTY_SCORE,D2,instrument,'named frailty instrument score; preoperative assessment per D-02'
-FRAILTY_CATEGORY,D2,instrument,'named frailty instrument category; preoperative assessment per D-02'
-FEELS_EXHAUSTED,D2,instrument,'frailty component (Fried criteria); preoperative assessment'
-WEIGHT_LOSS,D2,instrument,'frailty component (Fried criteria); preoperative assessment'
-GRIP_STRENGTH,D2,instrument,'frailty component (Fried criteria); preoperative assessment'
-WALK_TIME,D2,instrument,'frailty component (Fried criteria); preoperative assessment'
-PHYSICAL_ACTIVITY,D2,instrument,'frailty component (Fried criteria); preoperative assessment'
-ASA_CLASS,D2,analytic_role,'preoperative risk classification assigned before surgery; D2 per analytic role'
-ASA,D2,analytic_role,'preoperative risk classification; D2 per analytic role'
-SMOKING_STATUS,D2,timing,'preoperative habit assessment; standard preoperative variable'
-SMOKING,D2,timing,'preoperative habit assessment; standard preoperative variable'
-HYPERTENSION,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-DIABETES,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-COPD,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-CHF,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-CAD,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-AFIB,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-CKD,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-CANCER,D2,timing,'comorbidity documented in preoperative assessment; D2 by timing'
-COGNITIVE_SCORE,D3,instrument,'named cognitive instrument score (dCDT/MoCA); instrument membership overrides timing'
-COGNITIVE_CATEGORY,D3,instrument,'named cognitive instrument category; instrument membership overrides timing'
-CLOCK_SCORE,D3,instrument,'clock-drawing instrument score; instrument membership overrides timing'
-DCDT_SCORE,D3,instrument,'dCDT instrument score; instrument membership overrides timing'
-DCDT_COMMAND,D3,instrument,'dCDT command clock subscale; instrument membership overrides timing'
-DCDT_COPY,D3,instrument,'dCDT copy clock subscale; instrument membership overrides timing'
-PROCEDURE_NAME,D4,timing,'surgical procedure recorded at time of operation; D4 by timing'
-CPT_CODE,D4,timing,'procedure CPT code assigned at time of operation; D4 by timing'
-SERVICE_LINE,D4,timing,'surgical service recorded at time of operation; D4 by timing'
-ANESTHESIA_TYPE,D4,timing,'anesthesia type administered intraoperatively; D4 by timing'
-CASE_DURATION,D4,timing,'elapsed operative time; intraoperative variable by timing'
-OPERATIVE_TIME,D4,timing,'elapsed operative time; intraoperative variable by timing'
-EMERGENT,D4,timing,'emergent case flag set at time of surgery; D4 by timing'
-EMERGENT_CASE,D4,timing,'emergent case flag set at time of surgery; D4 by timing'
-AVG_ABP_MEAN,D4,timing,'intraoperative arterial blood pressure mean; D4 by timing'
-ABP_LESS_THAN_60_COUNT,D4,timing,'count of intraoperative ABP < 60 events; D4 by timing'
-BIS_INDEX_LESS_30_COUNT,D4,timing,'count of intraoperative BIS < 30 events; D4 by timing'
-TOTAL_MIDAZOLAM_MG,D4,timing,'total intraoperative midazolam dose; D4 by timing'
-ISO_SEV_TOTAL,D4,timing,'total volatile anesthetic exposure (isoflurane/sevoflurane); D4 by timing'
-ISO_SEV_AVG,D4,timing,'average volatile anesthetic exposure; D4 by timing'
-_30_DAY_MORTALITY,D5,analytic_role,'postoperative outcome realized after surgery; D5 by analytic role'
-MORTALITY_30,D5,analytic_role,'30-day mortality outcome realized postoperatively; D5 by analytic role'
-LOS,D5,analytic_role,'length of stay determined postoperatively; D5 by analytic role'
-LENGTH_OF_STAY,D5,analytic_role,'length of stay determined postoperatively; D5 by analytic role'
-READMISSION_30,D5,analytic_role,'30-day readmission outcome realized postoperatively; D5 by analytic role'
-READMISSION,D5,analytic_role,'readmission outcome realized postoperatively; D5 by analytic role'
-DISCHARGE_DISPOSITION,D5,analytic_role,'disposition known only at discharge; D5 by analytic role'
-DISCHARGE_DISPO,D5,analytic_role,'disposition known only at discharge; D5 by analytic role'
-COMPLICATIONS,D5,analytic_role,'postoperative complication status; D5 by analytic role'
-ORAL_MORPHINE_EQUIV_MG_POD_DAY6,D5,analytic_role,'postoperative opioid use (POD day 6) realized after surgery; D5 by analytic role'
+AGE_AT_SURGERY,D1,timing,captured at surgery registration; sociodemographic descriptor
+AGE_AT_ENCOUNTER,D1,timing,captured at encounter; sociodemographic descriptor
+SEX,D1,timing,recorded at registration; sociodemographic descriptor
+RACE,D1,timing,recorded at registration; sociodemographic descriptor
+ETHNICITY,D1,timing,recorded at registration; sociodemographic descriptor
+INSURANCE_TYPE,D1,analytic_role,payer type known preoperatively; sociodemographic proxy
+PAYER,D1,analytic_role,payer type known preoperatively; sociodemographic proxy
+MARITAL_STATUS,D1,timing,recorded at registration; sociodemographic descriptor
+MARITAL,D1,timing,recorded at registration; sociodemographic descriptor
+ZIP_CODE,D1,timing,geographic locator recorded at registration; sociodemographic
+ZIPCODE,D1,timing,geographic locator recorded at registration; sociodemographic
+STATE,D1,timing,geographic locator recorded at registration; sociodemographic
+ADMIT_BMI,D2,timing,captured at preoperative admission; preoperative physiologic assessment
+BMI,D2,timing,measured preoperatively; standard preoperative assessment variable
+FRAILTY_SCORE,D2,timing,frailty assessed before surgery; preoperative assessment
+FRAILTY_CATEGORY,D2,timing,frailty assessed before surgery; preoperative assessment
+FEELS_EXHAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria)
+FEELS_EXAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria; source spelling)
+WEIGHT_LOSS,D2,timing,frailty component captured preoperatively (Fried criteria)
+GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria)
+WEAK_GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria)
+WALK_TIME,D2,timing,frailty component captured preoperatively (Fried criteria)
+SLOW_WALKING_SPEED,D2,timing,frailty component captured preoperatively (Fried criteria)
+PHYSICAL_ACTIVITY,D2,timing,frailty component captured preoperatively (Fried criteria)
+LOW_PHYSICAL_ACTIVITY,D2,timing,frailty component captured preoperatively (Fried criteria)
+ASA_CLASS,D2,analytic_role,preoperative risk classification assigned before surgery
+ASA,D2,analytic_role,preoperative risk classification assigned before surgery
+SMOKING_STATUS,D2,timing,preoperative habit assessment; standard preoperative variable
+SMOKING,D2,timing,preoperative habit assessment; standard preoperative variable
+HYPERTENSION,D2,timing,comorbidity documented in preoperative assessment
+DIABETES,D2,timing,comorbidity documented in preoperative assessment
+COPD,D2,timing,comorbidity documented in preoperative assessment
+CHF,D2,timing,comorbidity documented in preoperative assessment
+CAD,D2,timing,comorbidity documented in preoperative assessment
+AFIB,D2,timing,comorbidity documented in preoperative assessment
+CKD,D2,timing,comorbidity documented in preoperative assessment
+CANCER,D2,timing,comorbidity documented in preoperative assessment
+COGNITIVE_SCORE,D3,instrument,named cognitive instrument score; instrument membership overrides timing
+COGNITIVE_CATEGORY,D3,instrument,named cognitive instrument category; instrument membership overrides timing
+CLOCK_SCORE,D3,instrument,clock-drawing instrument score; instrument membership overrides timing
+DCDT_SCORE,D3,instrument,dCDT instrument score; instrument membership overrides timing
+DCDT_COMMAND,D3,instrument,dCDT command clock subscale; instrument membership overrides timing
+DCDT_COPY,D3,instrument,dCDT copy clock subscale; instrument membership overrides timing
+PROCEDURE_NAME,D4,timing,surgical procedure recorded at time of operation
+BASE_PROCEDURE_1,D4,timing,surgical procedure recorded at time of operation
+CPT_CODE,D4,timing,procedure CPT code assigned at time of operation
+CPT_1,D4,timing,procedure CPT code assigned at time of operation
+SERVICE_LINE,D4,timing,surgical service recorded at time of operation
+ANESTHESIA_TYPE,D4,timing,anesthesia type administered intraoperatively
+CASE_DURATION,D4,timing,elapsed operative time; intraoperative variable by timing
+OPERATIVE_TIME,D4,timing,elapsed operative time; intraoperative variable by timing
+EMERGENT,D4,timing,emergent case flag set at time of surgery
+EMERGENT_CASE,D4,timing,emergent case flag set at time of surgery
+AVG_ABP_MEAN,D4,timing,intraoperative arterial blood pressure mean
+ABP_LESS_THAN_60_COUNT,D4,timing,count of intraoperative low arterial pressure events
+BIS_INDEX_LESS_30_COUNT,D4,timing,count of intraoperative low BIS index events
+SD_BIS_INDEX,D4,timing,intraoperative BIS index variability
+TOTAL_MIDAZOLAM_MG,D4,timing,total intraoperative midazolam dose
+ISO_SEV_TOTAL,D4,timing,total volatile anesthetic exposure
+ISO_SEV_AVG,D4,timing,average volatile anesthetic exposure
+_30_DAY_MORTALITY,D5,analytic_role,postoperative outcome realized after surgery
+MORTALITY_30,D5,analytic_role,30-day mortality outcome realized postoperatively
+LOS,D5,analytic_role,length of stay determined postoperatively
+LENGTH_OF_STAY,D5,analytic_role,length of stay determined postoperatively
+READMISSION_30,D5,analytic_role,30-day readmission outcome realized postoperatively
+READMISSION,D5,analytic_role,readmission outcome realized postoperatively
+DISCHARGE_DISPOSITION,D5,analytic_role,disposition known only at discharge
+DISCHARGE_DISPO,D5,analytic_role,disposition known only at discharge
+COMPLICATIONS,D5,analytic_role,postoperative complication status
+ORAL_MORPHINE_EQUIV_MG_POD_DAY6,D5,analytic_role,postoperative opioid use realized after surgery
 ;
 run;
 
-/* Apply lookup to domain_staging3 */
+/* Apply the lookup. The ON clause scopes the join to rows that are not     */
+/* already OUT_OF_SCOPE, so identifier exclusions are not overridden.       */
 proc sql;
   create table work.domain_staging4 as
     select ds.*,
-           coalesce(dl.domain,           ds.domain)           as domain_final   length=16,
+           coalesce(dl.domain,           ds.domain)           as domain_final    length=16,
            coalesce(dl.domain_rationale, ds.domain_rationale) as rationale_final length=200,
            coalesce(dl.assign_rule,      ds.assign_rule)      as rule_final      length=20
     from work.domain_staging3 as ds
     left join work.domain_lookup as dl
       on upcase(ds.varname) = dl.varname_u
-      and ds.domain not in ('OUT_OF_SCOPE');
+     and ds.domain not in ('OUT_OF_SCOPE');
 quit;
 
 data work.domain_staging4;
@@ -1221,49 +1400,68 @@ data work.domain_staging4;
   domain           = domain_final;
   domain_rationale = rationale_final;
   assign_rule      = rule_final;
-  /* Any remaining unassigned matched variable -> OUT_OF_SCOPE / unrecognised */
+
+  /* A matched, dictionary-documented variable with no lookup entry is an
+     INCOMPLETE MAP, not an out-of-scope variable. It is parked here and
+     GUARD 5 below fails the run so the omission cannot pass review. */
   if domain = '' then do;
     domain           = 'OUT_OF_SCOPE';
-    domain_rationale = 'not in domain lookup; review needed';
+    domain_rationale = 'not in domain lookup; lookup is incomplete';
     assign_rule      = 'unrecognised';
+    stat_route       = '';
   end;
+
+  /* Any row demoted to OUT_OF_SCOPE must not carry a statistic route */
+  if domain = 'OUT_OF_SCOPE' then stat_route = '';
+
   drop domain_final rationale_final rule_final;
 run;
 
-/* Apply denominator note to D3 and frailty (D2 frailty block) variables */
+/* Denominator note on the extension-sourced blocks */
 data work.domain_staging4;
   set work.domain_staging4;
   length denominator_note $300;
-  if domain = 'D3' then denominator_note = "&D3_DENOM_NOTE";
-  else if domain = 'D2' and assign_rule = 'instrument' then
-    denominator_note = "&D3_DENOM_NOTE";
+  if source_dataset = 'master_data_merged' then denominator_note = "&D3_DENOM_NOTE";
   else denominator_note = '';
 run;
 
-/* ---- Write g.var_domain_map (the ONE permanent artifact of this phase) -- */
+/* ---- Write g.var_domain_map: the ONE permanent artifact of this phase --- */
+/* g.analysis_base and g.master_data_merged remain read-only. This dataset  */
+/* is the explicitly authorized exception (see 17-CONTEXT.md).              */
 data g.var_domain_map;
-  length varname $32 sas_label $256 vtype $4 n_levels 8
+  length varname $32 sas_label $256 vtype $4 n_levels 8 hi_cardinality_flag $3
          stat_route $8 domain $16 domain_rationale $200
          assign_rule $20 source_dataset $32 denominator_note $300
          dict_name $60 match_how $8;
   set work.domain_staging4;
-  rename sas_label = sas_label;
-  keep varname sas_label vtype n_levels stat_route domain domain_rationale
-       assign_rule source_dataset denominator_note dict_name match_how;
+  keep varname sas_label vtype n_levels hi_cardinality_flag stat_route
+       domain domain_rationale assign_rule source_dataset denominator_note
+       dict_name match_how;
 run;
 
-/* Sort by domain then varname for human review */
 proc sort data=g.var_domain_map; by domain varname; run;
 
 %put NOTE: [17-S4] g.var_domain_map written.;
 
 
+/* ---- Export the crosswalk BEFORE the guards ---------------------------- */
+/* The export runs first deliberately. GUARD 5 is expected to fail on the   */
+/* first pass while the lookup is incomplete, and the reviewer needs the    */
+/* CSV in hand to see exactly which variables still need lookup entries.    */
+proc export data=g.var_domain_map
+  outfile="&qc_path.\17_var_domain_map_review.csv"
+  dbms=csv replace;
+run;
+
+%put NOTE: [17-S4] qc\17_var_domain_map_review.csv exported for Checkpoint 1 review.;
+
+
 /* =========================================================================
-   SECTION 4 GUARDS: Hard exit criteria
-   Each in a named macro calling %fail_out.
+   SECTION 4 GUARDS: hard exit criteria
    ========================================================================= */
 
-/* GUARD 1: Blank rationale on any assigned (non-OUT_OF_SCOPE) variable */
+/* GUARD 1: blank rationale on any assigned variable */
+%let n_blank = 0;
 proc sql noprint;
   select count(*) into :n_blank trimmed
   from g.var_domain_map
@@ -1272,14 +1470,14 @@ quit;
 
 %macro check_blank_rationale;
   %if &n_blank > 0 %then %do;
-    %fail_out(msg=&n_blank variables have blank domain_rationale and are not OUT_OF_SCOPE -- Checkpoint 1 cannot proceed);
+    %fail_out(msg=&n_blank assigned variables have a blank domain_rationale -- Checkpoint 1 cannot proceed);
   %end;
-  %put NOTE: [17-S4] Blank-rationale guard passed (n_blank=&n_blank).;
+  %put NOTE: [17-S4] Blank-rationale guard passed.;
 %mend check_blank_rationale;
 %check_blank_rationale;
 
-
 /* GUARD 2: VARnn positional name survivor */
+%let n_varnn_map = 0;
 proc sql noprint;
   select count(*) into :n_varnn_map trimmed
   from g.var_domain_map
@@ -1288,31 +1486,31 @@ quit;
 
 %macro check_varnn_map;
   %if &n_varnn_map > 0 %then %do;
-    %fail_out(msg=&n_varnn_map VARnn positional names survived into g.var_domain_map -- dictionary match is defective);
+    %fail_out(msg=&n_varnn_map VARnn positional names survived into g.var_domain_map -- the dictionary match is defective);
   %end;
-  %put NOTE: [17-S4] VARnn guard passed (n_varnn_map=&n_varnn_map).;
+  %put NOTE: [17-S4] VARnn guard passed.;
 %mend check_varnn_map;
 %check_varnn_map;
 
-
-/* GUARD 3: Blank stat_route on any in-scope variable */
+/* GUARD 3: stat_route set on every in-scope variable */
+%let n_blank_route = 0;
 proc sql noprint;
   select count(*) into :n_blank_route trimmed
   from g.var_domain_map
-  where domain not in ('OUT_OF_SCOPE')
+  where domain ne 'OUT_OF_SCOPE'
     and stat_route not in ('MEANS','FREQ');
 quit;
 
 %macro check_blank_route;
   %if &n_blank_route > 0 %then %do;
-    %fail_out(msg=&n_blank_route in-scope variables have a stat_route that is not MEANS or FREQ -- routing is incomplete);
+    %fail_out(msg=&n_blank_route in-scope variables have a stat_route that is neither MEANS nor FREQ);
   %end;
-  %put NOTE: [17-S4] Stat-route guard passed (n_blank_route=&n_blank_route).;
+  %put NOTE: [17-S4] Stat-route guard passed.;
 %mend check_blank_route;
 %check_blank_route;
 
-
-/* GUARD 4: Identifier leak — any in-scope row whose name matches identifier pattern */
+/* GUARD 4: identifier leak into statistics */
+%let n_id_leak = 0;
 proc sql noprint;
   select count(*) into :n_id_leak trimmed
   from g.var_domain_map
@@ -1327,35 +1525,57 @@ quit;
 
 %macro check_id_leak;
   %if &n_id_leak > 0 %then %do;
-    %fail_out(msg=&n_id_leak identifier variables have a stat_route set and are not OUT_OF_SCOPE -- identifier leak into statistics);
+    %fail_out(msg=&n_id_leak identifier variables have a stat_route set and are not OUT_OF_SCOPE);
   %end;
-  %put NOTE: [17-S4] Identifier-leak guard passed (n_id_leak=&n_id_leak).;
+  %put NOTE: [17-S4] Identifier-leak guard passed.;
 %mend check_id_leak;
 %check_id_leak;
 
+/* GUARD 5: dictionary-documented variables with no domain assignment
+   -----------------------------------------------------------------
+   A variable that matched the PRECEDE dictionary but is absent from the
+   Section 4 lookup is an incomplete map. Previously it became OUT_OF_SCOPE
+   with a non-blank rationale, so GUARD 1 and GUARD 3 both passed and the
+   omission was invisible. This guard makes it a hard failure. */
+%let n_unassigned = 0;
+proc sql noprint;
+  select count(*) into :n_unassigned trimmed
+  from g.var_domain_map
+  where assign_rule = 'unrecognised' and match_how ne 'NONE';
+quit;
 
-/* ---- Export g.var_domain_map to CSV for Checkpoint 1 review ----------- */
-/* Rows already sorted by domain then varname (applied above).              */
-proc export data=g.var_domain_map
-  outfile="&qc_path.\17_var_domain_map_review.csv"
-  dbms=csv replace;
-run;
-
-%put NOTE: [17-S4] qc\17_var_domain_map_review.csv exported for Checkpoint 1 review.;
+%macro check_unassigned;
+  %if &n_unassigned > 0 %then %do;
+    %put ERROR: [17-S4] The following documented variables have no lookup entry.;
+    proc print data=g.var_domain_map noobs;
+      where assign_rule = 'unrecognised' and match_how ne 'NONE';
+      var varname sas_label vtype n_levels;
+      title "Documented variables missing from the Section 4 domain lookup";
+    run;
+    title;
+    %fail_out(msg=&n_unassigned dictionary-documented variables have no entry in the Section 4 domain lookup -- filter the review CSV on assign_rule=unrecognised and add them before Checkpoint 1);
+  %end;
+  %put NOTE: [17-S4] Unassigned-documented guard passed.;
+%mend check_unassigned;
+%check_unassigned;
 
 
 /* =========================================================================
-   END OF WAVE 1 (Sections 1-4)
+   END OF WAVE 1 (Sections 1 to 4)
    -------------------------------------------------------------------------
    Checkpoint 1: Gerard reviews qc\17_var_domain_map_review.csv
-   variable-by-variable. After approval:
-     1. Set %let DOMAIN_MAP_APPROVED = 1; in Section 0 above.
-     2. Re-run the program. %gate_stats will no longer abort.
-     3. Sections 5-11 (Wave 2 statistics and Wave 3 workbook) will execute.
+   variable-by-variable -- domain, domain_rationale, and stat_route, paying
+   closest attention to rows where assign_rule is analytic_role and to
+   numeric variables near the 10-level routing boundary.
+
+   Sections 5 to 11 (sentinel recode, PROC MEANS, PROC FREQ, suppression,
+   ODS EXCEL workbook, QC artifact) are NOT in this file yet. Setting
+   DOMAIN_MAP_APPROVED to 1 will not produce statistics until they are
+   written. Each of those sections must open with %gate_stats.
    ========================================================================= */
 
 %put NOTE: ==== Phase 17 Wave 1 complete. Checkpoint 1 pending. ====;
-%put NOTE: Open qc\17_var_domain_map_review.csv and review domain assignment variable-by-variable.;
-%put NOTE: Set DOMAIN_MAP_APPROVED=1 in Section 0 only after approval then re-run.;
+%put NOTE: Review qc\17_var_domain_map_review.csv variable-by-variable.;
+%put NOTE: Sections 5 to 11 are not yet written -- see the header block.;
 
 %restore_log;

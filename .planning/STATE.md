@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
-status: verifying
-last_updated: "2026-09-03T15:43:25.944Z"
-last_activity: 2026-08-29
+status: executing
+last_updated: "2026-09-03T16:24:54.702Z"
+last_activity: 2026-09-03
 progress:
   total_phases: 12
   completed_phases: 6
-  total_plans: 25
-  completed_plans: 21
-  percent: 84
+  total_plans: 29
+  completed_plans: 22
+  percent: 76
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-03T15:43:25.939Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-03T16:24:54.697Z
 
 ---
 
@@ -23,16 +23,16 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 14 — label-similarity-sweep
+**Current Focus:** Phase 17 — summary-stats-by-domain-context
 
 ---
 
 ## Current Position
 
-Phase: 14 (label-similarity-sweep) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-08-29
+Phase: 17 (summary-stats-by-domain-context) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-09-03
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
   redundant), and summary statistics already cover every variable. What remains open is the
@@ -51,7 +51,7 @@ Plan: 2 of 3
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [████████░░] 84%
+**Progress:** [████████░░] 76%
 
 **Phase status at a glance:**
 
@@ -110,6 +110,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 | Phase 07 P01 | 30 | 1 tasks | 1 files |
 | Phase 08 P01 | 30 | 1 tasks | 2 files |
 | Phase 14 P01 | 15 | 1 tasks | 1 files |
+| Phase 17 P01 | 140 | 2 tasks | 1 files |
 
 ## Accumulated Context
 

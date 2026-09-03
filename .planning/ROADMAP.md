@@ -172,10 +172,10 @@ suppression (<=11). Descriptive only -- no inferential testing, no cohort restri
 g.analysis_base.
 **Requirements**: SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK
 **Depends on:** Phase 16
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
-- [ ] 17-01-PLAN.md -- Wave 0 discovery: program scaffold (config, log routing, preconditions) + discover year variable, extension KEEP= list, per-year N (SUMM-DOMAIN-DISC)
+- [x] 17-01-PLAN.md -- Wave 0 discovery: program scaffold (config, log routing, preconditions) + discover year variable, extension KEEP= list, per-year N (SUMM-DOMAIN-DISC)
 - [ ] 17-02-PLAN.md -- Wave 1: build work.analysis_base_ext (D-01 CHAR $12 join), dictionary match, domain assignment with rationale, g.var_domain_map + Checkpoint 1 human review (SUMM-DOMAIN-MAP)
 - [ ] 17-03-PLAN.md -- Wave 2: sentinel recode + log, PROC MEANS + PROC FREQ pooled and per-year, small-cell suppression (SUMM-DOMAIN-STATS)
 - [ ] 17-04-PLAN.md -- Wave 3: ODS EXCEL workbook (KEY leftmost, D1-D5, Crosswalk, QC), UF colors, QC text artifact + Checkpoint 2 review (SUMM-DOMAIN-BOOK)

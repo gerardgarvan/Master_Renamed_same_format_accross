@@ -12,10 +12,11 @@
 ### Locked Decisions
 
 **D-01 — Source dataset**
-Use `g.analysis_base_ext` = `g.analysis_base` left-joined to the frailty, cognitive, and
+Use `work.analysis_base_ext` = `g.analysis_base` left-joined to the frailty, cognitive, and
 intraoperative-physiologic columns from `g.master_data_merged`, keyed on `PRECEDE_STUDY_ID`.
-Run all five domains (D1–D5) against this extended dataset. `g.analysis_base_ext` is a
-temporary/working dataset for this phase only; it is not committed to the permanent library.
+Run all five domains (D1–D5) against this extended dataset. It is a temporary WORK dataset for this
+phase only — `work.analysis_base_ext`, never `g.analysis_base_ext` — and is not committed to the
+permanent library.
 PRECEDE_STUDY_ID type conflict must be resolved before the join: CHAR $12 in md1–md6, md8
 but NUM8 in md7 — normalize to CHAR $12.
 
@@ -55,11 +56,11 @@ Every variable assignment gets a one-line `domain_rationale`. A blank `domain_ra
 - Checkpoint 2 (Wave 3): Review of the issued workbook against the data dictionary
 
 **Authoritative spec document**
-`summary-stats-by-domain-CONTEXT (1).md` (repo root) — use this, not the earlier draft
+`docs/17-spec-summary-stats-by-domain.md` (repo root) — use this, not the earlier draft
 
 ### Claude's Discretion
 - Handling of variables "in data only" (not in dictionary): mark out of scope with reason "not in PRECEDE dictionary" rather than assigning to a domain
-- Whether `g.analysis_base_ext` is materialized as a permanent or temporary (`work.`) dataset
+- Materialization of `work.analysis_base_ext` (resolved: WORK, temporary)
 
 ### Deferred Ideas (OUT OF SCOPE)
 - Inferential testing / modeling
@@ -73,7 +74,7 @@ Every variable assignment gets a one-line `domain_rationale`. A blank `domain_ra
 
 Phase 17 produces descriptive summary statistics for every PRECEDE-dictionary-documented
 variable, organized across five clinical domains, output as a single Excel workbook with
-pooled and per-year column blocks. The authoritative spec (`summary-stats-by-domain-CONTEXT (1).md`)
+pooled and per-year column blocks. The authoritative spec (`docs/17-spec-summary-stats-by-domain.md`)
 is unusually complete and functions as a near-final PRD. Research confirms that all required
 SAS techniques are already demonstrated in the existing pipeline (Programs 09 and 16), and no
 external tools or novel SAS features are needed.
@@ -100,7 +101,7 @@ patterns from Programs 09 and 16. Write `work.analysis_base_ext` (not permanent)
 | ODS EXCEL | SAS 9.4M5+ | Native .xlsx output with multiple sheets | Established pattern in Programs 09 and 16 |
 | PROC MEANS | base SAS | Continuous variable statistics | Cannot process character variables — must route by type |
 | PROC FREQ | base SAS | Categorical variable statistics + NLEVELS | One-pass distinct counts; use `/ MISSING` to keep missing visible, then split |
-| PROC CONTENTS | base SAS | Variable inventory from g.analysis_base_ext | Already used in Program 09 via `dictionary.columns` |
+| PROC CONTENTS | base SAS | Variable inventory from work.analysis_base_ext | Already used in Program 09 via `dictionary.columns` |
 | dictionary.columns | base SAS | Variable type, length, label metadata | TYPE is char/num (not 1/2 as in PROC CONTENTS OUT=) — see pitfall below |
 | PROC IMPORT | base SAS | Read `docs/precede_dictionary.csv` | Pattern from Program 16 |
 | PROC SQL | base SAS | All joins, count macros, crosswalk assembly | Pattern throughout pipeline |
@@ -123,12 +124,14 @@ No new packages. All tools are base SAS 9.4.
 ```
 17_summary_stats_by_domain.sas
   Section 0:  Options, %include config, preconditions
-  Section 1:  Build g.analysis_base_ext (left join)
+  Section 1:  Build work.analysis_base_ext (macro-time key cast, uniqueness gate, left join)
   Section 2:  Read precede_dictionary.csv → work.dd_precede
-  Section 3:  Match dictionary against PROC CONTENTS of g.analysis_base_ext
+  Section 3:  Match dictionary against PROC CONTENTS of work.analysis_base_ext
               → work.var_domain_raw (reconciliation: in both, dict only, data only)
   Section 4:  Assign domains and domain_rationale → g.var_domain_map
-              [STOP — Checkpoint 1 human review]
+              [GATE — %gate_stats aborts unless DOMAIN_MAP_APPROVED = 1
+               Checkpoint 1 human review happens here; the flag is set only after approval.
+               Sections 5-11 are unreachable until then.]
   Section 5:  Sentinel recoding → work.analysis_base_clean, log recode counts
   Section 6:  Continuous stats — PROC MEANS, pooled + per year
   Section 7:  Categorical stats — PROC FREQ, pooled + per year
@@ -142,28 +145,64 @@ No new packages. All tools are base SAS 9.4.
 **What:** Left-join frailty/cognitive/intraop-physiologic columns from `g.master_data_merged`
 onto `g.analysis_base`, keyed on PRECEDE_STUDY_ID. Result stays in WORK.
 
-**Critical:** PRECEDE_STUDY_ID is CHAR $12 in `g.analysis_base` (and in md1–md6/md8) but NUM8
-in md7 (which contributed some rows to `g.master_data_merged`). The join key in
-`g.master_data_merged` must be cast to CHAR $12 before the left join.
+**Critical:** PRECEDE_STUDY_ID is CHAR $12 in `g.analysis_base` (and in md1–md6/md8) but was NUM8
+in the md7 SOURCE file. Note carefully: **a SAS variable has exactly one type per dataset**. The
+md7 history describes the source files, not `g.master_data_merged`, which now holds a single
+resolved type for the key. Wave 0 discovers that resolved type; Wave 1 generates the cast from it.
 
-**Example — safe join pattern:**
+**Do NOT use runtime `vtype()` branching.** A DATA step compiles *both* branches of an IF regardless
+of which one executes, so `put(charvar, z12.)` is a compile-time error whenever the key is character
+— the step never runs at all. `vtype()` cannot make one piece of source code support both types.
+
+**Format choice:** use `best12.`, not `z12.`, unless discovery proved the character key is
+zero-padded. `z12.` pads to twelve digits, so numeric 123456789 becomes `'000123456789'` while the
+character side holds `'123456789'`; the merge then matches nothing, the row count still passes, and
+every extension column comes back missing — exactly the silent failure Pitfall 1 describes. The
+leading-zero audit of the source CSVs came back empty, so `best12.` is the expected answer.
+
+**Uniqueness:** assert `PRECEDE_STUDY_ID` is unique in `g.master_data_merged` BEFORE merging. The
+post-merge row-count assertion does catch duplicate-driven inflation, but it reports
+"41,153 ne 41,150" rather than naming the cause.
+
+**Example — corrected join pattern:**
 ```sas
-/* Cast the key in master_data_merged to CHAR $12 in a work copy */
-data work.merged_ext_cols;
-  set g.master_data_merged (keep=PRECEDE_STUDY_ID
-        Cognitive_Score Frailty_Score
-        /* frailty components */
-        Feels_Exausted Weight_Loss Weak_Grip_Strength
-        Slow_Walking_Speed Low_Physical_Activity
-        /* intraop physiologic block — all variables from md8 hemodynamic block */
-        /* ... enumerate from PROC CONTENTS of g.master_data_merged ... */
-        );
-  length key_char $12;
-  if vtype(PRECEDE_STUDY_ID) = 'N' then key_char = put(PRECEDE_STUDY_ID, z12.);
-  else key_char = strip(PRECEDE_STUDY_ID);
-  drop PRECEDE_STUDY_ID;
-  rename key_char = PRECEDE_STUDY_ID;
-run;
+/* 0. uniqueness gate */
+proc sql noprint;
+  select count(*) into :n_key_dups trimmed
+  from (select PRECEDE_STUDY_ID from g.master_data_merged
+        group by PRECEDE_STUDY_ID having count(*) > 1);
+quit;
+%macro check_key_unique;
+  %if &n_key_dups > 0 %then %do;
+    %fail_out(msg=&n_key_dups duplicate PRECEDE_STUDY_ID values in g.master_data_merged);
+  %end;
+%mend check_key_unique;
+%check_key_unique;
+
+/* 1. resolve the key type at MACRO time */
+proc sql noprint;
+  select type into :key_type_merged trimmed
+  from dictionary.columns
+  where libname='G' and memname='MASTER_DATA_MERGED'
+    and upcase(name)='PRECEDE_STUDY_ID';
+quit;
+
+/* 2. generate the cast — only one branch is ever compiled */
+%macro build_ext_cols;
+  data work.merged_ext_cols;
+    set g.master_data_merged (keep=PRECEDE_STUDY_ID &extension_keep_list);
+    length key_char $12;
+    %if &key_type_merged = num %then %do;
+      key_char = strip(put(PRECEDE_STUDY_ID, best12.));
+    %end;
+    %else %do;
+      key_char = strip(PRECEDE_STUDY_ID);
+    %end;
+    drop PRECEDE_STUDY_ID;
+    rename key_char = PRECEDE_STUDY_ID;
+  run;
+%mend build_ext_cols;
+%build_ext_cols;
 
 proc sort data=work.merged_ext_cols; by PRECEDE_STUDY_ID; run;
 proc sort data=g.analysis_base out=work.analysis_base_sorted; by PRECEDE_STUDY_ID; run;
@@ -187,58 +226,84 @@ Deduplicate to one row per variable before joining. Flag match ties as warnings,
 directly portable. Key difference for Phase 17: match against `work.analysis_base_ext`
 (dictionary.columns) rather than `g.analysis_base`.
 
-### Pattern 3: Variable Type Routing (from Programs 09 and 16)
-**What:** Separate lists for MEANS-eligible (numeric, low cardinality rule does NOT apply
-here — all numerics get PROC MEANS) vs FREQ-eligible (character, or numeric with few levels).
+### Pattern 3: Statistic Routing — type AND cardinality, plus identifier exclusion
+**What:** Route on a stored `stat_route` column, not on `vtype` alone.
+
+**Cardinality matters here.** Routing every numeric to PROC MEANS is wrong for this dataset:
+`_30_DAY_MORTALITY`, sex, race, ASA class and emergent Y/N are plausibly stored as 0/1 or small
+integer codes, and PROC MEANS would report "mean 0.03, SD 0.17" for the phase's headline outcome
+instead of a level/n/% table. Run `proc freq nlevels` once, store `n_levels`, and set:
+- `vtype='char'` → FREQ
+- `vtype='num'` and `n_levels <= 10` → FREQ
+- `vtype='num'` and `n_levels > 10` → MEANS
+
+The threshold is a default. Checkpoint 1 is where a genuine numeric score with few observed values
+gets overridden back to MEANS.
+
+**Identifiers must be excluded entirely.** A character ID routed to PROC FREQ produces a table with
+~41,000 levels and an unusable Excel sheet. Mark `PRECEDE_STUDY_ID`, `PRECEDE_STUDY_ID_1`,
+`ENCRYPTED_MRN`, `ENCRYPTED_ENCOUNTER`, anything matching `/(^|_)(ID|MRN)(_|$)/`, and any character
+variable with more than 200 levels as `OUT_OF_SCOPE` with reason "identifier or technical key; not
+an analytic variable". They stay in the Crosswalk — excluded from statistics, not from documentation.
+
 **Critical:** `dictionary.columns.type` is `'num'` / `'char'` (character values), NOT 1/2.
 Comparing against 1 or 2 silently never matches.
 
 ```sas
 proc sql noprint;
-  select varname into :num_varlist separated by ' '
-  from work.var_domain_map where vtype = 'num';
+  select varname into :means_d1 separated by ' '
+  from g.var_domain_map where domain = 'D1' and stat_route = 'MEANS';
 
-  select varname into :chr_varlist separated by ' '
-  from work.var_domain_map where vtype = 'char';
+  select varname into :freq_d1 separated by ' '
+  from g.var_domain_map where domain = 'D1' and stat_route = 'FREQ';
 quit;
 ```
 
-### Pattern 4: Sentinel Recoding Before Statistics
-**What:** Three sentinel forms must be recoded to missing BEFORE any PROC MEANS or PROC FREQ:
+### Pattern 4: Sentinel Recoding Before Statistics — scoped, single-pass
+**What:** Sentinel forms must be recoded to missing BEFORE any PROC MEANS or PROC FREQ:
 - Numeric `-999` → `.`
 - Literal string `'NULL'` → `''`
 - Empty strings → already missing to SAS (length(strip(x))=0 is missing)
 
-Log the count of recodes per variable. Store in `work.sentinel_log` for the QC sheet.
+**SCOPE THE RECODE.** Do not blanket-apply `-999` to every numeric variable. `-999` is a documented
+sentinel for the clock-drawing/dCDT variables; it is not a proven global reserved code across the
+master data, and applying it everywhere would destroy legitimate `-999` values wherever one exists.
+Wave 0 produces a sentinel applicability list — the variables where `-999` or literal `NULL` was
+actually observed — and Wave 2 recodes only those. The QC sheet lists them per variable so an
+unexpected entry surfaces at Checkpoint 2.
+
+**COUNT ONLY WHAT YOU RECODE.** The character count must match `upcase(strip(&v))='NULL'` alone.
+Adding `or missing(&v)` inflates `n_recoded` with rows that were already missing and were never
+recoded, making the QC sheet wrong.
+
+**ONE PASS, NOT ONE PER VARIABLE.** Rewriting the whole dataset once per variable means ~250
+sequential steps across ~125 variables and an unreadable log. Count first, then recode everything
+in a single DATA step with arrays.
 
 ```sas
-/* Numeric sentinel — one macro call per numeric variable */
-%macro recode_num(v=);
-  %local cnt;
-  proc sql noprint;
-    select count(*) into :cnt trimmed
-    from work.analysis_base_clean where &v = -999;
-  quit;
-  data work.analysis_base_clean;
-    set work.analysis_base_clean;
-    if &v = -999 then call missing(&v);
-  run;
-  /* insert cnt into work.sentinel_log */
-%mend recode_num;
+%macro recode_sentinels;
+  /* counts BEFORE recoding — character count matches literal NULL ONLY */
+  ... build work.sentinel_log (varname, sentinel_kind, n_recoded) from
+      (select count(*) from work.analysis_base_clean where &v = -999) and
+      (select count(*) from work.analysis_base_clean where upcase(strip(&v)) = 'NULL') ...
 
-/* Character sentinel */
-%macro recode_char(v=);
-  %local cnt;
-  proc sql noprint;
-    select count(*) into :cnt trimmed
-    from work.analysis_base_clean
-    where upcase(strip(&v)) = 'NULL' or missing(&v);
-  quit;
   data work.analysis_base_clean;
     set work.analysis_base_clean;
-    if upcase(strip(&v)) = 'NULL' then call missing(&v);
+    %if %length(&sentinel_num_list) > 0 %then %do;
+      array _sn {*} &sentinel_num_list;
+      do _i = 1 to dim(_sn);
+        if _sn{_i} = -999 then call missing(_sn{_i});
+      end;
+    %end;
+    %if %length(&sentinel_chr_list) > 0 %then %do;
+      array _sc {*} &sentinel_chr_list;
+      do _j = 1 to dim(_sc);
+        if upcase(strip(_sc{_j})) = 'NULL' then call missing(_sc{_j});
+      end;
+    %end;
+    drop _i _j;
   run;
-%mend recode_char;
+%mend recode_sentinels;
 ```
 
 ### Pattern 5: Pooled + Per-Year Statistics
@@ -246,13 +311,20 @@ Log the count of recodes per variable. Store in `work.sentinel_log` for the QC s
 once with `BY year` (per-year blocks). Stack outputs. Year variable must be identified from
 the dataset (likely a fiscal year or calendar year column already present in `g.analysis_base`).
 
-**Approach for per-year:**
+**Use CLASS, not BY.** A `BY` statement requires the input sorted by that variable, and
+`work.analysis_base_clean` descends from a dataset sorted by `PRECEDE_STUDY_ID` — a `by year` would
+abort with "BY variables are not properly sorted". `CLASS` needs no sort and emits the pooled row
+and every per-year row in a single pass, so the two-pass structure below is unnecessary. The same
+applies to PROC FREQ: use `tables (&freq_d1) * &year_variable` rather than `by year`.
+
+**Approach for pooled + per-year in one call:**
 ```sas
 proc means data=work.analysis_base_clean n nmiss mean std median p25 p75 min max
-           stackodsoutput;
-  var &num_d1_varlist;  /* separate call per domain is cleanest */
-  by year;
-  ods output summary=work.means_by_year;
+           maxdec=2 stackodsoutput;
+  var &means_d1;                 /* separate call per domain is cleanest */
+  class &year_variable;
+  types () &year_variable;       /* () = pooled overall; &year_variable = one row per year */
+  ods output summary=work.means_d1;
 run;
 ```
 
@@ -264,8 +336,22 @@ simpler approach is: assemble a wide dataset with columns like `n_pooled`, `mean
 requires a PROC TRANSPOSE step after PROC MEANS.
 
 ### Pattern 6: Small-Cell Suppression
-**What:** Any frequency count ≤11 is replaced with the display value `<11`. Applies to
-both pooled and per-year cells, for both n and % columns.
+**What:** Any subject-level count ≤ `&SUPPRESS_MAX` (11) is replaced with `&SUPPRESS_LABEL` (`--`).
+Applies to both pooled and per-year cells, for both n and % columns.
+
+**Do NOT use `<11` as the label.** Under an `n <= 11` rule, a cell of exactly 11 rendered as "<11"
+is a false statement. Either the rule is `n < 11` with a `<11` label, or the rule is `n <= 11` with
+a `--` label. This project takes the second — `&SUPPRESS_MAX = 11`, `&SUPPRESS_LABEL = --`.
+
+**Scope of suppression — all four, not just level counts:**
+1. Categorical level counts (and their percentages).
+2. `n_missing`. "Male 5,120 / Female 4,832 / Missing 7" discloses a small cell as plainly as an
+   unsuppressed level would.
+3. **The entire statistic row of a continuous block whose non-missing n ≤ the threshold** — mean,
+   SD, median, Q1, Q3, min, max, and n. Min and max on seven patients are more disclosive than the
+   count you suppressed; showing `n=--` beside a real mean defeats the rule.
+4. Complementary disclosure: when only one level in a variable-block is suppressed and the block
+   total is printed, the suppressed count is back-calculable — suppress the next-smallest level too.
 
 **Suppression must happen AFTER computing statistics, BEFORE writing the workbook.**
 Store the count of suppressed cells in a macro variable for the QC sheet.
@@ -275,9 +361,9 @@ data work.cat_domain1_display;
   set work.cat_domain1_stats;
   /* Suppress counts ≤ 11 */
   length n_display $12 pct_display $12;
-  if n_count <= 11 then do;
-    n_display   = '<11';
-    pct_display = '<11';
+  if n_count <= &SUPPRESS_MAX then do;
+    n_display   = "&SUPPRESS_LABEL";
+    pct_display = "&SUPPRESS_LABEL";
     suppressed  = 1;
   end;
   else do;
@@ -293,12 +379,18 @@ run;
 `ods excel options(sheet_name="D1")`. Close once at the end.
 
 **Established pattern from Program 09:**
+**sheet_interval is load-bearing.** Under the ODS EXCEL default (`sheet_interval="table"`) every
+PROC REPORT starts a new sheet, so a domain's continuous table lands on `D1` and its categorical
+table on `D1 1` — fifteen tabs instead of eight. Hold `sheet_interval="none"` for the whole run and
+move tabs only by changing `sheet_name`.
+
 ```sas
 ods excel file="&qc_path.\17_summary_stats_by_domain.xlsx"
     options(sheet_name="KEY"
             embedded_titles="yes"
             autofilter="all"
-            frozen_headers="1");
+            frozen_headers="1"
+            sheet_interval="none");
 
 /* ... write KEY sheet content ... */
 
@@ -314,6 +406,16 @@ ods excel close;
 accent if needed.
 
 ### Anti-Patterns to Avoid
+- **Runtime `vtype()` type branching in a DATA step:** SAS compiles both branches. `put(charvar, z12.)` is a compile error even when that branch never executes. Resolve the type at macro time from `dictionary.columns` and generate one branch.
+- **`z12.` on an unpadded character key:** produces `'000123456789'` vs `'123456789'` and matches nothing. Use `best12.` unless padding was proven.
+- **`BY year` on an unsorted dataset:** hard abort. Use `class`/`types ()` in MEANS and `tables (...)*year` in FREQ.
+- **Blanket `-999` recoding across all numerics:** destroys legitimate values. Recode only the Wave 0 applicability list.
+- **Routing numerics to MEANS on `vtype` alone:** turns 30-day mortality into "mean 0.03". Route on `stat_route` (type AND cardinality).
+- **Summarizing identifiers:** a 41,000-level FREQ table. Mark identifiers and >200-level character variables OUT_OF_SCOPE.
+- **`'<11'` as a suppression label under an `n <= 11` rule:** misstates a cell of exactly 11. Use `&SUPPRESS_LABEL` (`--`).
+- **Suppressing only the count cell of a small continuous block:** mean/min/max still disclose. Suppress the whole row.
+- **ODS EXCEL default `sheet_interval`:** splits a domain across `D1` and `D1 1`. Set `sheet_interval="none"`.
+- **Validating outputs after `%restore_log`:** `%fail_out` calls `%restore_log` itself. Check `%check_xlsx` and `%check_qc_txt` first, then restore.
 - **`IS NOT MISSING` in DATA step:** PROC SQL / WHERE syntax only. In DATA step: `NOT MISSING(x)`. This has bitten the pipeline three times.
 - **`PROC MEANS` on character variables:** Fatal error. Always route by type first.
 - **`&SQLOBS`:** Never use. Use explicit `SELECT COUNT(*) INTO :macvar TRIMMED`.
@@ -321,7 +423,7 @@ accent if needed.
 - **`%PUT` with apostrophes or embedded semicolons:** A `%PUT` ends at its first semicolon; an apostrophe opens an unclosed string.
 - **`%abort cancel` in open code:** Must be inside a named macro (PCM-R-05).
 - **Writing to `g.` on left of DATA statement for source datasets:** `g.analysis_base` and `g.master_data_merged` are read-only sources.
-- **Using `g.analysis_base_ext` as permanent:** Decision D-01 explicitly says it is temporary/working only.
+- **Writing `analysis_base_ext` to the `g.` library:** Decision D-01 says it is temporary/working only. `g.var_domain_map` is the ONLY permanent artifact this phase creates.
 - **Double-quoting label strings in generated code:** Use single quotes to prevent `&` or `%` in dictionary descriptions from resolving as macro triggers (learned from Program 16, Section 1).
 - **`dictionary.columns.TYPE` compared against 1 or 2:** The dictionary form uses `'num'` and `'char'` (character strings), not numeric 1/2.
 
@@ -341,15 +443,21 @@ accent if needed.
 
 ## Common Pitfalls
 
-### Pitfall 1: PRECEDE_STUDY_ID Type Conflict
+### Pitfall 1: PRECEDE_STUDY_ID Type and Format Conflict
 **What goes wrong:** Left join of `g.analysis_base` (CHAR $12 key) to `g.master_data_merged`
-(contains NUM8 key from md7 contribution) silently produces all-missing extended columns if
-types differ.
-**Why it happens:** SAS merges only match on identical type. A numeric key value like 123456789012
-does not match the character string `"123456789012"`.
-**How to avoid:** Cast the key to CHAR $12 in a WORK copy of the extension columns before the merge.
+silently produces all-missing extended columns if the key types differ, or if both are character
+but padded differently.
+**Why it happens:** SAS merges only match on identical type AND identical value. A numeric key
+123456789012 does not match `"123456789012"`; and `z12.` padding turns 123456789 into
+`'000123456789'`, which does not match the unpadded `'123456789'` on the other side.
+**Framing correction:** md7's numeric key describes the SOURCE file. A SAS variable has exactly one
+type per dataset, so `g.master_data_merged` now holds one resolved type — discover it, do not
+branch on it at runtime.
+**How to avoid:** Resolve the key type at macro time from `dictionary.columns` and generate the
+cast; use `best12.` unless discovery proved the character key is zero-padded; assert key uniqueness
+before merging.
 **Warning signs:** Row count of `work.analysis_base_ext` equals `g.analysis_base` (join succeeded)
-but D3 and frailty variables are all missing.
+but D3 and frailty variables are all missing. The `n_cog_nonmiss > 0` guard exists to catch this.
 
 ### Pitfall 2: Sentinel Recoding After Statistics
 **What goes wrong:** If `-999` or literal `'NULL'` are not cleared before PROC MEANS, the
@@ -388,7 +496,7 @@ construction."
 ### Pitfall 8: `master_data_8` Row Count as Denominator
 **What goes wrong:** Using md8 row count (1,048,575 — Excel ceiling truncation) as any
 denominator for coverage or percentage.
-**How to avoid:** Always denominate against `g.analysis_base_ext` row count. Never reference
+**How to avoid:** Always denominate against `work.analysis_base_ext` row count. Never reference
 md8 row counts directly.
 
 ### Pitfall 9: Per-Year Block Width in ODS EXCEL
@@ -443,10 +551,11 @@ run;
 ### Existence Check Pattern (from established pipeline)
 ```sas
 /* Source: Programs 09, 16 — standard pattern */
+/* NOTE: analysis_base_ext lives in WORK per D-01, so libname is 'WORK', not 'G'. */
 proc sql noprint;
   select count(*) into :n_tab trimmed
   from dictionary.tables
-  where libname='G' and memname='ANALYSIS_BASE_EXT';
+  where libname='WORK' and memname='ANALYSIS_BASE_EXT';
 quit;
 
 %macro check_ext;
@@ -538,6 +647,12 @@ P: drive data path. No new tools required.
 
 ## Open Questions
 
+> **Status:** all questions below are resolved by the expanded Wave 0 discovery in `17-01-PLAN.md`,
+> which additionally establishes the key TYPE/LENGTH in both datasets with sampled values, key
+> uniqueness, extension coverage (the D3/frailty denominator), identifier and high-cardinality
+> candidates, and the sentinel applicability list. Downstream waves read the answers from
+> `17-01-SUMMARY.md` and must not guess them.
+
 1. **Year variable name in `g.analysis_base`**
    - What we know: A calendar or fiscal year column is assumed to exist for D-03 per-year stratification
    - What is unclear: The exact column name (could be `Year`, `FiscalYear`, `SurgeryYear`, etc.)
@@ -557,7 +672,7 @@ P: drive data path. No new tools required.
 3. **Calendar years present in the data**
    - What we know: `master_data_8` was truncated in 2021; multiple source files cover different
      year ranges
-   - What is unclear: How many distinct calendar years exist in `g.analysis_base_ext` and
+   - What is unclear: How many distinct calendar years exist in `work.analysis_base_ext` and
      whether any year has very few patients (raising suppression frequency concerns for per-year
      blocks)
    - Recommendation: Wave 0 task — `PROC FREQ` on the year variable; document the year range
@@ -581,7 +696,7 @@ P: drive data path. No new tools required.
 - `sas/00_config.sas` — Path macros, `in_pipeline` flag convention
 - `sas/07_cohort.sas` — `g.analysis_base` structure and scope
 - `.planning/phases/17-summary-stats-by-domain-context/17-CONTEXT.md` — Locked decisions D-01/D-02/D-03
-- `summary-stats-by-domain-CONTEXT (1).md` — Authoritative spec: domain taxonomy, assignment rules, pitfall list, wave plan, exit criteria
+- `docs/17-spec-summary-stats-by-domain.md` — Authoritative spec: domain taxonomy, assignment rules, pitfall list, wave plan, exit criteria
 
 ### Secondary (MEDIUM confidence)
 - `.planning/REQUIREMENTS.md` — Phase 17 is new; no requirement IDs yet assigned; SUMM-01/SUMM-02 are already marked complete for Phase 11 scope

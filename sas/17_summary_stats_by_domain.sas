@@ -76,6 +76,24 @@
         even when absent from the PRECEDE dictionary; stat_route is
         recomputed after the lookup; unmapped extension columns WARN.
         Lookup entries added for the 13 extension columns seen in the log.
+    R19 Sections 5-11 review fixes (2026-09-10):
+        - PROC MEANS stackodsoutput names the variable column Variable, not
+          _Label_; pooled vs per-year rows are told apart by a missing class
+          value, not _TYPE_ (the ODS Summary table has no _TYPE_).
+        - ODS ONEWAYFREQS/CROSSTABFREQS Table column reads Table VARNAME;
+          the level scan takes the NON-MISSING F_ column; crosstab marginal
+          rows (_TYPE_ ne 11) are dropped.
+        - SYMGET cannot be called through %sysfunc; &D3_DENOM_NOTE is used.
+        - d5_note contained a semicolon that ended the %let early.
+        - n_years was the first group count (always 1); now %nwords.
+        - sas_label is joined from g.var_domain_map for the wide datasets;
+          transposes guard the empty-domain case.
+        - work.sentinel_log column is n_recoded, not n_sentinel.
+        - Crosswalk PROC REPORT BY statement removed (one table per variable).
+        - ODS EXCEL: sheet_interval=now starts each new tab; none is set
+          only after the first table on the tab has been written.
+        - Suppressed continuous cells display as -- via formats, not as dot.
+        - year_variable must be non-empty before Section 6.
 ==========================================================================*/
 
 
@@ -2040,6 +2058,14 @@ run;
 
 %put NOTE: ==== Section 5: sentinel recode starting ====;
 
+/* Per-year stratification in Sections 6-9 requires a resolved year column. */
+%macro check_year_resolved;
+  %if %length(&year_variable) = 0 %then %do;
+    %fail_out(msg=No numeric year variable was resolved in discovery -- Sections 6 to 9 stratify by year and cannot run);
+  %end;
+%mend check_year_resolved;
+%check_year_resolved;
+
 /* ---- 5.1 Working copy -------------------------------------------------- */
 data work.analysis_base_clean;
   set work.analysis_base_ext;
@@ -2249,7 +2275,8 @@ quit;
   %if &nv = 0 %then %do;
     %put NOTE: [17-S6] Domain &domain has no MEANS-routed variables. PROC MEANS skipped.;
     data &out;
-      length varname $32 _type_ 8;
+      length varname $32 domain $4 &year_variable 8 N 8 NMiss 8 Mean 8 StdDev 8
+             Median 8 P25 8 P75 8 Min 8 Max 8;
       stop;
     run;
     %return;
@@ -2266,12 +2293,12 @@ quit;
   run;
   ods listing;
 
-  /* Add a varname column from the _Label_ column emitted by stackodsoutput. */
-  /* _Label_ holds the variable label (or name when no label is set).         */
+  /* stackodsoutput emits Variable (the name) and, when labels exist, Label. */
+  /* Pooled rows are the ones where the class value is missing (TYPES ()).   */
   data &out;
     set &out;
-    length varname $32;
-    varname = upcase(strip(_Label_));
+    length varname $32 domain $4;
+    varname = upcase(strip(Variable));
     domain  = "&domain";
   run;
 
@@ -2386,16 +2413,15 @@ quit;
   data work.freq_pooled_long;
     length varname $32 level $200;
     set &out_pooled;
-    varname  = upcase(strip(Table));
-    /* F_ prefix is stripped: the actual level column name changes per variable */
-    /* but SAS stores the level value in every column whose name starts with F_ */
-    /* Use _name_ and _val_ from PDV? ONEWAYFREQS does not provide that cleanly */
-    /* Instead use: the formatted value is in a char var beginning with 'F_'.   */
-    /* We rename generically with arrays inside the DATA step.                  */
+    /* Table reads Table VARNAME -- the second word is the name.              */
+    varname  = upcase(strip(scan(Table, 2, ' ')));
+    /* One F_ column exists per variable in the TABLES list; only the column  */
+    /* for this row's variable is populated. Take the NON-MISSING one (a       */
+    /* missing level leaves every F_ column blank, so level stays blank).      */
     array _fcols {*} $ _character_;
     level = '';
     do _k = 1 to dim(_fcols);
-      if substr(vname(_fcols{_k}),1,2) = 'F_' and vname(_fcols{_k}) ne 'Table'
+      if substr(vname(_fcols{_k}),1,2) = 'F_' and not missing(_fcols{_k})
         then level = strip(_fcols{_k});
     end;
     keep varname level Frequency;
@@ -2435,8 +2461,10 @@ quit;
   data work.freq_year_long;
     length varname $32 level $200 year_val $32;
     set &out_year;
-    /* Table column format: "varname * year_variable"                         */
-    varname  = upcase(strip(scan(Table, 1, '*')));
+    /* CROSSTABFREQS carries marginal rows (_TYPE_ 10, 01, 00). Cells only.   */
+    where _TYPE_ = '11';
+    /* Table reads Table VARNAME * YEAR -- the second word is the name.       */
+    varname  = upcase(strip(scan(Table, 2, ' *')));
     year_val = strip(put(&year_variable, best12.));
 
     array _fcols2 {*} $ _character_;
@@ -2444,7 +2472,7 @@ quit;
     do _k = 1 to dim(_fcols2);
       if substr(vname(_fcols2{_k}),1,2) = 'F_'
          and upcase(vname(_fcols2{_k})) ne upcase("F_&year_variable")
-         and vname(_fcols2{_k}) ne 'Table'
+         and not missing(_fcols2{_k})
         then level = strip(_fcols2{_k});
     end;
     keep varname level year_val Frequency;
@@ -2553,7 +2581,8 @@ quit;
     suppressed   = 0;
     supp_reason  = '';
     n_display    = strip(put(frequency, comma12.));
-    pct_display  = strip(put(pct_nonmissing, 6.1));
+    if missing(level) then pct_display = '';
+    else pct_display = strip(put(pct_nonmissing, 6.1));
 
     /* Suppress level counts that are <= &SUPPRESS_MAX */
     if not missing(level) and frequency <= &SUPPRESS_MAX then do;
@@ -2770,12 +2799,25 @@ quit;
 %let n_years   = 0;
 
 proc sql noprint;
-  select year_value, count(*) into :year_list separated by ' ', :n_years trimmed
+  select distinct year_value into :year_list separated by ' '
   from work.year_dist
   where not missing(year_value)
-  group by year_value
   order by year_value;
 quit;
+%let n_years = %nwords(&year_list);
+
+%macro check_years;
+  %if &n_years = 0 %then %do;
+    %fail_out(msg=work.year_dist has no non-missing year values -- per-year column blocks cannot be built);
+  %end;
+%mend check_years;
+%check_years;
+
+/* Display formats: suppressed (missing) numeric cells print as the label. */
+proc format;
+  value suppint  . = "&SUPPRESS_LABEL" other = [comma12.];
+  value suppdec  . = "&SUPPRESS_LABEL" other = [12.2];
+run;
 
 %put NOTE: [17-S9] Year list for spanning headers: &year_list (n=&n_years years);
 
@@ -2791,7 +2833,7 @@ data work.key;
   item="Categorical stats"; detail="Level N % of non-missing N-missing -- pooled and per year"; output;
   item="Suppression rule";  detail="Cells representing &SUPPRESS_MAX or fewer patients are shown as &SUPPRESS_LABEL. For continuous blocks at or below that count ALL statistics for the block are suppressed -- not only N. N-missing is suppressed on the same rule."; output;
   item="Denominator rule";  detail="Percents on categorical variables are computed on the non-missing denominator (D-02). N-missing is reported separately and is itself subject to suppression."; output;
-  item="D3 and D2 frailty denominator"; detail="%sysfunc(symget(D3_DENOM_NOTE))"; output;
+  item="D3 and D2 frailty denominator"; detail=symget('D3_DENOM_NOTE'); output;
   item="Domains";           detail="D1 Sociodemographics; D2 Preoperative incl. frailty; D3 Cognitive instruments; D4 Intraoperative; D5 Outcomes"; output;
   item="OUT_OF_SCOPE";      detail="Identifiers, high-cardinality keys, and variables not matched to the PRECEDE dictionary are excluded from statistics but appear on the Crosswalk sheet with their reason."; output;
 run;
@@ -2804,21 +2846,33 @@ run;
 /*               n_YYYY mean_YYYY std_YYYY ... for each year                   */
 
 %macro transpose_means_wide(ds=, out=);
-  /* Pool rows: _type_=0 (PROC MEANS TYPE 0 = pooled) */
-  /* Year rows: _type_=1 */
-  /* The year variable column holds the year value.    */
-  %local i yr;
+  /* Pooled rows: class value missing (TYPES () emits the overall row with  */
+  /* the class variable missing). Year rows: class value present.           */
+  /* sas_label is not in the MEANS output; it is joined from the map.        */
+  %local i yr n_in;
+  %let n_in = 0;
+  proc sql noprint;
+    select count(*) into :n_in trimmed from &ds;
+  quit;
+  %if &n_in = 0 %then %do;
+    data &out;
+      length varname $32 domain $4 sas_label $256;
+      stop;
+    run;
+    %return;
+  %end;
 
-  /* Rename stat columns to pool suffix for the pooled rows */
   proc sql noprint;
     create table work._m_pool as
-      select varname, domain, sas_label, supp_reason,
-             N as n_pool, NMiss as nmiss_pool, Mean as mean_pool,
-             &sd_col_name as std_pool, Median as median_pool,
-             P25 as q1_pool, P75 as q3_pool, Min as min_pool, Max as max_pool,
-             suppressed as supp_pool
-      from &ds
-      where _type_ = 0;
+      select d.varname, d.domain, m.sas_label, d.supp_reason,
+             d.N as n_pool, d.NMiss as nmiss_pool, d.Mean as mean_pool,
+             d.&sd_col_name as std_pool, d.Median as median_pool,
+             d.P25 as q1_pool, d.P75 as q3_pool, d.Min as min_pool, d.Max as max_pool,
+             d.suppressed as supp_pool
+      from &ds as d
+      left join g.var_domain_map as m on d.varname = m.varname
+      where missing(d.&year_variable)
+      order by d.varname;
   quit;
 
   /* One set of year columns per year value */
@@ -2846,7 +2900,7 @@ run;
                P25 as q1_&yr, P75 as q3_&yr, Min as min_&yr, Max as max_&yr,
                suppressed as supp_&yr
         from &ds
-        where _type_ = 1 and &year_variable = &yr;
+        where &year_variable = &yr;
     quit;
 
     proc sql;
@@ -2879,17 +2933,30 @@ run;
   /* Pool rows: is_pooled=1 (year_val='')                              */
   /* Year rows: is_pooled=0, year_val holds the year as a string       */
   /* Output: one row per varname+level with pool columns and year cols */
-  %local i yr;
+  %local i yr n_in;
+  %let n_in = 0;
+  proc sql noprint;
+    select count(*) into :n_in trimmed from &ds;
+  quit;
+  %if &n_in = 0 %then %do;
+    data &out;
+      length varname $32 domain $4 level $200 sas_label $256;
+      stop;
+    run;
+    %return;
+  %end;
 
   proc sql noprint;
     create table work._f_pool as
-      select varname, domain, level, sas_label,
-             frequency as n_pool, n_nonmissing as n_nonmiss_pool,
-             n_missing as n_miss_pool, pct_nonmissing as pct_pool,
-             n_display as n_disp_pool, pct_display as pct_disp_pool,
-             suppressed as supp_pool, supp_reason as supp_reason_pool
-      from &ds
-      where is_pooled = 1;
+      select d.varname, d.domain, d.level, m.sas_label,
+             d.frequency as n_pool, d.n_nonmissing as n_nonmiss_pool,
+             d.n_missing as n_miss_pool, d.pct_nonmissing as pct_pool,
+             d.n_display as n_disp_pool, d.pct_display as pct_disp_pool,
+             d.suppressed as supp_pool, d.supp_reason as supp_reason_pool
+      from &ds as d
+      left join g.var_domain_map as m on d.varname = m.varname
+      where d.is_pooled = 1
+      order by d.varname, d.level;
   quit;
 
   data work._f_wide;
@@ -2926,6 +2993,8 @@ run;
 
   data &out;
     set work._f_wide;
+    /* The missing level is a real row; label it so it is not a blank cell */
+    if missing(level) then level = '(missing)';
   run;
 
   proc datasets lib=work nolist;
@@ -3001,7 +3070,12 @@ run;
 
 /* Macro: report one domain sheet */
 %macro report_domain(dom=, means_ds=, freq_ds=, note=);
-  ods excel options(sheet_name="&dom" sheet_interval="none");
+  /* sheet_interval=now opens a new tab for the next table. Under none a     */
+  /* changed sheet_name does NOT open a tab. none is restored only after the  */
+  /* first table on this tab has been written, so the second table joins it. */
+  %local tab_started;
+  %let tab_started = 0;
+  ods excel options(sheet_name="&dom" sheet_interval="now");
 
   /* -- Continuous section -- */
   %local n_rows_m;
@@ -3020,30 +3094,32 @@ run;
       %means_col_stmt
       define varname    / display "Variable"  style(column)=[width=1.2in];
       define sas_label  / display "Label"     style(column)=[width=1.8in];
-      define n_pool     / display "N";
-      define nmiss_pool / display "N-miss";
-      define mean_pool  / display "Mean";
-      define std_pool   / display "SD";
-      define median_pool / display "Median";
-      define q1_pool    / display "Q1";
-      define q3_pool    / display "Q3";
-      define min_pool   / display "Min";
-      define max_pool   / display "Max";
+      define n_pool     / display "N"      format=suppint.;
+      define nmiss_pool / display "N-miss" format=suppint.;
+      define mean_pool  / display "Mean"   format=suppdec.;
+      define std_pool   / display "SD"     format=suppdec.;
+      define median_pool / display "Median" format=suppdec.;
+      define q1_pool    / display "Q1"     format=suppdec.;
+      define q3_pool    / display "Q3"     format=suppdec.;
+      define min_pool   / display "Min"    format=suppdec.;
+      define max_pool   / display "Max"    format=suppdec.;
       %local i yr;
       %do i = 1 %to &n_years;
         %let yr = %scan(&year_list, &i);
-        define n_&yr      / display "N";
-        define nmiss_&yr  / display "N-miss";
-        define mean_&yr   / display "Mean";
-        define std_&yr    / display "SD";
-        define median_&yr / display "Median";
-        define q1_&yr     / display "Q1";
-        define q3_&yr     / display "Q3";
-        define min_&yr    / display "Min";
-        define max_&yr    / display "Max";
+        define n_&yr      / display "N"      format=suppint.;
+        define nmiss_&yr  / display "N-miss" format=suppint.;
+        define mean_&yr   / display "Mean"   format=suppdec.;
+        define std_&yr    / display "SD"     format=suppdec.;
+        define median_&yr / display "Median" format=suppdec.;
+        define q1_&yr     / display "Q1"     format=suppdec.;
+        define q3_&yr     / display "Q3"     format=suppdec.;
+        define min_&yr    / display "Min"    format=suppdec.;
+        define max_&yr    / display "Max"    format=suppdec.;
       %end;
     run;
     title;
+    %let tab_started = 1;
+    ods excel options(sheet_interval="none");
   %end;
 
   /* -- Categorical section -- */
@@ -3074,23 +3150,26 @@ run;
       %end;
     run;
     title;
+    %if &tab_started = 0 %then %do;
+      ods excel options(sheet_interval="none");
+    %end;
   %end;
 %mend report_domain;
 
 /* D5 note about _30_DAY_MORTALITY missingness */
-%let d5_note = _30_DAY_MORTALITY -- missingness reflects the md1 join (cases not in md1 have no outcome value); it does not indicate the outcome itself;
+%let d5_note = _30_DAY_MORTALITY -- missingness reflects the md1 join (cases not in md1 have no outcome value) and does not indicate the outcome itself;
 
 %report_domain(dom=D1, means_ds=work.means_d1_wide, freq_ds=work.freq_d1_wide, note=);
 %report_domain(dom=D2, means_ds=work.means_d2_wide, freq_ds=work.freq_d2_wide,
-               note=%sysfunc(symget(D3_DENOM_NOTE)));
+               note=%bquote(&D3_DENOM_NOTE));
 %report_domain(dom=D3, means_ds=work.means_d3_wide, freq_ds=work.freq_d3_wide,
-               note=%sysfunc(symget(D3_DENOM_NOTE)));
+               note=%bquote(&D3_DENOM_NOTE));
 %report_domain(dom=D4, means_ds=work.means_d4_wide, freq_ds=work.freq_d4_wide, note=);
 %report_domain(dom=D5, means_ds=work.means_d5_wide, freq_ds=work.freq_d5_wide,
                note=&d5_note);
 
 /* ---- 9.6 Crosswalk sheet -------------------------------------------------- */
-ods excel options(sheet_name="Crosswalk" sheet_interval="none");
+ods excel options(sheet_name="Crosswalk" sheet_interval="now");
 title "Crosswalk -- All Variables (including OUT_OF_SCOPE identifiers)";
 proc report data=g.var_domain_map(keep=varname sas_label vtype n_levels stat_route
                                        source_dataset domain domain_rationale
@@ -3110,8 +3189,8 @@ proc report data=g.var_domain_map(keep=varname sas_label vtype n_levels stat_rou
   define domain_rationale / display "Domain Rationale" style(column)=[width=2.0in];
   define assign_rule      / display "Assign Rule"    style(column)=[width=0.8in];
   define denominator_note / display "Denominator Note" style(column)=[width=1.8in];
-  by domain varname;
 run;
+ods excel options(sheet_interval="none");
 title;
 
 /* ---- 9.7 QC sheet --------------------------------------------------------- */
@@ -3140,15 +3219,7 @@ proc sql noprint;
   select count(*) into :n_rule_timing  trimmed from g.var_domain_map where assign_rule='timing';
   select count(*) into :n_rule_analytic trimmed from g.var_domain_map where assign_rule='analytic_role';
   select count(*) into :n_rule_instrument trimmed from g.var_domain_map where assign_rule='instrument';
-  select sum(n_sentinel) into :n_total_recodes trimmed from work.sentinel_log;
-quit;
-
-/* Suppression counts by reason */
-proc sql noprint;
-  select count(*) into :n_supp_level  trimmed from work.freq_d1_display where supp_reason='level_count';
-  select count(*) into :n_supp_nmiss  trimmed from work.freq_d1_display where supp_reason='n_missing';
-  select count(*) into :n_supp_comp   trimmed from work.freq_d1_display where supp_reason='complementary';
-  select count(*) into :n_supp_cont   trimmed from work.means_d1_display where supp_reason='continuous_small_n';
+  select coalesce(sum(n_recoded), 0) into :n_total_recodes trimmed from work.sentinel_log;
 quit;
 
 /* Accumulate across all domains for suppression by reason */
@@ -3203,10 +3274,10 @@ data work.qc_summary;
   item="  -- n_missing";        value="&n_supp_nmiss";                           output;
   item="  -- complementary";    value="&n_supp_comp";                            output;
   item="  -- continuous_small_n"; value="&n_supp_cont";                          output;
-  item="D3/frailty denominator note"; value="%sysfunc(symget(D3_DENOM_NOTE))";   output;
+  item="D3/frailty denominator note"; value=symget('D3_DENOM_NOTE');   output;
 run;
 
-ods excel options(sheet_name="QC" sheet_interval="none");
+ods excel options(sheet_name="QC" sheet_interval="now");
 title "QC Sheet -- Run Metadata and Validation Counts";
 proc report data=work.qc_summary nowd
     style(header)=[background=CX0021A5 color=white fontweight=bold]
@@ -3216,16 +3287,17 @@ proc report data=work.qc_summary nowd
   define value / display "Value" style(column)=[width=3.0in];
 run;
 title;
+ods excel options(sheet_interval="none");
 
 /* Per-variable sentinel recode counts on QC sheet (separate table) */
 title "QC Sheet -- Per-Variable Sentinel Recode Counts";
 proc report data=work.sentinel_log nowd
     style(header)=[background=CX0021A5 color=white fontweight=bold]
     style(column)=[fontsize=9pt];
-  columns varname sentinel_kind n_sentinel;
+  columns varname sentinel_kind n_recoded;
   define varname       / display "Variable"      style(column)=[width=1.5in];
   define sentinel_kind / display "Sentinel Type" style(column)=[width=1.0in];
-  define n_sentinel    / display "Recode Count";
+  define n_recoded     / display "Recode Count";
 run;
 title;
 

@@ -99,6 +99,16 @@
         - Duplicate varname-year-level keys fail before the wide UPDATE.
         - Year values are checked to be four-digit integers.
         - n_suppressed is labelled as rows/blocks, not cells.
+    R20 Y/blank flags (2026-09-10, Checkpoint 1 decision -- option 2):
+        Character variables whose only non-missing level is Y (the _YN
+        comorbidity flags and similar) code absence as blank, not N. They
+        are detected in Section 3c (yn_blank_flag=YES in the map) and in
+        Section 7 the blank level is reported as a real level named
+        (blank = absent) with the percent on the TOTAL N. Data are not
+        recoded. KEY and QC sheets carry the rule.
+        COGNITIVE_DISORDER (extension) is a strict subset of
+        COGNITIVEDISORDER_YN (11 of 144 Y) and is now OUT_OF_SCOPE as
+        redundant.
 ==========================================================================*/
 
 
@@ -1448,6 +1458,68 @@ data work.domain_staging2;
   drop src_ds;
 run;
 
+/* ---- Y/blank flag detection ------------------------------------------- */
+/* A character variable whose only non-missing level is Y codes absence as */
+/* blank. Treating that blank as missing would report N-missing = 41000 and */
+/* Y = 100 percent of non-missing. Detected here, flagged in the map, and   */
+/* handled in Section 7 (blank reported as a level, percent on total N).    */
+/* Candidates: character, at most 2 levels including missing.               */
+%let yn_cand_list = ;
+proc sql noprint;
+  select c.varname into :yn_cand_list separated by ' '
+  from work.actual_ext as c
+  inner join work.nlevels_ext as nl on c.var_u = nl.varname_u
+  where c.vtype = 'char' and nl.n_levels <= 2
+  order by c.varname;
+quit;
+
+data work.yn_blank_vars;
+  length varname $32;
+  stop;
+run;
+
+%macro scan_yn_blank;
+  %local n_c i v n_lv lv;
+  %let n_c = %nwords(&yn_cand_list);
+  %do i = 1 %to &n_c;
+    %let v    = %scan(&yn_cand_list, &i);
+    %let n_lv = 0;
+    %let lv   = ;
+    proc sql noprint;
+      select count(distinct upcase(strip(&v))), max(upcase(strip(&v)))
+        into :n_lv trimmed, :lv trimmed
+      from work.analysis_base_ext
+      where not missing(&v);
+    quit;
+    %if &n_lv = 1 and %upcase(&lv) = Y %then %do;
+      proc sql;
+        insert into work.yn_blank_vars set varname = "&v";
+      quit;
+    %end;
+  %end;
+%mend scan_yn_blank;
+%scan_yn_blank;
+
+%let n_yn_blank = 0;
+proc sql noprint;
+  select count(*) into :n_yn_blank trimmed from work.yn_blank_vars;
+quit;
+%put NOTE: [17-S3c] &n_yn_blank character variables are Y/blank coded (blank = absent).;
+
+data _null_;
+  file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+  put " ";
+  put "--- Y/BLANK CODED FLAGS (only non-missing level is Y) ---";
+  put "Count: &n_yn_blank";
+  put "Blank is reported as a level named (blank = absent) with percent on total N.";
+run;
+
+data _null_;
+  set work.yn_blank_vars;
+  file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+  put "  " varname;
+run;
+
 /* Join n_levels, the sentinel flag, and the dictionary match count.       */
 /* NLEVELS was computed on the raw data, so -999 and literal NULL each      */
 /* count as one level. For a variable in work.sentinel_applicable that      */
@@ -1458,8 +1530,11 @@ proc sql;
     select ds.*,
            nl.n_levels                  as n_levels_join,
            (sa.varname is not null)     as has_sentinel,
-           mc.n_at_best                 as n_dict_matches_join
+           mc.n_at_best                 as n_dict_matches_join,
+           (yb.varname is not null)     as is_yn_blank
     from work.domain_staging2 as ds
+    left join work.yn_blank_vars as yb
+      on upcase(ds.varname) = upcase(yb.varname)
     left join work.nlevels_ext as nl
       on upcase(ds.varname) = nl.varname_u
     left join work.sentinel_applicable as sa
@@ -1474,7 +1549,10 @@ data work.domain_staging3;
   if missing(n_levels) then n_levels = n_levels_join;
   if has_sentinel = 1 and n_levels > . then n_levels = n_levels - 1;
   if missing(n_dict_matches) then n_dict_matches = coalesce(n_dict_matches_join, 0);
-  drop n_levels_join has_sentinel n_dict_matches_join;
+  length yn_blank_flag $3;
+  if is_yn_blank = 1 then yn_blank_flag = 'YES';
+  else yn_blank_flag = 'NO';
+  drop n_levels_join has_sentinel n_dict_matches_join is_yn_blank;
 run;
 
 
@@ -1723,7 +1801,7 @@ AVG_NIBP_MEAN,D4,timing,intraoperative non-invasive blood pressure mean (extensi
 AVG_BIS_INDEX,D4,timing,intraoperative BIS index mean (extension column)
 UNINTENDED_WEIGHT_LOSS,D2,timing,frailty component captured preoperatively (Fried criteria -- extension column)
 WEEK_GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria -- extension column source spelling)
-COGNITIVE_DISORDER,D3,timing,cognitive-status column from the extension block (REVIEW: align with COGNITIVEDISORDER_YN which is D2 -- choose one domain for both)
+COGNITIVE_DISORDER,OUT_OF_SCOPE,redundant,strict subset of COGNITIVEDISORDER_YN (11 of 144 Y) -- redundant and below the suppression threshold
 ;
 run;
 
@@ -1860,12 +1938,14 @@ data g.var_domain_map;
   length varname $32 sas_label $256 vtype $4 n_levels 8 n_levels_raw 8
          hi_cardinality_flag $3 stat_route $8 domain $16 domain_rationale $200
          assign_rule $20 source_dataset $32 denominator_note $300
-         dict_name $60 match_how $8 n_dict_matches 8 map_status $12;
+         dict_name $60 match_how $8 n_dict_matches 8 map_status $12
+         yn_blank_flag $3;
   set work.domain_staging4;
   map_status = 'INCOMPLETE';
   keep varname sas_label vtype n_levels n_levels_raw hi_cardinality_flag
        stat_route domain domain_rationale assign_rule source_dataset
-       denominator_note dict_name match_how n_dict_matches map_status;
+       denominator_note dict_name match_how n_dict_matches map_status
+       yn_blank_flag;
 run;
 
 proc sort data=g.var_domain_map; by domain varname; run;
@@ -1994,7 +2074,8 @@ quit;
 proc sql noprint;
   select count(*) into :n_ext_unmapped trimmed
   from g.var_domain_map
-  where source_dataset = 'master_data_merged' and domain = 'OUT_OF_SCOPE';
+  where source_dataset = 'master_data_merged' and domain = 'OUT_OF_SCOPE'
+    and assign_rule ne 'redundant';
 quit;
 
 %macro warn_ext_unmapped;
@@ -2381,6 +2462,16 @@ quit;
 
 %put NOTE: ==== Section 7: PROC FREQ (categorical) starting ====;
 
+/* Y/blank flags: the blank level is a real level (absence), reported as   */
+/* (blank = absent) and included in the percent denominator (total N).     */
+%global yn_blank_list;
+%let yn_blank_list = ;
+proc sql noprint;
+  select varname into :yn_blank_list separated by ' '
+  from g.var_domain_map where yn_blank_flag = 'YES';
+quit;
+%put NOTE: [17-S7] Y/blank flags reported with blank as a level: &yn_blank_list;
+
 /* ---- 7.1 Macro: run PROC FREQ and normalize output for one domain ------- */
 %macro run_freq(domain=, varlist=, out_pooled=, out_year=, out=);
   %local nv;
@@ -2431,6 +2522,9 @@ quit;
     end;
     /* A numeric variable's missing level is formatted as a dot, not blank */
     if level = '.' then level = '';
+    /* Y/blank flag: blank is absence, not missing -- keep it as a level    */
+    if missing(level) and indexw("&yn_blank_list", strip(varname), ' ') > 0
+      then level = '(blank = absent)';
     keep varname level Frequency;
     rename Frequency=frequency;
   run;
@@ -2483,6 +2577,8 @@ quit;
         then level = strip(_fcols2{_k});
     end;
     if level = '.' then level = '';
+    if missing(level) and indexw("&yn_blank_list", strip(varname), ' ') > 0
+      then level = '(blank = absent)';
     keep varname level year_val Frequency;
     rename Frequency=frequency;
   run;
@@ -2865,6 +2961,7 @@ data work.key;
   item="Categorical stats"; detail="Level N % of non-missing N-missing -- pooled and per year"; output;
   item="Suppression rule";  detail="Cells representing &SUPPRESS_MAX or fewer patients are shown as &SUPPRESS_LABEL. For continuous blocks at or below that count ALL statistics for the block are suppressed -- not only N. N-missing is suppressed on the same rule."; output;
   item="Denominator rule";  detail="Percents on categorical variables are computed on the non-missing denominator (D-02). N-missing is reported separately and is itself subject to suppression."; output;
+  item="Y/blank flags";      detail="For flags whose only recorded value is Y (yn_blank_flag=YES on the Crosswalk), blank means absent, not unknown. The blank level is shown as (blank = absent) and the percent is on the total N. Values were not recoded."; output;
   item="D3 and D2 frailty denominator"; detail=symget('D3_DENOM_NOTE'); output;
   item="Domains";           detail="D1 Sociodemographics; D2 Preoperative incl. frailty; D3 Cognitive instruments; D4 Intraoperative; D5 Outcomes"; output;
   item="OUT_OF_SCOPE";      detail="Identifiers, high-cardinality keys, and variables not matched to the PRECEDE dictionary are excluded from statistics but appear on the Crosswalk sheet with their reason."; output;
@@ -3026,6 +3123,7 @@ run;
   data &out;
     set work._f_wide;
     /* The missing level is a real row; label it so it is not a blank cell */
+    /* (Y/blank flags already carry the level (blank = absent) from S7.)   */
     if missing(level) then level = '(missing)';
   run;
 
@@ -3205,12 +3303,12 @@ ods excel options(sheet_name="Crosswalk" sheet_interval="now");
 title "Crosswalk -- All Variables (including OUT_OF_SCOPE identifiers)";
 proc report data=g.var_domain_map(keep=varname sas_label vtype n_levels stat_route
                                        source_dataset domain domain_rationale
-                                       assign_rule denominator_note)
+                                       assign_rule yn_blank_flag denominator_note)
     nowd
     style(header)=[background=CX0021A5 color=white fontweight=bold]
     style(column)=[fontsize=8pt];
   columns varname sas_label vtype n_levels stat_route source_dataset
-          domain domain_rationale assign_rule denominator_note;
+          domain domain_rationale assign_rule yn_blank_flag denominator_note;
   define varname          / display "Variable"       style(column)=[width=1.2in];
   define sas_label        / display "Label"          style(column)=[width=1.8in];
   define vtype            / display "Type"           style(column)=[width=0.4in];
@@ -3220,6 +3318,7 @@ proc report data=g.var_domain_map(keep=varname sas_label vtype n_levels stat_rou
   define domain           / display "Domain"         style(column)=[width=0.6in];
   define domain_rationale / display "Domain Rationale" style(column)=[width=2.0in];
   define assign_rule      / display "Assign Rule"    style(column)=[width=0.8in];
+  define yn_blank_flag    / display "Y/blank"        style(column)=[width=0.5in];
   define denominator_note / display "Denominator Note" style(column)=[width=1.8in];
 run;
 ods excel options(sheet_interval="none");
@@ -3291,6 +3390,7 @@ data work.qc_summary;
   item="Variables D3";          value="&n_d3";                                   output;
   item="Variables D4";          value="&n_d4";                                   output;
   item="Variables D5";          value="&n_d5";                                   output;
+  item="Y/blank coded flags";   value="&n_yn_blank";                             output;
   item="OUT_OF_SCOPE total";    value="&n_oos";                                  output;
   item="  -- identifier/key";   value="&n_oos_id";                               output;
   item="  -- not in dictionary";value="&n_oos_dict";                             output;
@@ -3371,6 +3471,7 @@ data _null_;
   put "OUT_OF_SCOPE_identifier_or_key=&n_oos_id";
   put "OUT_OF_SCOPE_not_in_dictionary=&n_oos_dict";
   put "OUT_OF_SCOPE_not_in_domain_lookup=&n_oos_lookup";
+  put "yn_blank_coded_flags=&n_yn_blank";
   put " ";
   put "ASSIGNMENT RULE COUNTS";
   put "assign_rule_timing=&n_rule_timing";
@@ -3396,6 +3497,7 @@ data _null_;
   put "DENOMINATOR RULE (D-02)";
   put "Percents computed on non-missing denominator";
   put "N-missing is reported separately and suppressed on the same rule";
+  put "Y/blank flags: blank reported as (blank = absent) with percent on total N";
 run;
 
 %put NOTE: ==== Section 10 complete. QC text artifact written. ====;

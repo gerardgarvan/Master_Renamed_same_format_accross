@@ -1770,7 +1770,7 @@ quit;
   %if &n_lookup_hits = 0 %then %do;
     %fail_out(msg=No variable in domain_staging3 matched any of the &n_lookup_rows lookup keys -- inspect work.domain_lookup varname_u values in the log before adding entries);
   %end;
-  %put NOTE: [17-S4] Lookup loaded &n_lookup_rows keys; &n_lookup_hits staging rows match a key.;
+  %put NOTE: [17-S4] Lookup loaded &n_lookup_rows keys -- &n_lookup_hits staging rows match a key.;
 %mend check_lookup_hits;
 %check_lookup_hits;
 

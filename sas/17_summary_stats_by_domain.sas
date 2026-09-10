@@ -33,6 +33,9 @@
       query leaves an empty macro variable rather than an unresolved reference
     - dictionary.columns.TYPE is char/num, not 1/2
     - ASCII only (session encoding is not UTF-8 on this project)
+    - No semicolons inside DATALINES rows (plain DATALINES stops at one)
+    - %sysfunc(countw()) is never called on a possibly-empty list; %nwords
+      wraps it because an empty argument is an ERROR, not zero
 
   REVISION NOTES (2026-09-10):
     R1  Dictionary import is now guarded: required columns must exist in
@@ -64,6 +67,13 @@
         are explicitly OUT_OF_SCOPE (privacy_exclusion).
     R15 Lookup keys are upcased and stripped on load; the join strips the
         staging varname; a zero-hit lookup fails before GUARD 5.
+    R16 ROOT CAUSE of the empty lookup: DATALINES stops at the first line
+        containing a semicolon. All rationales now use -- instead.
+    R17 %nwords replaces %sysfunc(countw()) everywhere (empty list = ERROR).
+    R18 Extension columns from g.master_data_merged may take a lookup entry
+        even when absent from the PRECEDE dictionary; stat_route is
+        recomputed after the lookup; unmapped extension columns WARN.
+        Lookup entries added for the 13 extension columns seen in the log.
 ==========================================================================*/
 
 
@@ -129,6 +139,14 @@ options nodate nonumber ps=max ls=200 nofmterr;
   %restore_log;
   %abort cancel;
 %mend fail_out;
+
+/* ---- nwords: word count that is safe on an empty list ------------------ */
+/* %sysfunc(countw()) with an empty argument is an ERROR (too few          */
+/* arguments), not 0. The 2026-09-10 run hit this in the cognitive guard.  */
+%macro nwords(list);
+  %if %length(%superq(list)) = 0 %then 0;
+  %else %sysfunc(countw(%superq(list)));
+%mend nwords;
 
 /* ---- Checkpoint 1 gate macro (for Sections 5 to 11 when written) ------- */
 %macro gate_stats;
@@ -440,7 +458,7 @@ quit;
 /* The empty-dataset branch above must not reference an undefined variable. */
 %macro pick_year_safe;
   %global year_variable n_year_cands year_note;
-  %let n_year_cands = %sysfunc(countw(&year_cand_list));
+  %let n_year_cands = %nwords(&year_cand_list);
 
   %if &n_year_cands = 0 %then %do;
     %let year_variable = ;
@@ -562,8 +580,8 @@ quit;
 
 %macro scan_sentinels;
   %local n_num n_chr;
-  %let n_num = %sysfunc(countw(&sent_num_all));
-  %let n_chr = %sysfunc(countw(&sent_chr_all));
+  %let n_num = %nwords(&sent_num_all);
+  %let n_chr = %nwords(&sent_chr_all);
 
   %if &n_num = 0 and &n_chr = 0 %then %do;
     data work.sentinel_applicable;
@@ -1017,7 +1035,7 @@ quit;
 
 %macro check_cog_populated;
   %local n_cog i c n_this;
-  %let n_cog = %sysfunc(countw(&cog_col));
+  %let n_cog = %nwords(&cog_col);
   %if &n_cog = 0 %then %do;
     %put WARNING: [17-S1] No cognitive score column (COGNI and SCORE) in ext_candidates. Cognitive guard skipped.;
   %end;
@@ -1050,8 +1068,8 @@ quit;
 /* Single pass with arrays, split by type -- a SAS array cannot mix types.  */
 %macro ext_coverage;
   %local n_en n_ec;
-  %let n_en = %sysfunc(countw(&ext_num_list));
-  %let n_ec = %sysfunc(countw(&ext_chr_list));
+  %let n_en = %nwords(&ext_num_list);
+  %let n_ec = %nwords(&ext_chr_list);
 
   data work.ext_coverage(keep=_vn _nm rename=(_vn=varname _nm=n_nonmiss));
     length _vn $32 _nm 8;
@@ -1506,6 +1524,11 @@ run;
    were never needed -- DATALINES does not resolve macro triggers, and no
    rationale contains a comma.
 
+   NO SEMICOLONS IN THE DATA LINES. Plain DATALINES ends at the first line
+   containing a semicolon. The 2026-09-10 run loaded ZERO rows because the
+   first rationale contained one, and every documented variable then came
+   out unrecognised. Rationales use -- as the clause separator instead.
+
    assign_rule for frailty is 'timing', not 'instrument'. The locked rule
    defines instrument membership as the override to D3 for named COGNITIVE
    instruments. Tagging frailty the same way would mix the two in the QC
@@ -1522,24 +1545,24 @@ data work.domain_lookup;
   domain      = upcase(strip(domain));
   assign_rule = strip(assign_rule);
 datalines;
-AGE_AT_SURGERY,D1,timing,captured at surgery registration; sociodemographic descriptor
-AGE_AT_ENCOUNTER,D1,timing,captured at encounter; sociodemographic descriptor
-SEX,D1,timing,recorded at registration; sociodemographic descriptor
-RACE,D1,timing,recorded at registration; sociodemographic descriptor
-ETHNICITY,D1,timing,recorded at registration; sociodemographic descriptor
-INSURANCE_TYPE,D1,analytic_role,payer type known preoperatively; sociodemographic proxy
-PAYER,D1,analytic_role,payer type known preoperatively; sociodemographic proxy
-MARITAL_STATUS,D1,timing,recorded at registration; sociodemographic descriptor
-MARITAL,D1,timing,recorded at registration; sociodemographic descriptor
-ZIP_CODE,D1,timing,geographic locator recorded at registration; sociodemographic
-ZIPCODE,D1,timing,geographic locator recorded at registration; sociodemographic
-STATE,D1,timing,geographic locator recorded at registration; sociodemographic
-ADMIT_BMI,D2,timing,captured at preoperative admission; preoperative physiologic assessment
-BMI,D2,timing,measured preoperatively; standard preoperative assessment variable
-FRAILTY_SCORE,D2,timing,frailty assessed before surgery; preoperative assessment
-FRAILTY_CATEGORY,D2,timing,frailty assessed before surgery; preoperative assessment
+AGE_AT_SURGERY,D1,timing,captured at surgery registration -- sociodemographic descriptor
+AGE_AT_ENCOUNTER,D1,timing,captured at encounter -- sociodemographic descriptor
+SEX,D1,timing,recorded at registration -- sociodemographic descriptor
+RACE,D1,timing,recorded at registration -- sociodemographic descriptor
+ETHNICITY,D1,timing,recorded at registration -- sociodemographic descriptor
+INSURANCE_TYPE,D1,analytic_role,payer type known preoperatively -- sociodemographic proxy
+PAYER,D1,analytic_role,payer type known preoperatively -- sociodemographic proxy
+MARITAL_STATUS,D1,timing,recorded at registration -- sociodemographic descriptor
+MARITAL,D1,timing,recorded at registration -- sociodemographic descriptor
+ZIP_CODE,D1,timing,geographic locator recorded at registration -- sociodemographic
+ZIPCODE,D1,timing,geographic locator recorded at registration -- sociodemographic
+STATE,D1,timing,geographic locator recorded at registration -- sociodemographic
+ADMIT_BMI,D2,timing,captured at preoperative admission -- preoperative physiologic assessment
+BMI,D2,timing,measured preoperatively -- standard preoperative assessment variable
+FRAILTY_SCORE,D2,timing,frailty assessed before surgery -- preoperative assessment
+FRAILTY_CATEGORY,D2,timing,frailty assessed before surgery -- preoperative assessment
 FEELS_EXHAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria)
-FEELS_EXAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria; source spelling)
+FEELS_EXAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria -- source spelling)
 WEIGHT_LOSS,D2,timing,frailty component captured preoperatively (Fried criteria)
 GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria)
 WEAK_GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria)
@@ -1549,8 +1572,8 @@ PHYSICAL_ACTIVITY,D2,timing,frailty component captured preoperatively (Fried cri
 LOW_PHYSICAL_ACTIVITY,D2,timing,frailty component captured preoperatively (Fried criteria)
 ASA_CLASS,D2,analytic_role,preoperative risk classification assigned before surgery
 ASA,D2,analytic_role,preoperative risk classification assigned before surgery
-SMOKING_STATUS,D2,timing,preoperative habit assessment; standard preoperative variable
-SMOKING,D2,timing,preoperative habit assessment; standard preoperative variable
+SMOKING_STATUS,D2,timing,preoperative habit assessment -- standard preoperative variable
+SMOKING,D2,timing,preoperative habit assessment -- standard preoperative variable
 HYPERTENSION,D2,timing,comorbidity documented in preoperative assessment
 DIABETES,D2,timing,comorbidity documented in preoperative assessment
 COPD,D2,timing,comorbidity documented in preoperative assessment
@@ -1559,20 +1582,20 @@ CAD,D2,timing,comorbidity documented in preoperative assessment
 AFIB,D2,timing,comorbidity documented in preoperative assessment
 CKD,D2,timing,comorbidity documented in preoperative assessment
 CANCER,D2,timing,comorbidity documented in preoperative assessment
-COGNITIVE_SCORE,D3,instrument,named cognitive instrument score; instrument membership overrides timing
-COGNITIVE_CATEGORY,D3,instrument,named cognitive instrument category; instrument membership overrides timing
-CLOCK_SCORE,D3,instrument,clock-drawing instrument score; instrument membership overrides timing
-DCDT_SCORE,D3,instrument,dCDT instrument score; instrument membership overrides timing
-DCDT_COMMAND,D3,instrument,dCDT command clock subscale; instrument membership overrides timing
-DCDT_COPY,D3,instrument,dCDT copy clock subscale; instrument membership overrides timing
+COGNITIVE_SCORE,D3,instrument,named cognitive instrument score -- instrument membership overrides timing
+COGNITIVE_CATEGORY,D3,instrument,named cognitive instrument category -- instrument membership overrides timing
+CLOCK_SCORE,D3,instrument,clock-drawing instrument score -- instrument membership overrides timing
+DCDT_SCORE,D3,instrument,dCDT instrument score -- instrument membership overrides timing
+DCDT_COMMAND,D3,instrument,dCDT command clock subscale -- instrument membership overrides timing
+DCDT_COPY,D3,instrument,dCDT copy clock subscale -- instrument membership overrides timing
 PROCEDURE_NAME,D4,timing,surgical procedure recorded at time of operation
 BASE_PROCEDURE_1,D4,timing,surgical procedure recorded at time of operation
 CPT_CODE,D4,timing,procedure CPT code assigned at time of operation
 CPT_1,D4,timing,procedure CPT code assigned at time of operation
 SERVICE_LINE,D4,timing,surgical service recorded at time of operation
 ANESTHESIA_TYPE,D4,timing,anesthesia type administered intraoperatively
-CASE_DURATION,D4,timing,elapsed operative time; intraoperative variable by timing
-OPERATIVE_TIME,D4,timing,elapsed operative time; intraoperative variable by timing
+CASE_DURATION,D4,timing,elapsed operative time -- intraoperative variable by timing
+OPERATIVE_TIME,D4,timing,elapsed operative time -- intraoperative variable by timing
 EMERGENT,D4,timing,emergent case flag set at time of surgery
 EMERGENT_CASE,D4,timing,emergent case flag set at time of surgery
 AVG_ABP_MEAN,D4,timing,intraoperative arterial blood pressure mean
@@ -1592,26 +1615,26 @@ DISCHARGE_DISPOSITION,D5,analytic_role,disposition known only at discharge
 DISCHARGE_DISPO,D5,analytic_role,disposition known only at discharge
 COMPLICATIONS,D5,analytic_role,postoperative complication status
 ORAL_MORPHINE_EQUIV_MG_POD_DAY6,D5,analytic_role,postoperative opioid use realized after surgery
-ADMIT_SOURCE,D2,timing,admission source known at admission before surgery; encounter context (REVIEW: could be argued D1)
+ADMIT_SOURCE,D2,timing,admission source known at admission before surgery -- encounter context (REVIEW: could be argued D1)
 BASE_PROCEDURE_CODE_1,D4,timing,procedure code assigned at time of operation
-ASA__ANESTH_RECORD_,D2,analytic_role,preoperative risk classification from the anesthesia record; ASA variant
-CHARGES,D5,analytic_role,encounter charges accrue through discharge; realized after surgery (REVIEW: consider excluding from descriptive summary)
+ASA__ANESTH_RECORD_,D2,analytic_role,preoperative risk classification from the anesthesia record -- ASA variant
+CHARGES,D5,analytic_role,encounter charges accrue through discharge -- realized after surgery (REVIEW: consider excluding from descriptive summary)
 CHARLSON_COMORBIDITY_INDEX,D2,timing,comorbidity burden index computed from preoperative diagnoses
-COGNITIVEDISORDER_YN,D2,timing,cognitive disorder diagnosis flag is a comorbidity not a named instrument; timing rule applies (REVIEW: D3 if treated as cognitive status)
+COGNITIVEDISORDER_YN,D2,timing,cognitive disorder diagnosis flag is a comorbidity not a named instrument -- timing rule applies (REVIEW: D3 if treated as cognitive status)
 COMPLICATION_SUM,D5,analytic_role,count of postoperative complications realized after surgery
-DAY_OF_WEEK__CHAR_,D4,timing,day of week of the operative encounter; scheduling characteristic (REVIEW: confirm anchor event)
+DAY_OF_WEEK__CHAR_,D4,timing,day of week of the operative encounter -- scheduling characteristic (REVIEW: confirm anchor event)
 DEATH_DATE_Y_N,D5,analytic_role,death indicator realized after surgery
 DIABETES_YN,D2,timing,comorbidity documented in preoperative assessment
 DISCHG_DISPOSITION,D5,analytic_role,disposition known only at discharge
-EDUCATION,D1,timing,recorded at registration; sociodemographic descriptor
-EMPLOYEESTATUS,D1,timing,recorded at registration; sociodemographic descriptor
+EDUCATION,D1,timing,recorded at registration -- sociodemographic descriptor
+EMPLOYEESTATUS,D1,timing,recorded at registration -- sociodemographic descriptor
 FENTANYL_SUBLIMAZE_MG_INTRAOP_TO,D4,timing,total intraoperative opioid dose
-HOLIDAYS,D4,timing,holiday indicator for the operative encounter; scheduling characteristic (REVIEW: confirm anchor event)
+HOLIDAYS,D4,timing,holiday indicator for the operative encounter -- scheduling characteristic (REVIEW: confirm anchor event)
 HYDROMORPHONE_MG_INTRAOP_TOTAL,D4,timing,total intraoperative opioid dose
 HYPERLIPIDEMIA_YN,D2,timing,comorbidity documented in preoperative assessment
 HYPERTENSION_YN,D2,timing,comorbidity documented in preoperative assessment
-ICD10_PRINCIPAL_DIAGNOSIS,D2,timing,principal diagnosis is the indication for surgery; preoperative clinical characteristic (REVIEW: coded at discharge)
-ICD10_PRINCIPAL_DIAGNOSIS_DESC,D2,timing,principal diagnosis description; preoperative clinical characteristic (REVIEW: coded at discharge)
+ICD10_PRINCIPAL_DIAGNOSIS,D2,timing,principal diagnosis is the indication for surgery -- preoperative clinical characteristic (REVIEW: coded at discharge)
+ICD10_PRINCIPAL_DIAGNOSIS_DESC,D2,timing,principal diagnosis description -- preoperative clinical characteristic (REVIEW: coded at discharge)
 ICU_LOS_TOTAL_TIME_HOURS,D5,analytic_role,ICU length of stay determined postoperatively
 INTRAOP_KETAMINE,D4,timing,intraoperative adjunct administered
 ISO_EXP_INTRAOP_MAC_AVERAGE,D4,timing,average intraoperative volatile anesthetic exposure
@@ -1620,8 +1643,8 @@ ISO_EXP_INTRAOP_MAC_TOTAL,D4,timing,total intraoperative volatile anesthetic exp
 ISO_EXP_INTRAOP_TOTAL,D4,timing,total intraoperative volatile anesthetic exposure
 ISO_SEV_INTRAOP_MAC_AVERAGE,D4,timing,average intraoperative volatile anesthetic exposure (extension column)
 KETAMINE_MG_INTRAOP_TOTAL,D4,timing,total intraoperative ketamine dose
-LATITUDE,OUT_OF_SCOPE,privacy_exclusion,precise geolocation; quasi-identifier not summarised (REVIEW: ZIP-level geography is the D1 locator)
-LONGITUDE,OUT_OF_SCOPE,privacy_exclusion,precise geolocation; quasi-identifier not summarised (REVIEW: ZIP-level geography is the D1 locator)
+LATITUDE,OUT_OF_SCOPE,privacy_exclusion,precise geolocation -- quasi-identifier not summarised (REVIEW: ZIP-level geography is the D1 locator)
+LONGITUDE,OUT_OF_SCOPE,privacy_exclusion,precise geolocation -- quasi-identifier not summarised (REVIEW: ZIP-level geography is the D1 locator)
 LIDOCAINE_MG_INTRAOP_TOTAL,D4,timing,total intraoperative lidocaine dose
 LOS_IN_HOURS,D5,analytic_role,length of stay in hours determined postoperatively
 MOVEMENTDISORDER_YN,D2,timing,comorbidity documented in preoperative assessment
@@ -1632,10 +1655,10 @@ ORAL_MORPHINE_EQUIV_MG_POD_DAY3,D5,analytic_role,postoperative opioid use realiz
 ORAL_MORPHINE_EQUIV_MG_POD_DAY4,D5,analytic_role,postoperative opioid use realized after surgery
 ORAL_MORPHINE_EQUIV_MG_POD_DAY5,D5,analytic_role,postoperative opioid use realized after surgery
 ORAL_MORPHINE_EQUIV_MG_POD_DAY7,D5,analytic_role,postoperative opioid use realized after surgery
-PATIENT_TYPE,D2,timing,encounter type (inpatient or outpatient) set before surgery; encounter context (REVIEW: could be argued D4)
+PATIENT_TYPE,D2,timing,encounter type (inpatient or outpatient) set before surgery -- encounter context (REVIEW: could be argued D4)
 PREOP_BLOCK,D4,timing,regional block is an anesthetic intervention of the operative episode (REVIEW: name says preop)
 PROPOFOL_MG_INTRAOP_TOTAL,D4,timing,total intraoperative propofol dose
-ROOM_TYPE,D4,timing,room type of the operative encounter (REVIEW: confirm whether OR room or ward room; if ward then D5)
+ROOM_TYPE,D4,timing,room type of the operative encounter (REVIEW: confirm whether OR room or ward room -- if ward then D5)
 RT_ADMIT_TO_AN_END_MINS,D4,timing,perioperative process interval anchored on the operative episode
 RT_ADMIT_TO_AN_START_MINS,D4,timing,perioperative process interval anchored on the operative episode
 RT_ADMIT_TO_BLOCK_END_MINS,D4,timing,perioperative process interval anchored on the operative episode
@@ -1647,21 +1670,35 @@ RT_ADMIT_TO_RM_START_MINS,D4,timing,perioperative process interval anchored on t
 RT_ANCHOR_TO_ADMIT_DAYS,D4,timing,scheduling interval from anchor to admission (REVIEW: confirm anchor definition)
 RT_ANCHOR_TO_DISCHG_DAYS,D5,analytic_role,interval to discharge realized postoperatively
 RT_ANCHOR_TO_SURGERY_DAYS,D4,timing,scheduling interval from anchor to surgery (REVIEW: confirm anchor definition)
-RT_AN_START_TO_AN_END_MINS,D4,timing,anesthesia duration; intraoperative variable by timing
-RT_BLOCK_START_TO_BLOCK_END_MINS,D4,timing,block duration; intraoperative variable by timing
-RT_INCISE_TO_DRESS_MINS,D4,timing,incision to dressing duration; intraoperative variable by timing
-RT_RM_START_TO_AN_START_MINS,D4,timing,operating room process interval; intraoperative variable by timing
-RT_RM_START_TO_DRESS_MINS,D4,timing,operating room process interval; intraoperative variable by timing
-RT_RM_START_TO_EMERGENCE_MINS,D4,timing,operating room process interval; intraoperative variable by timing
-RT_RM_START_TO_INCISION_MINS,D4,timing,operating room process interval; intraoperative variable by timing
-RT_RM_START_TO_INDUCTION_MINS,D4,timing,operating room process interval; intraoperative variable by timing
-RT_RM_START_TO_RM_END_MINS,D4,timing,operating room time; intraoperative variable by timing
+RT_AN_START_TO_AN_END_MINS,D4,timing,anesthesia duration -- intraoperative variable by timing
+RT_BLOCK_START_TO_BLOCK_END_MINS,D4,timing,block duration -- intraoperative variable by timing
+RT_INCISE_TO_DRESS_MINS,D4,timing,incision to dressing duration -- intraoperative variable by timing
+RT_RM_START_TO_AN_START_MINS,D4,timing,operating room process interval -- intraoperative variable by timing
+RT_RM_START_TO_DRESS_MINS,D4,timing,operating room process interval -- intraoperative variable by timing
+RT_RM_START_TO_EMERGENCE_MINS,D4,timing,operating room process interval -- intraoperative variable by timing
+RT_RM_START_TO_INCISION_MINS,D4,timing,operating room process interval -- intraoperative variable by timing
+RT_RM_START_TO_INDUCTION_MINS,D4,timing,operating room process interval -- intraoperative variable by timing
+RT_RM_START_TO_RM_END_MINS,D4,timing,operating room time -- intraoperative variable by timing
 SERVICE,D4,timing,surgical service recorded at time of operation
 SEV_EXP_INTRAOP_TOTAL,D4,timing,total intraoperative volatile anesthetic exposure
 SLEEP_APNEA_YN,D2,timing,comorbidity documented in preoperative assessment
 SSDI_DEATH_DATE_Y_N,D5,analytic_role,death indicator from SSDI realized after surgery
 SUFENTANIL_MG_INTRAOP_TOTAL,D4,timing,total intraoperative opioid dose
-WEEKEND_INDICATOR,D4,timing,weekend indicator for the operative encounter; scheduling characteristic (REVIEW: confirm anchor event)
+WEEKEND_INDICATOR,D4,timing,weekend indicator for the operative encounter -- scheduling characteristic (REVIEW: confirm anchor event)
+ISO_SEV_MAC_TOTAL_EXP,D4,timing,total volatile anesthetic exposure (extension column)
+ABP_LESS_THAN_70_COUNT,D4,timing,count of intraoperative low arterial pressure events (extension column)
+ABP_LESS_THAN_80_COUNT,D4,timing,count of intraoperative low arterial pressure events (extension column)
+BIS_INDEX_LESS_40_COUNT,D4,timing,count of intraoperative low BIS index events (extension column)
+NIBP_LESS_60_COUNT,D4,timing,count of intraoperative low non-invasive blood pressure events (extension column)
+NIBP_LESS_70_COUNT,D4,timing,count of intraoperative low non-invasive blood pressure events (extension column)
+NIBP_LESS_80_COUNT,D4,timing,count of intraoperative low non-invasive blood pressure events (extension column)
+SD_ABP_MEAN,D4,timing,intraoperative arterial pressure variability (extension column)
+SD_NIBP_MEAN,D4,timing,intraoperative non-invasive blood pressure variability (extension column)
+AVG_NIBP_MEAN,D4,timing,intraoperative non-invasive blood pressure mean (extension column)
+AVG_BIS_INDEX,D4,timing,intraoperative BIS index mean (extension column)
+UNINTENDED_WEIGHT_LOSS,D2,timing,frailty component captured preoperatively (Fried criteria -- extension column)
+WEEK_GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria -- extension column source spelling)
+COGNITIVE_DISORDER,D3,timing,cognitive-status column from the extension block (REVIEW: align with COGNITIVEDISORDER_YN which is D2 -- choose one domain for both)
 ;
 run;
 
@@ -1714,6 +1751,11 @@ quit;
 
 /* Apply the lookup. The ON clause scopes the join to rows that are not     */
 /* already OUT_OF_SCOPE, so identifier exclusions are not overridden.       */
+/* EXCEPTION: columns pulled in from g.master_data_merged by the Section 0b */
+/* concept filter are eligible even though they are not in the PRECEDE     */
+/* dictionary. The 2026-09-10 run showed 22 of the 23 extension columns    */
+/* (frailty components, ABP, NIBP, BIS) are absent from the dictionary;     */
+/* without this exception the extension is pulled in and then discarded.   */
 proc sql;
   create table work.domain_staging4 as
     select ds.*,
@@ -1723,7 +1765,8 @@ proc sql;
     from work.domain_staging3 as ds
     left join work.domain_lookup as dl
       on upcase(strip(ds.varname)) = dl.varname_u
-     and ds.domain not in ('OUT_OF_SCOPE');
+     and (   ds.domain not in ('OUT_OF_SCOPE')
+          or (ds.source_dataset = 'master_data_merged' and ds.assign_rule = 'data_only'));
 quit;
 
 data work.domain_staging4;
@@ -1742,8 +1785,17 @@ data work.domain_staging4;
     stat_route       = '';
   end;
 
-  /* Any row demoted to OUT_OF_SCOPE must not carry a statistic route */
-  if domain = 'OUT_OF_SCOPE' then stat_route = '';
+  /* stat_route is recomputed here because an extension column rescued by  */
+  /* the lookup was OUT_OF_SCOPE (blank route) at Section 3b.               */
+  if domain ne 'OUT_OF_SCOPE' then do;
+    if vtype = 'char' then stat_route = 'FREQ';
+    else if vtype = 'num' then do;
+      if      n_levels > . and n_levels <= 10 then stat_route = 'FREQ';
+      else if n_levels > 10                   then stat_route = 'MEANS';
+      else                                         stat_route = '';
+    end;
+  end;
+  else stat_route = '';
 
   drop domain_final rationale_final rule_final;
 run;
@@ -1910,6 +1962,22 @@ quit;
   %put NOTE: [17-S4] Unassigned-documented guard passed.;
 %mend check_unassigned;
 %check_unassigned;
+
+/* Extension columns with no lookup entry are a WARNING, not a failure:    */
+/* they are not dictionary-documented, so GUARD 5 does not own them.        */
+%let n_ext_unmapped = 0;
+proc sql noprint;
+  select count(*) into :n_ext_unmapped trimmed
+  from g.var_domain_map
+  where source_dataset = 'master_data_merged' and domain = 'OUT_OF_SCOPE';
+quit;
+
+%macro warn_ext_unmapped;
+  %if &n_ext_unmapped > 0 %then %do;
+    %put WARNING: [17-S4] &n_ext_unmapped extension columns from g.master_data_merged have no lookup entry and are OUT_OF_SCOPE -- filter the review CSV on source_dataset=master_data_merged.;
+  %end;
+%mend warn_ext_unmapped;
+%warn_ext_unmapped;
 
 /* ---- All guards passed: promote map_status and refresh the review CSV --- */
 proc sql;

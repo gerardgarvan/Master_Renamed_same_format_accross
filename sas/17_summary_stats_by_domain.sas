@@ -2624,7 +2624,32 @@ quit;
           group by varname, year_val, level having count(*) > 1);
   quit;
   %if &n_dup_lvl > 0 %then %do;
-    %fail_out(msg=&n_dup_lvl duplicate varname-year-level keys in &out -- two raw values format to the same level string);
+    /* Evidence first: the duplicated keys, then the raw ODS rows for the   */
+    /* first affected variable so the level extraction can be inspected.    */
+    %local dup_var;
+    %let dup_var = ;
+    proc sql;
+      create table work.freq_dup_keys as
+        select varname, year_val, level, count(*) as n_rows, sum(frequency) as sum_freq
+        from &out
+        group by varname, year_val, level
+        having count(*) > 1
+        order by varname, year_val, level;
+      select varname into :dup_var trimmed from work.freq_dup_keys(obs=1);
+    quit;
+    proc print data=work.freq_dup_keys(obs=20) noobs;
+      title "Duplicate varname-year-level keys in &out (first 20)";
+    run;
+    proc print data=&out(obs=40) noobs;
+      where varname = "&dup_var" and is_pooled = 0;
+      title "All per-year long rows for &dup_var";
+    run;
+    proc print data=&out_year(obs=30);
+      where upcase(strip(scan(Table, 2, ' *'))) = "&dup_var";
+      title "Raw CROSSTABFREQS rows for &dup_var (all _TYPE_ values, all columns)";
+    run;
+    title;
+    %fail_out(msg=&n_dup_lvl duplicate varname-year-level keys in &out -- see the three diagnostic prints above);
   %end;
 
   %put NOTE: [17-S7] PROC FREQ for domain &domain complete: &nv variables.;

@@ -99,6 +99,10 @@
         - Duplicate varname-year-level keys fail before the wide UPDATE.
         - Year values are checked to be four-digit integers.
         - n_suppressed is labelled as rows/blocks, not cells.
+        - CROSSTABFREQS has no F_ columns; the per-year level is read with
+          VVALUEX(varname). A blank-level guard fails early if it ever
+          regresses. PROC MEANS/FREQ statistical output is kept out of the
+          results viewer with ODS EXCLUDE ALL (ODS OUTPUT still writes).
     R20 Y/blank flags (2026-09-10, Checkpoint 1 decision -- option 2):
         Character variables whose only non-missing level is Y (the _YN
         comorbidity flags and similar) code absence as blank, not N. They
@@ -584,10 +588,12 @@ quit;
 /* These are NOT excluded. CPT codes, procedure names and ZIP codes all     */
 /* exceed 200 levels and are legitimate analytic variables. Cardinality is  */
 /* reported so the reviewer can sort on it at Checkpoint 1.                 */
+ods exclude all;
 proc freq data=g.analysis_base nlevels;
   tables _character_ / noprint;
   ods output nlevels=work.char_nlevels;
 run;
+ods select all;
 
 proc sql;
   create table work.hi_card_chars as
@@ -1387,10 +1393,12 @@ quit;
    ASA class, emergent Y/N). Type AND cardinality decide the route.
    ========================================================================= */
 
+ods exclude all;
 proc freq data=work.analysis_base_ext nlevels;
   tables _all_ / noprint;
   ods output nlevels=work.nlevels_raw;
 run;
+ods select all;
 
 data work.nlevels_ext;
   set work.nlevels_raw;
@@ -2368,7 +2376,7 @@ quit;
     %return;
   %end;
 
-  ods listing close;
+  ods exclude all;
   proc means data=work.analysis_base_clean
       n nmiss mean std median p25 p75 min max
       maxdec=2 stackodsoutput;
@@ -2377,7 +2385,7 @@ quit;
     types () &year_variable;
     ods output summary=&out;
   run;
-  ods listing;
+  ods select all;
 
   /* stackodsoutput emits Variable (the name) and, when labels exist, Label. */
   /* Pooled rows are the ones where the class value is missing (TYPES ()).   */
@@ -2488,20 +2496,20 @@ quit;
   %end;
 
   /* --- Pooled one-way frequency tables ----------------------------------- */
-  ods listing close;
+  ods exclude all;
   ods output onewayfreqs=&out_pooled;
   proc freq data=work.analysis_base_clean;
     tables (&varlist) / missing nocum;
   run;
-  ods listing;
+  ods select all;
 
   /* --- Per-year crosstab ------------------------------------------------- */
-  ods listing close;
+  ods exclude all;
   ods output crosstabfreqs=&out_year;
   proc freq data=work.analysis_base_clean;
     tables (&varlist) * &year_variable / missing nocum norow nocol nopercent;
   run;
-  ods listing;
+  ods select all;
 
   /* --- Normalize pooled output to the long structure --------------------- */
   /* ODS ONEWAYFREQS: Table (varname), F_<varname> (level char or formatted), */
@@ -2568,20 +2576,27 @@ quit;
     varname  = upcase(strip(scan(Table, 2, ' *')));
     year_val = strip(put(&year_variable, best12.));
 
-    array _fcols2 {*} $ _character_;
-    level = '';
-    do _k = 1 to dim(_fcols2);
-      if substr(vname(_fcols2{_k}),1,2) = 'F_'
-         and upcase(vname(_fcols2{_k})) ne upcase("F_&year_variable")
-         and not missing(_fcols2{_k})
-        then level = strip(_fcols2{_k});
-    end;
+    /* CROSSTABFREQS has NO F_ columns (unlike ONEWAYFREQS): the level sits */
+    /* in a column named after the variable. VVALUEX returns that column's  */
+    /* formatted value by name, for character and numeric variables alike.  */
+    level = strip(vvaluex(varname));
     if level = '.' then level = '';
     if missing(level) and indexw("&yn_blank_list", strip(varname), ' ') > 0
       then level = '(blank = absent)';
     keep varname level year_val Frequency;
     rename Frequency=frequency;
   run;
+
+  /* The level must have been found for at least one non-missing cell.     */
+  %local n_yr_lvl;
+  %let n_yr_lvl = 0;
+  proc sql noprint;
+    select count(*) into :n_yr_lvl trimmed
+    from work.freq_year_long where not missing(level);
+  quit;
+  %if &n_yr_lvl = 0 %then %do;
+    %fail_out(msg=Per-year level extraction returned blank for every cell in domain &domain -- inspect &out_year columns);
+  %end;
 
   proc sql;
     create table work.freq_year_agg as

@@ -5,17 +5,19 @@
             in g.analysis_base (extended with frailty, cognitive, and
             intraoperative-physiologic columns from g.master_data_merged).
 
-  SCOPE OF THIS FILE (read this before setting DOMAIN_MAP_APPROVED):
-            This file contains Sections 0, 0b, and 1 through 4 only.
-            Sections 5 through 11 (sentinel recode, PROC MEANS, PROC FREQ,
-            suppression, ODS EXCEL workbook, QC artifact) are NOT YET WRITTEN.
-            Setting DOMAIN_MAP_APPROVED to 1 will therefore not produce any
-            statistics. The %gate_stats macro is defined here for Sections
-            5 to 11 to call once they exist. It is deliberately not invoked.
+  SCOPE OF THIS FILE:
+            This file contains Sections 0, 0b, and 1 through 11 (complete).
+            Section 9: ODS EXCEL workbook assembly (KEY, D1-D5, Crosswalk, QC)
+            Section 10: QC text artifact
+            Section 11: Output verification and log restore
+            Sections 5 to 11 are gated by %gate_stats and only run when
+            DOMAIN_MAP_APPROVED = 1 (set after Checkpoint 1 review).
 
   Output  : qc\17_discovery.txt                 (Wave 0 plus Section 1 coverage)
             g.var_domain_map                    (Wave 1, the ONE permanent artifact)
             qc\17_var_domain_map_review.csv     (Wave 1, Checkpoint 1 review)
+            qc\17_summary_stats_by_domain.xlsx  (Wave 3, eight-tab deliverable)
+            qc\17_summary_stats_by_domain.txt   (Wave 3, QC text artifact)
 
   Reads   : g.analysis_base            (read-only)
             g.master_data_merged       (read-only)
@@ -2719,5 +2721,610 @@ quit;
    ========================================================================= */
 
 %put NOTE: ==== Phase 17 Wave 2 complete. Ready for Wave 3 ODS EXCEL assembly. ====;
+
+
+/* =========================================================================
+   SECTION 9: ODS EXCEL workbook assembly
+   -------------------------------------------------------------------------
+   Produces: qc\17_summary_stats_by_domain.xlsx
+   Sheet order (eight tabs, KEY leftmost):
+     KEY        -- legend, run metadata, suppression rule, denominator rules
+     D1 - D5    -- continuous + categorical tables per domain (both on one tab)
+     Crosswalk  -- g.var_domain_map with every variable incl. OUT_OF_SCOPE
+     QC         -- run metadata, recode counts, suppression counts,
+                   per-domain counts, per-rule counts, OUT_OF_SCOPE counts
+
+   CRITICAL: sheet_interval="none" is set at ODS EXCEL open and NEVER
+   changed. Under the default ("table") every PROC REPORT starts a new tab,
+   so a domain's continuous and categorical tables land on "D1" and "D1 1".
+   With sheet_interval="none" both PROC REPORTs land on the current tab;
+   switching tabs requires changing sheet_name via ods excel options().
+
+   Display datasets are in LONG format (one row per variable per year).
+   Sections 9.2-9.6 transpose each domain to WIDE before PROC REPORT so
+   that pooled and per-year blocks can be placed under spanning headers.
+   ========================================================================= */
+
+%put NOTE: ==== Section 9: ODS EXCEL workbook assembly starting ====;
+
+/* ---- 9.0 Delete prior workbook if it exists (locked-file guard) ----------- */
+%macro drop_stale_xlsx;
+  %local rc_xlsx;
+  %if %sysfunc(fileexist(%bquote(&qc_path.\17_summary_stats_by_domain.xlsx))) %then %do;
+    filename _oldx "&qc_path.\17_summary_stats_by_domain.xlsx";
+    %let rc_xlsx = %sysfunc(fdelete(_oldx));
+    filename _oldx clear;
+    %if &rc_xlsx ne 0 %then %do;
+      %fail_out(msg=Could not delete prior qc\17_summary_stats_by_domain.xlsx rc=&rc_xlsx -- file may be open in Excel);
+    %end;
+    %put NOTE: [17-S9] Prior xlsx deleted before rebuild.;
+  %end;
+%mend drop_stale_xlsx;
+%drop_stale_xlsx;
+
+/* ---- 9.1 Build the year list macro variable from work.year_dist ----------- */
+/* &year_list is a space-separated list of distinct years (numeric values)     */
+/* used below to loop over per-year column blocks for spanning headers.        */
+%global year_list n_years;
+%let year_list = ;
+%let n_years   = 0;
+
+proc sql noprint;
+  select year_value, count(*) into :year_list separated by ' ', :n_years trimmed
+  from work.year_dist
+  where not missing(year_value)
+  group by year_value
+  order by year_value;
+quit;
+
+%put NOTE: [17-S9] Year list for spanning headers: &year_list (n=&n_years years);
+
+/* ---- 9.1b Build the KEY dataset ------------------------------------------- */
+data work.key;
+  length item $60 detail $500;
+  item="Program";       detail="17_summary_stats_by_domain.sas -- Phase 17 Wave 3"; output;
+  item="Source";        detail="work.analysis_base_ext (g.analysis_base extended with g.master_data_merged frailty/cognitive/intraoperative columns)"; output;
+  item="Rows";          detail="&n_base_rows rows (one per PRECEDE_STUDY_ID)"; output;
+  item="Run datetime";  detail="%sysfunc(datetime(), datetime20.)"; output;
+  item="Scope";         detail="Descriptive statistics only -- no inferential testing. Pooled and per-year breakdowns for all dictionary-documented and approved extension variables."; output;
+  item="Continuous stats"; detail="N (non-missing) NMiss Mean SD Median Q1 Q3 Min Max -- pooled and per year"; output;
+  item="Categorical stats"; detail="Level N % of non-missing N-missing -- pooled and per year"; output;
+  item="Suppression rule";  detail="Cells representing &SUPPRESS_MAX or fewer patients are shown as &SUPPRESS_LABEL. For continuous blocks at or below that count ALL statistics for the block are suppressed -- not only N. N-missing is suppressed on the same rule."; output;
+  item="Denominator rule";  detail="Percents on categorical variables are computed on the non-missing denominator (D-02). N-missing is reported separately and is itself subject to suppression."; output;
+  item="D3 and D2 frailty denominator"; detail="%sysfunc(symget(D3_DENOM_NOTE))"; output;
+  item="Domains";           detail="D1 Sociodemographics; D2 Preoperative incl. frailty; D3 Cognitive instruments; D4 Intraoperative; D5 Outcomes"; output;
+  item="OUT_OF_SCOPE";      detail="Identifiers, high-cardinality keys, and variables not matched to the PRECEDE dictionary are excluded from statistics but appear on the Crosswalk sheet with their reason."; output;
+run;
+
+/* ---- 9.2 Transpose display datasets to WIDE for PROC REPORT --------------- */
+/* For means: pivot pooled row and per-year rows to wide columns so spanning   */
+/* headers can be placed over each year block.                                 */
+/* Column names: n_pool mean_pool std_pool median_pool q1_pool q3_pool         */
+/*               min_pool max_pool nmiss_pool                                  */
+/*               n_YYYY mean_YYYY std_YYYY ... for each year                   */
+
+%macro transpose_means_wide(ds=, out=);
+  /* Pool rows: _type_=0 (PROC MEANS TYPE 0 = pooled) */
+  /* Year rows: _type_=1 */
+  /* The year variable column holds the year value.    */
+  %local i yr;
+
+  /* Rename stat columns to pool suffix for the pooled rows */
+  proc sql noprint;
+    create table work._m_pool as
+      select varname, domain, sas_label, supp_reason,
+             N as n_pool, NMiss as nmiss_pool, Mean as mean_pool,
+             &sd_col_name as std_pool, Median as median_pool,
+             P25 as q1_pool, P75 as q3_pool, Min as min_pool, Max as max_pool,
+             suppressed as supp_pool
+      from &ds
+      where _type_ = 0;
+  quit;
+
+  /* One set of year columns per year value */
+  data work._m_wide;
+    set work._m_pool;
+    /* initialise all year columns to missing */
+    %do i = 1 %to &n_years;
+      %let yr = %scan(&year_list, &i);
+      length n_&yr 8 nmiss_&yr 8 mean_&yr 8 std_&yr 8
+             median_&yr 8 q1_&yr 8 q3_&yr 8 min_&yr 8 max_&yr 8 supp_&yr 8;
+      n_&yr = .; nmiss_&yr = .; mean_&yr = .; std_&yr = .;
+      median_&yr = .; q1_&yr = .; q3_&yr = .; min_&yr = .; max_&yr = .;
+      supp_&yr = 0;
+    %end;
+  run;
+
+  /* Update each year column from the per-year rows */
+  %do i = 1 %to &n_years;
+    %let yr = %scan(&year_list, &i);
+    proc sql noprint;
+      create table work._m_yr_&yr as
+        select varname,
+               N as n_&yr, NMiss as nmiss_&yr, Mean as mean_&yr,
+               &sd_col_name as std_&yr, Median as median_&yr,
+               P25 as q1_&yr, P75 as q3_&yr, Min as min_&yr, Max as max_&yr,
+               suppressed as supp_&yr
+        from &ds
+        where _type_ = 1 and &year_variable = &yr;
+    quit;
+
+    proc sql;
+      update work._m_wide w
+        set n_&yr      = (select n_&yr      from work._m_yr_&yr y where y.varname=w.varname),
+            nmiss_&yr  = (select nmiss_&yr  from work._m_yr_&yr y where y.varname=w.varname),
+            mean_&yr   = (select mean_&yr   from work._m_yr_&yr y where y.varname=w.varname),
+            std_&yr    = (select std_&yr    from work._m_yr_&yr y where y.varname=w.varname),
+            median_&yr = (select median_&yr from work._m_yr_&yr y where y.varname=w.varname),
+            q1_&yr     = (select q1_&yr     from work._m_yr_&yr y where y.varname=w.varname),
+            q3_&yr     = (select q3_&yr     from work._m_yr_&yr y where y.varname=w.varname),
+            min_&yr    = (select min_&yr    from work._m_yr_&yr y where y.varname=w.varname),
+            max_&yr    = (select max_&yr    from work._m_yr_&yr y where y.varname=w.varname),
+            supp_&yr   = (select supp_&yr   from work._m_yr_&yr y where y.varname=w.varname);
+    quit;
+  %end;
+
+  data &out;
+    set work._m_wide;
+  run;
+
+  /* Cleanup temp datasets */
+  proc datasets lib=work nolist;
+    delete _m_pool _m_wide
+    %do i = 1 %to &n_years; _m_yr_%scan(&year_list,&i) %end;;
+  quit;
+%mend transpose_means_wide;
+
+%macro transpose_freq_wide(ds=, out=);
+  /* Pool rows: is_pooled=1 (year_val='')                              */
+  /* Year rows: is_pooled=0, year_val holds the year as a string       */
+  /* Output: one row per varname+level with pool columns and year cols */
+  %local i yr;
+
+  proc sql noprint;
+    create table work._f_pool as
+      select varname, domain, level, sas_label,
+             frequency as n_pool, n_nonmissing as n_nonmiss_pool,
+             n_missing as n_miss_pool, pct_nonmissing as pct_pool,
+             n_display as n_disp_pool, pct_display as pct_disp_pool,
+             suppressed as supp_pool, supp_reason as supp_reason_pool
+      from &ds
+      where is_pooled = 1;
+  quit;
+
+  data work._f_wide;
+    set work._f_pool;
+    %do i = 1 %to &n_years;
+      %let yr = %scan(&year_list, &i);
+      length n_&yr 8 pct_&yr 8 n_disp_&yr $32 pct_disp_&yr $32 supp_&yr 8;
+      n_&yr = .; pct_&yr = .;
+      n_disp_&yr = ''; pct_disp_&yr = ''; supp_&yr = 0;
+    %end;
+  run;
+
+  %do i = 1 %to &n_years;
+    %let yr = %scan(&year_list, &i);
+    proc sql noprint;
+      create table work._f_yr_&yr as
+        select varname, level,
+               frequency as n_&yr, pct_nonmissing as pct_&yr,
+               n_display as n_disp_&yr, pct_display as pct_disp_&yr,
+               suppressed as supp_&yr
+        from &ds
+        where is_pooled = 0 and year_val = strip(put(&yr, best12.));
+    quit;
+
+    proc sql;
+      update work._f_wide w
+        set n_&yr        = (select n_&yr        from work._f_yr_&yr y where y.varname=w.varname and y.level=w.level),
+            pct_&yr      = (select pct_&yr      from work._f_yr_&yr y where y.varname=w.varname and y.level=w.level),
+            n_disp_&yr   = (select n_disp_&yr   from work._f_yr_&yr y where y.varname=w.varname and y.level=w.level),
+            pct_disp_&yr = (select pct_disp_&yr from work._f_yr_&yr y where y.varname=w.varname and y.level=w.level),
+            supp_&yr     = (select supp_&yr     from work._f_yr_&yr y where y.varname=w.varname and y.level=w.level);
+    quit;
+  %end;
+
+  data &out;
+    set work._f_wide;
+  run;
+
+  proc datasets lib=work nolist;
+    delete _f_pool _f_wide
+    %do i = 1 %to &n_years; _f_yr_%scan(&year_list,&i) %end;;
+  quit;
+%mend transpose_freq_wide;
+
+/* Transpose all five domains */
+%transpose_means_wide(ds=work.means_d1_display, out=work.means_d1_wide);
+%transpose_means_wide(ds=work.means_d2_display, out=work.means_d2_wide);
+%transpose_means_wide(ds=work.means_d3_display, out=work.means_d3_wide);
+%transpose_means_wide(ds=work.means_d4_display, out=work.means_d4_wide);
+%transpose_means_wide(ds=work.means_d5_display, out=work.means_d5_wide);
+
+%transpose_freq_wide(ds=work.freq_d1_display, out=work.freq_d1_wide);
+%transpose_freq_wide(ds=work.freq_d2_display, out=work.freq_d2_wide);
+%transpose_freq_wide(ds=work.freq_d3_display, out=work.freq_d3_wide);
+%transpose_freq_wide(ds=work.freq_d4_display, out=work.freq_d4_wide);
+%transpose_freq_wide(ds=work.freq_d5_display, out=work.freq_d5_wide);
+
+%put NOTE: [17-S9] Wide display datasets built for all five domains.;
+
+/* ---- 9.3 Macro: PROC REPORT spanning column list -------------------------- */
+/* Generates the COLUMN statement for a wide means or freq dataset with        */
+/* Pooled and per-year spanning headers.                                       */
+%macro means_col_stmt;
+  /* Pooled spanning group */
+  column varname sas_label
+    ("Pooled" n_pool nmiss_pool mean_pool std_pool median_pool q1_pool q3_pool min_pool max_pool)
+  %local i yr;
+  %do i = 1 %to &n_years;
+    %let yr = %scan(&year_list, &i);
+    ("&yr" n_&yr nmiss_&yr mean_&yr std_&yr median_&yr q1_&yr q3_&yr min_&yr max_&yr)
+  %end;
+  ;
+%mend means_col_stmt;
+
+%macro freq_col_stmt;
+  column varname sas_label level
+    ("Pooled" n_disp_pool pct_disp_pool)
+  %local i yr;
+  %do i = 1 %to &n_years;
+    %let yr = %scan(&year_list, &i);
+    ("&yr" n_disp_&yr pct_disp_&yr)
+  %end;
+  ;
+%mend freq_col_stmt;
+
+/* ---- 9.4 Open ODS EXCEL once with sheet_interval=none, KEY sheet first --- */
+%let ods_excel_open = 1;
+ods listing close;
+ods excel file="&qc_path.\17_summary_stats_by_domain.xlsx"
+    options(sheet_name="KEY"
+            embedded_titles="yes"
+            autofilter="all"
+            frozen_headers="1"
+            sheet_interval="none");
+
+/* KEY sheet */
+proc report data=work.key nowd
+    style(header)=[background=CX0021A5 color=white fontweight=bold]
+    style(column)=[fontsize=9pt];
+  columns item detail;
+  define item   / display "Item"   style(column)=[width=1.8in fontweight=bold];
+  define detail / display "Detail" style(column)=[width=5.5in];
+run;
+
+/* ---- 9.5 Domain sheets D1 through D5 ------------------------------------- */
+/* For each domain: switch sheet, report the wide continuous dataset,          */
+/* then the wide categorical dataset. Both land on the same tab because        */
+/* sheet_interval is none.                                                     */
+
+/* Macro: report one domain sheet */
+%macro report_domain(dom=, means_ds=, freq_ds=, note=);
+  ods excel options(sheet_name="&dom" sheet_interval="none");
+
+  /* -- Continuous section -- */
+  %local n_rows_m;
+  %let n_rows_m = 0;
+  proc sql noprint;
+    select count(*) into :n_rows_m trimmed from &means_ds;
+  quit;
+  %if &n_rows_m > 0 %then %do;
+    title "&dom -- Continuous Statistics (n, n-missing, mean, SD, median, Q1, Q3, min, max)";
+    %if %length(&note) > 0 %then %do;
+      title2 "&note";
+    %end;
+    proc report data=&means_ds nowd
+        style(header)=[background=CX0021A5 color=white fontweight=bold]
+        style(column)=[fontsize=8pt];
+      %means_col_stmt
+      define varname    / display "Variable"  style(column)=[width=1.2in];
+      define sas_label  / display "Label"     style(column)=[width=1.8in];
+      define n_pool     / display "N";
+      define nmiss_pool / display "N-miss";
+      define mean_pool  / display "Mean";
+      define std_pool   / display "SD";
+      define median_pool / display "Median";
+      define q1_pool    / display "Q1";
+      define q3_pool    / display "Q3";
+      define min_pool   / display "Min";
+      define max_pool   / display "Max";
+      %local i yr;
+      %do i = 1 %to &n_years;
+        %let yr = %scan(&year_list, &i);
+        define n_&yr      / display "N";
+        define nmiss_&yr  / display "N-miss";
+        define mean_&yr   / display "Mean";
+        define std_&yr    / display "SD";
+        define median_&yr / display "Median";
+        define q1_&yr     / display "Q1";
+        define q3_&yr     / display "Q3";
+        define min_&yr    / display "Min";
+        define max_&yr    / display "Max";
+      %end;
+    run;
+    title;
+  %end;
+
+  /* -- Categorical section -- */
+  %local n_rows_f;
+  %let n_rows_f = 0;
+  proc sql noprint;
+    select count(*) into :n_rows_f trimmed from &freq_ds;
+  quit;
+  %if &n_rows_f > 0 %then %do;
+    title "&dom -- Categorical Statistics (level, n, % of non-missing, n-missing)";
+    %if %length(&note) > 0 %then %do;
+      title2 "&note";
+    %end;
+    proc report data=&freq_ds nowd
+        style(header)=[background=CX0021A5 color=white fontweight=bold]
+        style(column)=[fontsize=8pt];
+      %freq_col_stmt
+      define varname       / display "Variable"  style(column)=[width=1.2in];
+      define sas_label     / display "Label"     style(column)=[width=1.8in];
+      define level         / display "Level"     style(column)=[width=1.0in];
+      define n_disp_pool   / display "N";
+      define pct_disp_pool / display "%";
+      %local i yr;
+      %do i = 1 %to &n_years;
+        %let yr = %scan(&year_list, &i);
+        define n_disp_&yr   / display "N";
+        define pct_disp_&yr / display "%";
+      %end;
+    run;
+    title;
+  %end;
+%mend report_domain;
+
+/* D5 note about _30_DAY_MORTALITY missingness */
+%let d5_note = _30_DAY_MORTALITY -- missingness reflects the md1 join (cases not in md1 have no outcome value); it does not indicate the outcome itself;
+
+%report_domain(dom=D1, means_ds=work.means_d1_wide, freq_ds=work.freq_d1_wide, note=);
+%report_domain(dom=D2, means_ds=work.means_d2_wide, freq_ds=work.freq_d2_wide,
+               note=%sysfunc(symget(D3_DENOM_NOTE)));
+%report_domain(dom=D3, means_ds=work.means_d3_wide, freq_ds=work.freq_d3_wide,
+               note=%sysfunc(symget(D3_DENOM_NOTE)));
+%report_domain(dom=D4, means_ds=work.means_d4_wide, freq_ds=work.freq_d4_wide, note=);
+%report_domain(dom=D5, means_ds=work.means_d5_wide, freq_ds=work.freq_d5_wide,
+               note=&d5_note);
+
+/* ---- 9.6 Crosswalk sheet -------------------------------------------------- */
+ods excel options(sheet_name="Crosswalk" sheet_interval="none");
+title "Crosswalk -- All Variables (including OUT_OF_SCOPE identifiers)";
+proc report data=g.var_domain_map(keep=varname sas_label vtype n_levels stat_route
+                                       source_dataset domain domain_rationale
+                                       assign_rule denominator_note)
+    nowd
+    style(header)=[background=CX0021A5 color=white fontweight=bold]
+    style(column)=[fontsize=8pt];
+  columns varname sas_label vtype n_levels stat_route source_dataset
+          domain domain_rationale assign_rule denominator_note;
+  define varname          / display "Variable"       style(column)=[width=1.2in];
+  define sas_label        / display "Label"          style(column)=[width=1.8in];
+  define vtype            / display "Type"           style(column)=[width=0.4in];
+  define n_levels         / display "N Levels";
+  define stat_route       / display "Stat Route"     style(column)=[width=0.7in];
+  define source_dataset   / display "Source"         style(column)=[width=1.0in];
+  define domain           / display "Domain"         style(column)=[width=0.6in];
+  define domain_rationale / display "Domain Rationale" style(column)=[width=2.0in];
+  define assign_rule      / display "Assign Rule"    style(column)=[width=0.8in];
+  define denominator_note / display "Denominator Note" style(column)=[width=1.8in];
+  by domain varname;
+run;
+title;
+
+/* ---- 9.7 QC sheet --------------------------------------------------------- */
+/* Build work.qc_summary from accumulated macro variables and sentinel_log.    */
+
+/* Per-domain variable counts from g.var_domain_map */
+%let n_d1=0; %let n_d2=0; %let n_d3=0; %let n_d4=0; %let n_d5=0;
+%let n_oos=0; %let n_oos_id=0; %let n_oos_dict=0; %let n_oos_lookup=0;
+%let n_rule_timing=0; %let n_rule_analytic=0; %let n_rule_instrument=0;
+%let n_total_recodes=0;
+%let n_supp_level=0; %let n_supp_nmiss=0; %let n_supp_comp=0; %let n_supp_cont=0;
+
+proc sql noprint;
+  select count(*) into :n_d1           trimmed from g.var_domain_map where domain='D1';
+  select count(*) into :n_d2           trimmed from g.var_domain_map where domain='D2';
+  select count(*) into :n_d3           trimmed from g.var_domain_map where domain='D3';
+  select count(*) into :n_d4           trimmed from g.var_domain_map where domain='D4';
+  select count(*) into :n_d5           trimmed from g.var_domain_map where domain='D5';
+  select count(*) into :n_oos          trimmed from g.var_domain_map where domain='OUT_OF_SCOPE';
+  select count(*) into :n_oos_id       trimmed from g.var_domain_map
+    where domain='OUT_OF_SCOPE' and index(domain_rationale,'identifier') > 0;
+  select count(*) into :n_oos_dict     trimmed from g.var_domain_map
+    where domain='OUT_OF_SCOPE' and index(domain_rationale,'not in PRECEDE dictionary') > 0;
+  select count(*) into :n_oos_lookup   trimmed from g.var_domain_map
+    where domain='OUT_OF_SCOPE' and index(domain_rationale,'not in domain lookup') > 0;
+  select count(*) into :n_rule_timing  trimmed from g.var_domain_map where assign_rule='timing';
+  select count(*) into :n_rule_analytic trimmed from g.var_domain_map where assign_rule='analytic_role';
+  select count(*) into :n_rule_instrument trimmed from g.var_domain_map where assign_rule='instrument';
+  select sum(n_sentinel) into :n_total_recodes trimmed from work.sentinel_log;
+quit;
+
+/* Suppression counts by reason */
+proc sql noprint;
+  select count(*) into :n_supp_level  trimmed from work.freq_d1_display where supp_reason='level_count';
+  select count(*) into :n_supp_nmiss  trimmed from work.freq_d1_display where supp_reason='n_missing';
+  select count(*) into :n_supp_comp   trimmed from work.freq_d1_display where supp_reason='complementary';
+  select count(*) into :n_supp_cont   trimmed from work.means_d1_display where supp_reason='continuous_small_n';
+quit;
+
+/* Accumulate across all domains for suppression by reason */
+%macro count_supp_reason(domain_n=);
+  %local _sl _sn _sc _sk;
+  %let _sl=0; %let _sn=0; %let _sc=0; %let _sk=0;
+  proc sql noprint;
+    select count(*) into :_sl trimmed from work.freq_d&domain_n._display where supp_reason='level_count';
+    select count(*) into :_sn trimmed from work.freq_d&domain_n._display where supp_reason='n_missing';
+    select count(*) into :_sc trimmed from work.freq_d&domain_n._display where supp_reason='complementary';
+    select count(*) into :_sk trimmed from work.means_d&domain_n._display where supp_reason='continuous_small_n';
+  quit;
+  %let n_supp_level = %eval(&n_supp_level + &_sl);
+  %let n_supp_nmiss = %eval(&n_supp_nmiss + &_sn);
+  %let n_supp_comp  = %eval(&n_supp_comp  + &_sc);
+  %let n_supp_cont  = %eval(&n_supp_cont  + &_sk);
+%mend count_supp_reason;
+
+/* Reset and re-accumulate across all 5 domains */
+%let n_supp_level=0; %let n_supp_nmiss=0; %let n_supp_comp=0; %let n_supp_cont=0;
+%count_supp_reason(domain_n=1);
+%count_supp_reason(domain_n=2);
+%count_supp_reason(domain_n=3);
+%count_supp_reason(domain_n=4);
+%count_supp_reason(domain_n=5);
+
+data work.qc_summary;
+  length item $80 value $200;
+  item="Run datetime";          value="%sysfunc(datetime(), datetime20.)";       output;
+  item="Source dataset";        value="work.analysis_base_ext";                  output;
+  item="Source rows";           value="&n_base_rows";                            output;
+  item="Year variable";         value="&year_variable";                          output;
+  item="Years available";       value="&year_list";                              output;
+  item="";                      value="";                                         output;
+  item="Variables D1";          value="&n_d1";                                   output;
+  item="Variables D2";          value="&n_d2";                                   output;
+  item="Variables D3";          value="&n_d3";                                   output;
+  item="Variables D4";          value="&n_d4";                                   output;
+  item="Variables D5";          value="&n_d5";                                   output;
+  item="OUT_OF_SCOPE total";    value="&n_oos";                                  output;
+  item="  -- identifier/key";   value="&n_oos_id";                               output;
+  item="  -- not in dictionary";value="&n_oos_dict";                             output;
+  item="  -- not in lookup";    value="&n_oos_lookup";                           output;
+  item="";                      value="";                                         output;
+  item="Assign_rule timing";    value="&n_rule_timing";                          output;
+  item="Assign_rule analytic_role"; value="&n_rule_analytic";                    output;
+  item="Assign_rule instrument"; value="&n_rule_instrument";                     output;
+  item="";                      value="";                                         output;
+  item="Total sentinel recodes";value="&n_total_recodes";                        output;
+  item="Total suppressed cells";value="&n_suppressed";                           output;
+  item="  -- level_count";      value="&n_supp_level";                           output;
+  item="  -- n_missing";        value="&n_supp_nmiss";                           output;
+  item="  -- complementary";    value="&n_supp_comp";                            output;
+  item="  -- continuous_small_n"; value="&n_supp_cont";                          output;
+  item="D3/frailty denominator note"; value="%sysfunc(symget(D3_DENOM_NOTE))";   output;
+run;
+
+ods excel options(sheet_name="QC" sheet_interval="none");
+title "QC Sheet -- Run Metadata and Validation Counts";
+proc report data=work.qc_summary nowd
+    style(header)=[background=CX0021A5 color=white fontweight=bold]
+    style(column)=[fontsize=9pt];
+  columns item value;
+  define item  / display "Item"  style(column)=[width=2.0in fontweight=bold];
+  define value / display "Value" style(column)=[width=3.0in];
+run;
+title;
+
+/* Per-variable sentinel recode counts on QC sheet (separate table) */
+title "QC Sheet -- Per-Variable Sentinel Recode Counts";
+proc report data=work.sentinel_log nowd
+    style(header)=[background=CX0021A5 color=white fontweight=bold]
+    style(column)=[fontsize=9pt];
+  columns varname sentinel_kind n_sentinel;
+  define varname       / display "Variable"      style(column)=[width=1.5in];
+  define sentinel_kind / display "Sentinel Type" style(column)=[width=1.0in];
+  define n_sentinel    / display "Recode Count";
+run;
+title;
+
+/* Close ODS EXCEL */
+ods excel close;
+%let ods_excel_open = 0;
+ods listing;
+
+%put NOTE: ==== Section 9 complete. Workbook written. ====;
+
+
+/* =========================================================================
+   SECTION 10: QC text artifact
+   -------------------------------------------------------------------------
+   qc\17_summary_stats_by_domain.txt -- machine-readable QC facts
+   No apostrophes or embedded semicolons in any literal string.
+   ========================================================================= */
+
+%put NOTE: ==== Section 10: QC text artifact starting ====;
+
+data _null_;
+  file "&qc_path.\17_summary_stats_by_domain.txt";
+  put "17_summary_stats_by_domain -- QC Artifact";
+  put "Run: %sysfunc(datetime(), datetime20.)";
+  put "=======================================================================";
+  put " ";
+  put "source=work.analysis_base_ext (g.analysis_base + extension columns)";
+  put "source_rows=&n_base_rows";
+  put "year_variable=&year_variable";
+  put "years_available=&year_list";
+  put " ";
+  put "DOMAIN VARIABLE COUNTS";
+  put "D1_variables=&n_d1";
+  put "D2_variables=&n_d2";
+  put "D3_variables=&n_d3";
+  put "D4_variables=&n_d4";
+  put "D5_variables=&n_d5";
+  put "OUT_OF_SCOPE_total=&n_oos";
+  put "OUT_OF_SCOPE_identifier_or_key=&n_oos_id";
+  put "OUT_OF_SCOPE_not_in_dictionary=&n_oos_dict";
+  put "OUT_OF_SCOPE_not_in_domain_lookup=&n_oos_lookup";
+  put " ";
+  put "ASSIGNMENT RULE COUNTS";
+  put "assign_rule_timing=&n_rule_timing";
+  put "assign_rule_analytic_role=&n_rule_analytic";
+  put "assign_rule_instrument=&n_rule_instrument";
+  put " ";
+  put "SENTINEL RECODES";
+  put "total_sentinel_recodes=&n_total_recodes";
+  put " ";
+  put "SUPPRESSION SUMMARY";
+  put "total_suppressed_cells=&n_suppressed";
+  put "suppressed_level_count=&n_supp_level";
+  put "suppressed_n_missing=&n_supp_nmiss";
+  put "suppressed_complementary=&n_supp_comp";
+  put "suppressed_continuous_small_n=&n_supp_cont";
+  put " ";
+  put "D3_FRAILTY_DENOMINATOR_NOTE=&D3_DENOM_NOTE";
+  put " ";
+  put "SUPPRESSION RULE";
+  put "Cells representing &SUPPRESS_MAX or fewer patients are shown as &SUPPRESS_LABEL";
+  put "Continuous blocks at or below that count have ALL statistics suppressed";
+  put " ";
+  put "DENOMINATOR RULE (D-02)";
+  put "Percents computed on non-missing denominator";
+  put "N-missing is reported separately and suppressed on the same rule";
+run;
+
+%put NOTE: ==== Section 10 complete. QC text artifact written. ====;
+
+
+/* =========================================================================
+   SECTION 11: Verify outputs, then restore log
+   -------------------------------------------------------------------------
+   Order matters: %fail_out calls %restore_log internally, so checking
+   outputs AFTER %restore_log is backwards -- the checks must come FIRST.
+   Both deliverables must exist before the log is restored.
+   ========================================================================= */
+
+%put NOTE: ==== Section 11: Output verification starting ====;
+
+%macro check_xlsx;
+  %if %sysfunc(fileexist(%bquote(&qc_path.\17_summary_stats_by_domain.xlsx))) = 0 %then %do;
+    %fail_out(msg=VERIFY FAILED: qc\17_summary_stats_by_domain.xlsx was not created);
+  %end;
+  %put NOTE: [17-S11] VERIFIED: qc\17_summary_stats_by_domain.xlsx exists.;
+%mend check_xlsx;
+
+%macro check_qc_txt;
+  %if %sysfunc(fileexist(%bquote(&qc_path.\17_summary_stats_by_domain.txt))) = 0 %then %do;
+    %fail_out(msg=VERIFY FAILED: qc\17_summary_stats_by_domain.txt was not created);
+  %end;
+  %put NOTE: [17-S11] VERIFIED: qc\17_summary_stats_by_domain.txt exists.;
+%mend check_qc_txt;
+
+%check_xlsx;
+%check_qc_txt;
+
+%put NOTE: ==== Section 11 complete. Both deliverables verified. ====;
+%put NOTE: ==== Phase 17 Wave 3 complete. Proceeding to log restore. ====;
 
 %restore_log;

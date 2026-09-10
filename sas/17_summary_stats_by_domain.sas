@@ -58,6 +58,12 @@
     R12 Denominator note is read with symget, not a quoted macro reference.
     R13 g.var_domain_map carries map_status (INCOMPLETE until all guards
         pass, then REVIEW) and n_dict_matches (tie count for review).
+    R14 Section 4 lookup extended to all 82 dictionary-documented variables
+        from the 2026-09-10 review CSV. Entries whose rationale contains
+        REVIEW are judgement calls for Checkpoint 1. LATITUDE and LONGITUDE
+        are explicitly OUT_OF_SCOPE (privacy_exclusion).
+    R15 Lookup keys are upcased and stripped on load; the join strips the
+        staging varname; a zero-hit lookup fails before GUARD 5.
 ==========================================================================*/
 
 
@@ -1512,6 +1518,9 @@ data work.domain_lookup;
   length varname_u $32 domain $16 assign_rule $20 domain_rationale $200;
   infile datalines dsd dlm=',' truncover;
   input varname_u :$32. domain :$16. assign_rule :$20. domain_rationale :$200.;
+  varname_u   = upcase(strip(varname_u));
+  domain      = upcase(strip(domain));
+  assign_rule = strip(assign_rule);
 datalines;
 AGE_AT_SURGERY,D1,timing,captured at surgery registration; sociodemographic descriptor
 AGE_AT_ENCOUNTER,D1,timing,captured at encounter; sociodemographic descriptor
@@ -1583,6 +1592,76 @@ DISCHARGE_DISPOSITION,D5,analytic_role,disposition known only at discharge
 DISCHARGE_DISPO,D5,analytic_role,disposition known only at discharge
 COMPLICATIONS,D5,analytic_role,postoperative complication status
 ORAL_MORPHINE_EQUIV_MG_POD_DAY6,D5,analytic_role,postoperative opioid use realized after surgery
+ADMIT_SOURCE,D2,timing,admission source known at admission before surgery; encounter context (REVIEW: could be argued D1)
+BASE_PROCEDURE_CODE_1,D4,timing,procedure code assigned at time of operation
+ASA__ANESTH_RECORD_,D2,analytic_role,preoperative risk classification from the anesthesia record; ASA variant
+CHARGES,D5,analytic_role,encounter charges accrue through discharge; realized after surgery (REVIEW: consider excluding from descriptive summary)
+CHARLSON_COMORBIDITY_INDEX,D2,timing,comorbidity burden index computed from preoperative diagnoses
+COGNITIVEDISORDER_YN,D2,timing,cognitive disorder diagnosis flag is a comorbidity not a named instrument; timing rule applies (REVIEW: D3 if treated as cognitive status)
+COMPLICATION_SUM,D5,analytic_role,count of postoperative complications realized after surgery
+DAY_OF_WEEK__CHAR_,D4,timing,day of week of the operative encounter; scheduling characteristic (REVIEW: confirm anchor event)
+DEATH_DATE_Y_N,D5,analytic_role,death indicator realized after surgery
+DIABETES_YN,D2,timing,comorbidity documented in preoperative assessment
+DISCHG_DISPOSITION,D5,analytic_role,disposition known only at discharge
+EDUCATION,D1,timing,recorded at registration; sociodemographic descriptor
+EMPLOYEESTATUS,D1,timing,recorded at registration; sociodemographic descriptor
+FENTANYL_SUBLIMAZE_MG_INTRAOP_TO,D4,timing,total intraoperative opioid dose
+HOLIDAYS,D4,timing,holiday indicator for the operative encounter; scheduling characteristic (REVIEW: confirm anchor event)
+HYDROMORPHONE_MG_INTRAOP_TOTAL,D4,timing,total intraoperative opioid dose
+HYPERLIPIDEMIA_YN,D2,timing,comorbidity documented in preoperative assessment
+HYPERTENSION_YN,D2,timing,comorbidity documented in preoperative assessment
+ICD10_PRINCIPAL_DIAGNOSIS,D2,timing,principal diagnosis is the indication for surgery; preoperative clinical characteristic (REVIEW: coded at discharge)
+ICD10_PRINCIPAL_DIAGNOSIS_DESC,D2,timing,principal diagnosis description; preoperative clinical characteristic (REVIEW: coded at discharge)
+ICU_LOS_TOTAL_TIME_HOURS,D5,analytic_role,ICU length of stay determined postoperatively
+INTRAOP_KETAMINE,D4,timing,intraoperative adjunct administered
+ISO_EXP_INTRAOP_MAC_AVERAGE,D4,timing,average intraoperative volatile anesthetic exposure
+ISO_EXP_INTRAOP_MAC_MINUTES_TOTA,D4,timing,total intraoperative volatile anesthetic exposure minutes
+ISO_EXP_INTRAOP_MAC_TOTAL,D4,timing,total intraoperative volatile anesthetic exposure
+ISO_EXP_INTRAOP_TOTAL,D4,timing,total intraoperative volatile anesthetic exposure
+ISO_SEV_INTRAOP_MAC_AVERAGE,D4,timing,average intraoperative volatile anesthetic exposure (extension column)
+KETAMINE_MG_INTRAOP_TOTAL,D4,timing,total intraoperative ketamine dose
+LATITUDE,OUT_OF_SCOPE,privacy_exclusion,precise geolocation; quasi-identifier not summarised (REVIEW: ZIP-level geography is the D1 locator)
+LONGITUDE,OUT_OF_SCOPE,privacy_exclusion,precise geolocation; quasi-identifier not summarised (REVIEW: ZIP-level geography is the D1 locator)
+LIDOCAINE_MG_INTRAOP_TOTAL,D4,timing,total intraoperative lidocaine dose
+LOS_IN_HOURS,D5,analytic_role,length of stay in hours determined postoperatively
+MOVEMENTDISORDER_YN,D2,timing,comorbidity documented in preoperative assessment
+ORAL_MORPHINE_EQUIV_INTRAOP_TOTA,D4,timing,total intraoperative opioid dose in oral morphine equivalents
+ORAL_MORPHINE_EQUIV_MG_POD_DAY1,D5,analytic_role,postoperative opioid use realized after surgery
+ORAL_MORPHINE_EQUIV_MG_POD_DAY2,D5,analytic_role,postoperative opioid use realized after surgery
+ORAL_MORPHINE_EQUIV_MG_POD_DAY3,D5,analytic_role,postoperative opioid use realized after surgery
+ORAL_MORPHINE_EQUIV_MG_POD_DAY4,D5,analytic_role,postoperative opioid use realized after surgery
+ORAL_MORPHINE_EQUIV_MG_POD_DAY5,D5,analytic_role,postoperative opioid use realized after surgery
+ORAL_MORPHINE_EQUIV_MG_POD_DAY7,D5,analytic_role,postoperative opioid use realized after surgery
+PATIENT_TYPE,D2,timing,encounter type (inpatient or outpatient) set before surgery; encounter context (REVIEW: could be argued D4)
+PREOP_BLOCK,D4,timing,regional block is an anesthetic intervention of the operative episode (REVIEW: name says preop)
+PROPOFOL_MG_INTRAOP_TOTAL,D4,timing,total intraoperative propofol dose
+ROOM_TYPE,D4,timing,room type of the operative encounter (REVIEW: confirm whether OR room or ward room; if ward then D5)
+RT_ADMIT_TO_AN_END_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_AN_START_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_BLOCK_END_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_BLOCK_START_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_DRESS_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_INCISION_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_RM_END_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ADMIT_TO_RM_START_MINS,D4,timing,perioperative process interval anchored on the operative episode
+RT_ANCHOR_TO_ADMIT_DAYS,D4,timing,scheduling interval from anchor to admission (REVIEW: confirm anchor definition)
+RT_ANCHOR_TO_DISCHG_DAYS,D5,analytic_role,interval to discharge realized postoperatively
+RT_ANCHOR_TO_SURGERY_DAYS,D4,timing,scheduling interval from anchor to surgery (REVIEW: confirm anchor definition)
+RT_AN_START_TO_AN_END_MINS,D4,timing,anesthesia duration; intraoperative variable by timing
+RT_BLOCK_START_TO_BLOCK_END_MINS,D4,timing,block duration; intraoperative variable by timing
+RT_INCISE_TO_DRESS_MINS,D4,timing,incision to dressing duration; intraoperative variable by timing
+RT_RM_START_TO_AN_START_MINS,D4,timing,operating room process interval; intraoperative variable by timing
+RT_RM_START_TO_DRESS_MINS,D4,timing,operating room process interval; intraoperative variable by timing
+RT_RM_START_TO_EMERGENCE_MINS,D4,timing,operating room process interval; intraoperative variable by timing
+RT_RM_START_TO_INCISION_MINS,D4,timing,operating room process interval; intraoperative variable by timing
+RT_RM_START_TO_INDUCTION_MINS,D4,timing,operating room process interval; intraoperative variable by timing
+RT_RM_START_TO_RM_END_MINS,D4,timing,operating room time; intraoperative variable by timing
+SERVICE,D4,timing,surgical service recorded at time of operation
+SEV_EXP_INTRAOP_TOTAL,D4,timing,total intraoperative volatile anesthetic exposure
+SLEEP_APNEA_YN,D2,timing,comorbidity documented in preoperative assessment
+SSDI_DEATH_DATE_Y_N,D5,analytic_role,death indicator from SSDI realized after surgery
+SUFENTANIL_MG_INTRAOP_TOTAL,D4,timing,total intraoperative opioid dose
+WEEKEND_INDICATOR,D4,timing,weekend indicator for the operative encounter; scheduling characteristic (REVIEW: confirm anchor event)
 ;
 run;
 
@@ -1610,6 +1689,29 @@ proc sql noprint;
   select count(*) into :n_stg3 trimmed from work.domain_staging3;
 quit;
 
+/* The lookup must actually hit. A run where every lookup key fails to     */
+/* match (encoding, stray whitespace, empty DATALINES) would otherwise show */
+/* up only as GUARD 5 listing variables that ARE in the lookup.             */
+%let n_lookup_rows = 0;
+%let n_lookup_hits = 0;
+proc sql noprint;
+  select count(*) into :n_lookup_rows trimmed from work.domain_lookup;
+  select count(*) into :n_lookup_hits trimmed
+  from work.domain_staging3 as ds
+  where upcase(strip(ds.varname)) in (select varname_u from work.domain_lookup);
+quit;
+
+%macro check_lookup_hits;
+  %if &n_lookup_rows = 0 %then %do;
+    %fail_out(msg=work.domain_lookup has no rows -- the DATALINES block did not load);
+  %end;
+  %if &n_lookup_hits = 0 %then %do;
+    %fail_out(msg=No variable in domain_staging3 matched any of the &n_lookup_rows lookup keys -- inspect work.domain_lookup varname_u values in the log before adding entries);
+  %end;
+  %put NOTE: [17-S4] Lookup loaded &n_lookup_rows keys; &n_lookup_hits staging rows match a key.;
+%mend check_lookup_hits;
+%check_lookup_hits;
+
 /* Apply the lookup. The ON clause scopes the join to rows that are not     */
 /* already OUT_OF_SCOPE, so identifier exclusions are not overridden.       */
 proc sql;
@@ -1620,7 +1722,7 @@ proc sql;
            coalesce(dl.assign_rule,      ds.assign_rule)      as rule_final      length=20
     from work.domain_staging3 as ds
     left join work.domain_lookup as dl
-      on upcase(ds.varname) = dl.varname_u
+      on upcase(strip(ds.varname)) = dl.varname_u
      and ds.domain not in ('OUT_OF_SCOPE');
 quit;
 

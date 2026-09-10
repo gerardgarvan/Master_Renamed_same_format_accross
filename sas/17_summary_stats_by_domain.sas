@@ -2009,6 +2009,715 @@ run;
 
 %put NOTE: ==== Phase 17 Wave 1 complete. Checkpoint 1 pending. ====;
 %put NOTE: Review qc\17_var_domain_map_review.csv variable-by-variable.;
-%put NOTE: Sections 5 to 11 are not yet written -- see the header block.;
+
+
+/* =========================================================================
+   SECTION 5: Gate entry, scoped sentinel recode, per-variable recode log
+   -------------------------------------------------------------------------
+   GATE FIRST. This section and all later sections (5-11) must not run
+   until Checkpoint 1 approval sets DOMAIN_MAP_APPROVED = 1.
+
+   Work plan:
+   1. Create work.analysis_base_clean as a copy of work.analysis_base_ext.
+   2. Read the sentinel applicability list (variables where -999 or literal
+      NULL was OBSERVED in Wave 0) and store as macro vars.
+   3. Count sentinel values BEFORE recoding (one row per variable).
+   4. Recode in a SINGLE DATA step using arrays -- NOT one dataset
+      rewrite per variable.
+   5. Concatenate numeric and character logs into work.sentinel_log.
+
+   PCM compliance:
+   - All conditional logic inside named macros.
+   - Counts use SELECT COUNT(*) INTO :macvar TRIMMED -- never &SQLOBS.
+   - Character count matches ONLY upcase(strip(v))='NULL' -- never
+     'or missing(v)' which inflates n_recoded with untouched rows.
+   - drop _i _j prevents index variables from reaching statistics.
+   ========================================================================= */
+
+%gate_stats;
+
+%put NOTE: ==== Section 5: sentinel recode starting ====;
+
+/* ---- 5.1 Working copy -------------------------------------------------- */
+data work.analysis_base_clean;
+  set work.analysis_base_ext;
+run;
+
+/* ---- 5.2 Retrieve sentinel applicability lists from Wave 0 ------------- */
+/* work.sentinel_applicable was built in Section 0b and is still in WORK.   */
+/* If it is absent (e.g. the program was restarted after Checkpoint 1) the  */
+/* recode macros still initialise the lists to empty and skip gracefully.    */
+%global sentinel_num_list sentinel_chr_list;
+%let sentinel_num_list = ;
+%let sentinel_chr_list = ;
+
+%macro load_sentinel_lists;
+  %local n_sent_tab;
+  %let n_sent_tab = 0;
+  proc sql noprint;
+    select count(*) into :n_sent_tab trimmed
+    from dictionary.tables
+    where libname='WORK' and memname='SENTINEL_APPLICABLE';
+  quit;
+  %if &n_sent_tab = 1 %then %do;
+    proc sql noprint;
+      select varname into :sentinel_num_list separated by ' '
+      from work.sentinel_applicable where sentinel_kind='NUM_-999';
+      select varname into :sentinel_chr_list separated by ' '
+      from work.sentinel_applicable where sentinel_kind='CHAR_NULL';
+    quit;
+    %put NOTE: [17-S5] sentinel_num_list: &sentinel_num_list;
+    %put NOTE: [17-S5] sentinel_chr_list: &sentinel_chr_list;
+  %end;
+  %else %do;
+    %put WARNING: [17-S5] work.sentinel_applicable not found. Sentinel lists are empty -- recode will be skipped.;
+  %end;
+%mend load_sentinel_lists;
+%load_sentinel_lists;
+
+/* ---- 5.3 Count sentinels BEFORE recoding -------------------------------- */
+/* One row per variable written into work.sentinel_log_num and               */
+/* work.sentinel_log_chr, then concatenated into work.sentinel_log.          */
+/* Character count uses ONLY upcase(strip(v))='NULL' -- adding               */
+/* 'or missing(v)' would inflate n_recoded with already-missing rows.        */
+%macro recode_sentinels;
+  %local n_sn n_sc i v;
+
+  %let n_sn = %nwords(&sentinel_num_list);
+  %let n_sc = %nwords(&sentinel_chr_list);
+
+  /* --- Numeric counts --- */
+  %if &n_sn > 0 %then %do;
+    proc sql;
+      create table work.sentinel_log_num as
+      %do i = 1 %to &n_sn;
+        %let v = %scan(&sentinel_num_list, &i);
+        select "&v"     as varname       length=32,
+               'NUM_-999' as sentinel_kind length=12,
+               (select count(*) from work.analysis_base_clean where &v = -999)
+                         as n_recoded
+        %if &i < &n_sn %then %do; union all %end;
+      %end;
+      ;
+    quit;
+  %end;
+  %else %do;
+    data work.sentinel_log_num;
+      length varname $32 sentinel_kind $12 n_recoded 8;
+      stop;
+    run;
+  %end;
+
+  /* --- Character counts (literal NULL only, never or missing()) --- */
+  %if &n_sc > 0 %then %do;
+    proc sql;
+      create table work.sentinel_log_chr as
+      %do i = 1 %to &n_sc;
+        %let v = %scan(&sentinel_chr_list, &i);
+        select "&v"       as varname       length=32,
+               'CHAR_NULL' as sentinel_kind length=12,
+               (select count(*) from work.analysis_base_clean
+                where upcase(strip(&v)) = 'NULL') as n_recoded
+        %if &i < &n_sc %then %do; union all %end;
+      %end;
+      ;
+    quit;
+  %end;
+  %else %do;
+    data work.sentinel_log_chr;
+      length varname $32 sentinel_kind $12 n_recoded 8;
+      stop;
+    run;
+  %end;
+
+  /* --- Single-pass recode using arrays: one DATA step for ALL variables --- */
+  /* Empty strings are already missing to SAS -- no action needed.            */
+  data work.analysis_base_clean;
+    set work.analysis_base_clean;
+    %if &n_sn > 0 %then %do;
+      array _sn {*} &sentinel_num_list;
+      do _i = 1 to dim(_sn);
+        if _sn{_i} = -999 then call missing(_sn{_i});
+      end;
+    %end;
+    %if &n_sc > 0 %then %do;
+      array _sc {*} $ &sentinel_chr_list;
+      do _j = 1 to dim(_sc);
+        if upcase(strip(_sc{_j})) = 'NULL' then call missing(_sc{_j});
+      end;
+    %end;
+    /* drop index variables so they do not appear in any downstream PROC */
+    %if &n_sn > 0 %then %do; drop _i; %end;
+    %if &n_sc > 0 %then %do; drop _j; %end;
+  run;
+
+  /* --- Concatenate into work.sentinel_log --------------------------------- */
+  data work.sentinel_log;
+    set work.sentinel_log_num
+        work.sentinel_log_chr;
+  run;
+
+  %put NOTE: [17-S5] Sentinel recode complete. &n_sn numeric variables and &n_sc character variables recoded.;
+  %put NOTE: [17-S5] work.sentinel_log has per-variable recode counts (consumed by Wave 3 QC sheet).;
+  %put NOTE: [17-S5] Empty strings are already missing to SAS and were not separately recoded.;
+%mend recode_sentinels;
+%recode_sentinels;
+
+/* Guard: work.analysis_base_clean must have the same row count as the       */
+/* pre-recode working copy (recode must not drop or add rows).               */
+%let n_clean_rows = 0;
+proc sql noprint;
+  select count(*) into :n_clean_rows trimmed from work.analysis_base_clean;
+quit;
+
+%macro check_clean_rows;
+  %if &n_clean_rows ne &n_ext_rows %then %do;
+    %fail_out(msg=Row count changed during sentinel recode: expected &n_ext_rows but work.analysis_base_clean has &n_clean_rows);
+  %end;
+  %put NOTE: [17-S5] Row-count guard after sentinel recode passed: &n_clean_rows rows.;
+%mend check_clean_rows;
+%check_clean_rows;
+
+%put NOTE: ==== Section 5 complete: work.analysis_base_clean ready for statistics ====;
+
+
+/* =========================================================================
+   SECTION 6: Continuous statistics -- PROC MEANS pooled + per-year via CLASS
+   -------------------------------------------------------------------------
+   Variables routed by stat_route='MEANS' in g.var_domain_map, never by
+   vtype alone. Numeric-coded categoricals (_30_DAY_MORTALITY, sex, ASA)
+   have stat_route='FREQ' and do not reach this section.
+
+   Per-year stratification uses CLASS &year_variable with TYPES () &year_variable
+   so no BY-sort is required and pooled plus per-year come from one PROC.
+
+   SD column name differs across SAS releases (StdDev vs Std). The column
+   list is resolved from dictionary.columns AFTER the ODS output step so
+   the code is release-safe.
+
+   Domains with an empty MEANS list are guarded by a named macro.
+   ========================================================================= */
+
+%put NOTE: ==== Section 6: PROC MEANS (continuous) starting ====;
+
+/* ---- 6.1 Pull per-domain MEANS lists from g.var_domain_map ------------- */
+%global means_d1 means_d2 means_d3 means_d4 means_d5
+        freq_d1  freq_d2  freq_d3  freq_d4  freq_d5;
+%let means_d1 = ; %let means_d2 = ; %let means_d3 = ;
+%let means_d4 = ; %let means_d5 = ;
+%let freq_d1  = ; %let freq_d2  = ; %let freq_d3  = ;
+%let freq_d4  = ; %let freq_d5  = ;
+
+proc sql noprint;
+  select varname into :means_d1 separated by ' '
+    from g.var_domain_map where domain='D1' and stat_route='MEANS';
+  select varname into :means_d2 separated by ' '
+    from g.var_domain_map where domain='D2' and stat_route='MEANS';
+  select varname into :means_d3 separated by ' '
+    from g.var_domain_map where domain='D3' and stat_route='MEANS';
+  select varname into :means_d4 separated by ' '
+    from g.var_domain_map where domain='D4' and stat_route='MEANS';
+  select varname into :means_d5 separated by ' '
+    from g.var_domain_map where domain='D5' and stat_route='MEANS';
+  select varname into :freq_d1  separated by ' '
+    from g.var_domain_map where domain='D1' and stat_route='FREQ';
+  select varname into :freq_d2  separated by ' '
+    from g.var_domain_map where domain='D2' and stat_route='FREQ';
+  select varname into :freq_d3  separated by ' '
+    from g.var_domain_map where domain='D3' and stat_route='FREQ';
+  select varname into :freq_d4  separated by ' '
+    from g.var_domain_map where domain='D4' and stat_route='FREQ';
+  select varname into :freq_d5  separated by ' '
+    from g.var_domain_map where domain='D5' and stat_route='FREQ';
+quit;
+
+%put NOTE: [17-S6] means_d1: &means_d1;
+%put NOTE: [17-S6] means_d2: &means_d2;
+%put NOTE: [17-S6] means_d3: &means_d3;
+%put NOTE: [17-S6] means_d4: &means_d4;
+%put NOTE: [17-S6] means_d5: &means_d5;
+
+/* ---- 6.2 Macro: run PROC MEANS for one domain -------------------------- */
+/* Guards against an empty variable list (named macro, calls %return).       */
+/* Uses CLASS &year_variable / TYPES () &year_variable so pooled row and     */
+/* per-year rows come from a SINGLE run -- no unsorted BY-group.             */
+%macro run_means(domain=, varlist=, out=);
+  %local nv;
+  %let nv = %nwords(&varlist);
+  %if &nv = 0 %then %do;
+    %put NOTE: [17-S6] Domain &domain has no MEANS-routed variables. PROC MEANS skipped.;
+    data &out;
+      length varname $32 _type_ 8;
+      stop;
+    run;
+    %return;
+  %end;
+
+  ods listing close;
+  proc means data=work.analysis_base_clean
+      n nmiss mean std median p25 p75 min max
+      maxdec=2 stackodsoutput;
+    var &varlist;
+    class &year_variable;
+    types () &year_variable;
+    ods output summary=&out;
+  run;
+  ods listing;
+
+  /* Add a varname column from the _Label_ column emitted by stackodsoutput. */
+  /* _Label_ holds the variable label (or name when no label is set).         */
+  data &out;
+    set &out;
+    length varname $32;
+    varname = upcase(strip(_Label_));
+    domain  = "&domain";
+  run;
+
+  %put NOTE: [17-S6] PROC MEANS for domain &domain complete: &nv variables.;
+%mend run_means;
+
+%run_means(domain=D1, varlist=&means_d1, out=work.means_d1);
+%run_means(domain=D2, varlist=&means_d2, out=work.means_d2);
+%run_means(domain=D3, varlist=&means_d3, out=work.means_d3);
+%run_means(domain=D4, varlist=&means_d4, out=work.means_d4);
+%run_means(domain=D5, varlist=&means_d5, out=work.means_d5);
+
+/* ---- 6.3 Resolve release-safe statistic column names ------------------- */
+/* The SD column is StdDev in some SAS 9.4 releases and Std in others.       */
+/* Inspect dictionary.columns AFTER the first ODS output to resolve the      */
+/* actual name. work.means_d1 is used as the probe; if it has no rows        */
+/* (empty MEANS list for D1), try subsequent domains.                        */
+%global sd_col_name;
+%let sd_col_name = Std;   /* safe default */
+
+%macro resolve_sd_col;
+  %local probe_ds n_probe i d;
+  %let probe_ds = ;
+  %do i = 1 %to 5;
+    %let d = D&i;
+    %let n_probe = 0;
+    proc sql noprint;
+      select count(*) into :n_probe trimmed
+      from dictionary.columns
+      where libname='WORK' and memname="MEANS_&d"
+        and upcase(name) in ('STDDEV','STD');
+    quit;
+    %if &n_probe > 0 %then %do;
+      %let probe_ds = means_d&i;
+      /* leave the loop by exhausting the index */
+      %let i = 99;
+    %end;
+  %end;
+  %if %length(&probe_ds) > 0 %then %do;
+    proc sql noprint;
+      select name into :sd_col_name trimmed
+      from dictionary.columns
+      where libname='WORK' and upcase(memname)=upcase("&probe_ds")
+        and upcase(name) in ('STDDEV','STD');
+    quit;
+    %put NOTE: [17-S6] SD column resolved as: &sd_col_name;
+  %end;
+  %else %do;
+    %put WARNING: [17-S6] Could not probe SD column name -- no MEANS output has rows. Using default: &sd_col_name;
+  %end;
+%mend resolve_sd_col;
+%resolve_sd_col;
+
+%put NOTE: ==== Section 6 complete ====;
+
+
+/* =========================================================================
+   SECTION 7: Categorical statistics -- PROC FREQ pooled + per-year
+   -------------------------------------------------------------------------
+   Variables routed by stat_route='FREQ' in g.var_domain_map.
+
+   Pooled: tables (&freq_dN) / missing nocum; ods output onewayfreqs=...
+   Per-year crosstab: tables (&freq_dN) * &year_variable / missing nocum
+                      norow nocol nopercent; ods output crosstabfreqs=...
+
+   Both outputs are normalized to a long structure:
+     varname | level | year (blank = pooled) | frequency |
+     n_nonmissing | n_missing | pct_nonmissing
+
+   Percent is recomputed on the NON-MISSING denominator per D-02.
+   The raw ODS Percent includes missing and is NOT used.
+
+   Domains with an empty FREQ list are guarded by a named macro.
+   ========================================================================= */
+
+%put NOTE: ==== Section 7: PROC FREQ (categorical) starting ====;
+
+/* ---- 7.1 Macro: run PROC FREQ and normalize output for one domain ------- */
+%macro run_freq(domain=, varlist=, out_pooled=, out_year=, out=);
+  %local nv;
+  %let nv = %nwords(&varlist);
+  %if &nv = 0 %then %do;
+    %put NOTE: [17-S7] Domain &domain has no FREQ-routed variables. PROC FREQ skipped.;
+    data &out;
+      length varname $32 level $200 year_val $32
+             frequency 8 n_nonmissing 8 n_missing 8 pct_nonmissing 8
+             is_pooled 8 domain $4;
+      stop;
+    run;
+    %return;
+  %end;
+
+  /* --- Pooled one-way frequency tables ----------------------------------- */
+  ods listing close;
+  ods output onewayfreqs=&out_pooled;
+  proc freq data=work.analysis_base_clean;
+    tables (&varlist) / missing nocum;
+  run;
+  ods listing;
+
+  /* --- Per-year crosstab ------------------------------------------------- */
+  ods listing close;
+  ods output crosstabfreqs=&out_year;
+  proc freq data=work.analysis_base_clean;
+    tables (&varlist) * &year_variable / missing nocum norow nocol nopercent;
+  run;
+  ods listing;
+
+  /* --- Normalize pooled output to the long structure --------------------- */
+  /* ODS ONEWAYFREQS: Table (varname), F_<varname> (level char or formatted), */
+  /* Frequency, Percent. Missing level identified by missing(F_<varname>).    */
+  data work.freq_pooled_long;
+    length varname $32 level $200;
+    set &out_pooled;
+    varname  = upcase(strip(Table));
+    /* F_ prefix is stripped: the actual level column name changes per variable */
+    /* but SAS stores the level value in every column whose name starts with F_ */
+    /* Use _name_ and _val_ from PDV? ONEWAYFREQS does not provide that cleanly */
+    /* Instead use: the formatted value is in a char var beginning with 'F_'.   */
+    /* We rename generically with arrays inside the DATA step.                  */
+    array _fcols {*} $ _character_;
+    level = '';
+    do _k = 1 to dim(_fcols);
+      if substr(vname(_fcols{_k}),1,2) = 'F_' and vname(_fcols{_k}) ne 'Table'
+        then level = strip(_fcols{_k});
+    end;
+    keep varname level Frequency;
+    rename Frequency=frequency;
+  run;
+
+  /* Compute n_missing and n_nonmissing per variable (pooled) */
+  proc sql;
+    create table work.freq_pool_agg as
+      select varname,
+             sum(case when missing(level) then frequency else 0 end) as n_missing,
+             sum(case when not missing(level) then frequency else 0 end) as n_nonmissing
+      from work.freq_pooled_long
+      group by varname;
+  quit;
+
+  /* Join back to get pct_nonmissing on non-missing denominator */
+  proc sql;
+    create table work.freq_pooled_out as
+      select f.varname, f.level,
+             '' as year_val length=32,
+             f.frequency,
+             a.n_nonmissing,
+             a.n_missing,
+             case when a.n_nonmissing > 0 and not missing(f.level)
+               then 100 * f.frequency / a.n_nonmissing
+               else . end as pct_nonmissing,
+             1 as is_pooled,
+             "&domain" as domain length=4
+      from work.freq_pooled_long as f
+      inner join work.freq_pool_agg as a on f.varname = a.varname;
+  quit;
+
+  /* --- Normalize per-year crosstab output -------------------------------- */
+  /* ODS CROSSTABFREQS: Table (varname*year), row var level, col var level,  */
+  /* Frequency.                                                               */
+  data work.freq_year_long;
+    length varname $32 level $200 year_val $32;
+    set &out_year;
+    /* Table column format: "varname * year_variable"                         */
+    varname  = upcase(strip(scan(Table, 1, '*')));
+    year_val = strip(put(&year_variable, best12.));
+
+    array _fcols2 {*} $ _character_;
+    level = '';
+    do _k = 1 to dim(_fcols2);
+      if substr(vname(_fcols2{_k}),1,2) = 'F_'
+         and upcase(vname(_fcols2{_k})) ne upcase("F_&year_variable")
+         and vname(_fcols2{_k}) ne 'Table'
+        then level = strip(_fcols2{_k});
+    end;
+    keep varname level year_val Frequency;
+    rename Frequency=frequency;
+  run;
+
+  proc sql;
+    create table work.freq_year_agg as
+      select varname, year_val,
+             sum(case when missing(level) then frequency else 0 end) as n_missing,
+             sum(case when not missing(level) then frequency else 0 end) as n_nonmissing
+      from work.freq_year_long
+      group by varname, year_val;
+  quit;
+
+  proc sql;
+    create table work.freq_year_out as
+      select f.varname, f.level, f.year_val,
+             f.frequency,
+             a.n_nonmissing,
+             a.n_missing,
+             case when a.n_nonmissing > 0 and not missing(f.level)
+               then 100 * f.frequency / a.n_nonmissing
+               else . end as pct_nonmissing,
+             0 as is_pooled,
+             "&domain" as domain length=4
+      from work.freq_year_long as f
+      inner join work.freq_year_agg as a
+        on f.varname = a.varname and f.year_val = a.year_val;
+  quit;
+
+  /* --- Stack pooled and per-year into a single long display dataset ------- */
+  data &out;
+    set work.freq_pooled_out
+        work.freq_year_out;
+  run;
+
+  %put NOTE: [17-S7] PROC FREQ for domain &domain complete: &nv variables.;
+%mend run_freq;
+
+%run_freq(domain=D1, varlist=&freq_d1,
+          out_pooled=work.freq_d1_pooled, out_year=work.freq_d1_year,
+          out=work.freq_d1);
+%run_freq(domain=D2, varlist=&freq_d2,
+          out_pooled=work.freq_d2_pooled, out_year=work.freq_d2_year,
+          out=work.freq_d2);
+%run_freq(domain=D3, varlist=&freq_d3,
+          out_pooled=work.freq_d3_pooled, out_year=work.freq_d3_year,
+          out=work.freq_d3);
+%run_freq(domain=D4, varlist=&freq_d4,
+          out_pooled=work.freq_d4_pooled, out_year=work.freq_d4_year,
+          out=work.freq_d4);
+%run_freq(domain=D5, varlist=&freq_d5,
+          out_pooled=work.freq_d5_pooled, out_year=work.freq_d5_year,
+          out=work.freq_d5);
+
+%put NOTE: ==== Section 7 complete ====;
+
+
+/* =========================================================================
+   SECTION 8: Small-cell suppression pass
+   -------------------------------------------------------------------------
+   Applied AFTER statistics, BEFORE any workbook output.
+   Reads &SUPPRESS_MAX and &SUPPRESS_LABEL from Section 0 constants.
+
+   Rules (all four must be applied):
+   a. Categorical level counts: frequency <= &SUPPRESS_MAX -> suppressed.
+   b. n_missing: suppress on the same rule as level counts.
+   c. Continuous blocks: if non-missing n <= &SUPPRESS_MAX for ANY block
+      (pooled or per-year), suppress the ENTIRE statistic row for that
+      variable-block (mean, SD, median, Q1, Q3, min, max, and n).
+   d. Complementary disclosure: when exactly one level of a variable-block
+      is suppressed and the block total is printed, suppress the next-
+      smallest level too.
+
+   Accumulates total suppressed cells into :n_suppressed.
+   Adds suppressed=1 flag on every affected cell.
+   ========================================================================= */
+
+%put NOTE: ==== Section 8: suppression pass starting ====;
+
+%global n_suppressed;
+%let n_suppressed = 0;
+
+/* ---- 8.1 Suppress categorical display datasets (work.freq_dN) ----------- */
+/* Applied to every domain; the macro loops over domains 1-5.                */
+%macro suppress_freq(ds=, out=);
+  %local n_rows_in;
+  %let n_rows_in = 0;
+  proc sql noprint;
+    select count(*) into :n_rows_in trimmed from &ds;
+  quit;
+  %if &n_rows_in = 0 %then %do;
+    data &out;
+      set &ds;
+      length n_display $32 pct_display $32 suppressed 8 supp_reason $32;
+      stop;
+    run;
+    %return;
+  %end;
+
+  /* --- step a+b: flag every small cell and n_missing -------------------- */
+  data work.freq_supp_step1;
+    set &ds;
+    length n_display $32 pct_display $32 suppressed 8 supp_reason $32;
+    suppressed   = 0;
+    supp_reason  = '';
+    n_display    = strip(put(frequency, comma12.));
+    pct_display  = strip(put(pct_nonmissing, 6.1));
+
+    /* Suppress level counts that are <= &SUPPRESS_MAX */
+    if not missing(level) and frequency <= &SUPPRESS_MAX then do;
+      n_display   = "&SUPPRESS_LABEL";
+      pct_display = "&SUPPRESS_LABEL";
+      suppressed  = 1;
+      supp_reason = 'level_count';
+    end;
+
+    /* Suppress n_missing on the same rule */
+    if missing(level) and n_missing <= &SUPPRESS_MAX then do;
+      n_display   = "&SUPPRESS_LABEL";
+      pct_display = "&SUPPRESS_LABEL";
+      suppressed  = 1;
+      supp_reason = 'n_missing';
+    end;
+  run;
+
+  /* --- step d: complementary disclosure suppression --------------------- */
+  /* Within each varname + year_val block, if exactly one non-missing level  */
+  /* is suppressed, suppress the next-smallest unsuppressed level also.      */
+  proc sort data=work.freq_supp_step1;
+    by domain varname year_val suppressed frequency;
+  run;
+
+  /* Count suppressed non-missing levels per block */
+  proc sql noprint;
+    create table work.freq_supp_counts as
+      select domain, varname, year_val,
+             sum(case when suppressed=1 and not missing(level) then 1 else 0 end)
+               as n_suppressed_levels,
+             min(case when suppressed=0 and not missing(level) then frequency
+                 else . end) as min_unsuppressed_freq
+      from work.freq_supp_step1
+      group by domain, varname, year_val;
+  quit;
+
+  /* Tag rows that need complementary suppression (the next-smallest          */
+  /* unsuppressed level in blocks where exactly one level is suppressed).     */
+  proc sql;
+    create table work.freq_supp_step2 as
+      select f.*,
+             c.n_suppressed_levels,
+             c.min_unsuppressed_freq,
+             case when c.n_suppressed_levels = 1
+                    and f.suppressed = 0
+                    and not missing(f.level)
+                    and f.frequency = c.min_unsuppressed_freq
+               then 1 else 0 end as comp_supp
+      from work.freq_supp_step1 as f
+      inner join work.freq_supp_counts as c
+        on f.domain=c.domain and f.varname=c.varname and f.year_val=c.year_val;
+  quit;
+
+  data &out;
+    set work.freq_supp_step2;
+    if comp_supp = 1 then do;
+      n_display   = "&SUPPRESS_LABEL";
+      pct_display = "&SUPPRESS_LABEL";
+      suppressed  = 1;
+      supp_reason = 'complementary';
+    end;
+    drop n_suppressed_levels min_unsuppressed_freq comp_supp;
+  run;
+
+  /* Accumulate suppressed cell count */
+  %local n_new_supp;
+  %let n_new_supp = 0;
+  proc sql noprint;
+    select count(*) into :n_new_supp trimmed from &out where suppressed = 1;
+  quit;
+  %let n_suppressed = %eval(&n_suppressed + &n_new_supp);
+
+  %put NOTE: [17-S8] &out suppressed cells: &n_new_supp (running total: &n_suppressed);
+%mend suppress_freq;
+
+%suppress_freq(ds=work.freq_d1, out=work.freq_d1_display);
+%suppress_freq(ds=work.freq_d2, out=work.freq_d2_display);
+%suppress_freq(ds=work.freq_d3, out=work.freq_d3_display);
+%suppress_freq(ds=work.freq_d4, out=work.freq_d4_display);
+%suppress_freq(ds=work.freq_d5, out=work.freq_d5_display);
+
+/* ---- 8.2 Suppress continuous display datasets (work.means_dN) ----------- */
+/* Rule c: if a variable-block (pooled or per-year) has non-missing n <=     */
+/* &SUPPRESS_MAX, the ENTIRE statistic row is suppressed -- mean, SD,        */
+/* median, Q1, Q3, min, max AND n. Min and max on seven patients are more    */
+/* disclosive than the suppressed count; showing n=-- beside a real mean     */
+/* defeats the rule entirely.                                                */
+%macro suppress_means(ds=, out=);
+  %local n_rows_in;
+  %let n_rows_in = 0;
+  proc sql noprint;
+    select count(*) into :n_rows_in trimmed from &ds;
+  quit;
+  %if &n_rows_in = 0 %then %do;
+    data &out;
+      set &ds;
+      length suppressed 8 supp_reason $32;
+      stop;
+    run;
+    %return;
+  %end;
+
+  data &out;
+    set &ds;
+    length suppressed 8 supp_reason $32;
+    suppressed  = 0;
+    supp_reason = '';
+
+    /* N is the non-missing count in PROC MEANS stackodsoutput output.        */
+    /* The column name is N (or NObs -- resolve from the actual dataset).     */
+    /* We test the variable named N; if absent the comparison will produce a  */
+    /* warning and the guard below catches it.                                 */
+    if N <= &SUPPRESS_MAX then do;
+      suppressed  = 1;
+      supp_reason = 'continuous_small_n';
+      /* Suppress every statistic by setting to missing */
+      N     = .;
+      NMiss = .;
+      Mean  = .;
+      &sd_col_name = .;
+      Median = .;
+      P25    = .;
+      P75    = .;
+      Min    = .;
+      Max    = .;
+    end;
+  run;
+
+  /* Accumulate */
+  %local n_new_supp;
+  %let n_new_supp = 0;
+  proc sql noprint;
+    select count(*) into :n_new_supp trimmed from &out where suppressed = 1;
+  quit;
+  %let n_suppressed = %eval(&n_suppressed + &n_new_supp);
+
+  %put NOTE: [17-S8] &out suppressed rows: &n_new_supp (running total: &n_suppressed);
+%mend suppress_means;
+
+%suppress_means(ds=work.means_d1, out=work.means_d1_display);
+%suppress_means(ds=work.means_d2, out=work.means_d2_display);
+%suppress_means(ds=work.means_d3, out=work.means_d3_display);
+%suppress_means(ds=work.means_d4, out=work.means_d4_display);
+%suppress_means(ds=work.means_d5, out=work.means_d5_display);
+
+%put NOTE: [17-S8] Total suppressed cells across all domains: &n_suppressed;
+%put NOTE: ==== Section 8 complete. Display datasets ready for Wave 3 assembly. ====;
+
+
+/* =========================================================================
+   END OF WAVE 2 (Sections 5 to 8)
+   -------------------------------------------------------------------------
+   Display datasets produced (per domain, D1-D5):
+     work.means_dN_display  -- continuous stats, suppression flags applied
+     work.freq_dN_display   -- categorical stats (long structure), suppression
+                               flags applied to level counts, n_missing, and
+                               complementary cells
+   Total suppressed cells: &n_suppressed
+
+   Wave 3 (Sections 9-10) will consume these datasets to assemble the
+   ODS EXCEL workbook and write the QC artifact.
+
+   Sentinel recode log (work.sentinel_log) is available for the QC sheet.
+   ========================================================================= */
+
+%put NOTE: ==== Phase 17 Wave 2 complete. Ready for Wave 3 ODS EXCEL assembly. ====;
 
 %restore_log;

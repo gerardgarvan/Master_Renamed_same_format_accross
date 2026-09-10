@@ -113,6 +113,11 @@
         COGNITIVE_DISORDER (extension) is a strict subset of
         COGNITIVEDISORDER_YN (11 of 144 Y) and is now OUT_OF_SCOPE as
         redundant.
+    R21 ext_candidates concept filter upcased (2026-09-10): index() is
+        case-sensitive -- Cognitive_Score and Cognitive_Category were
+        silently excluded because the filter searched for 'COGNI' in
+        mixed-case column names. All index() calls now wrap upcase(m.name);
+        prxmatch pattern gains /i flag for consistency.
 ==========================================================================*/
 
 
@@ -549,19 +554,19 @@ proc sql;
     where m.name not in (select name from work.cols_base)
       and m.name ne 'PRECEDE_STUDY_ID_1'   /* md6 duplicate -- pitfall 5 */
       and (
-            index(m.name,'FRAIL')          > 0
-         or index(m.name,'COGNI')          > 0
-         or index(m.name,'FEELS')          > 0
-         or index(m.name,'WEIGHT_LOSS')    > 0
-         or index(m.name,'GRIP')           > 0
-         or index(m.name,'WALK')           > 0
-         or index(m.name,'PHYSICAL_ACTIV') > 0
-         or index(m.name,'ABP')            > 0
-         or index(m.name,'BIS_')           > 0
-         or index(m.name,'NIBP')           > 0
-         or index(m.name,'MIDAZOLAM')      > 0
-         or prxmatch('/(^|_)MAC(_|$)/', strip(m.name)) > 0
-         or index(m.name,'ISO_SEV')        > 0
+            index(upcase(m.name),'FRAIL')          > 0
+         or index(upcase(m.name),'COGNI')          > 0
+         or index(upcase(m.name),'FEELS')          > 0
+         or index(upcase(m.name),'WEIGHT_LOSS')    > 0
+         or index(upcase(m.name),'GRIP')           > 0
+         or index(upcase(m.name),'WALK')           > 0
+         or index(upcase(m.name),'PHYSICAL_ACTIV') > 0
+         or index(upcase(m.name),'ABP')            > 0
+         or index(upcase(m.name),'BIS_')           > 0
+         or index(upcase(m.name),'NIBP')           > 0
+         or index(upcase(m.name),'MIDAZOLAM')      > 0
+         or prxmatch('/(^|_)MAC(_|$)/i', strip(m.name)) > 0
+         or index(upcase(m.name),'ISO_SEV')        > 0
       );
 quit;
 

@@ -21,7 +21,8 @@
             g.master_data_merged       (read-only)
             docs\precede_dictionary.csv
 
-  Author  : 2026-09-03
+  Created : 2026-09-03
+  Revised : 2026-09-10  (review fixes -- see REVISION NOTES)
 
   PCM compliance:
     - No bare open-code %IF or %DO (all conditional logic inside named macros)
@@ -32,6 +33,31 @@
       query leaves an empty macro variable rather than an unresolved reference
     - dictionary.columns.TYPE is char/num, not 1/2
     - ASCII only (session encoding is not UTF-8 on this project)
+
+  REVISION NOTES (2026-09-10):
+    R1  Dictionary import is now guarded: required columns must exist in
+        dict_raw, work.dict_u must have rows, and Section 3 must match at
+        least one variable. Previously a mis-headed CSV produced an empty
+        map that passed every guard.
+    R2  stat_route no longer counts sentinel values as levels: n_levels is
+        reduced by one for variables in work.sentinel_applicable, and the
+        raw count is kept as n_levels_raw for review. A missing n_levels
+        leaves stat_route blank so GUARD 3 fails instead of routing to FREQ.
+    R3  Section 4 lookup keys must be unique, and the row count is asserted
+        before and after the lookup join.
+    R4  %gate_stats now routes through %fail_out (single %abort cancel).
+    R5  %fail_out only closes ODS EXCEL when a destination is open.
+    R6  logs_path is checked before the log is routed.
+    R7  Numeric keys use best32. and the padded test uses the OBSERVED width
+        of the character side, not a fixed 12. Padding is also tried on the
+        base side when the base key is numeric and the merged key is char.
+    R8  Base-key duplicate and missing counts are reported in discovery.
+    R9  Key sampling stops after 10 output rows, not 5000 input rows.
+    R10 Year candidate order is deterministic (SURG-containing names first).
+    R11 Every cognitive score column is tested, not an arbitrary one.
+    R12 Denominator note is read with symget, not a quoted macro reference.
+    R13 g.var_domain_map carries map_status (INCOMPLETE until all guards
+        pass, then REVIEW) and n_dict_matches (tie count for review).
 ==========================================================================*/
 
 
@@ -83,9 +109,16 @@ options nodate nonumber ps=max ls=200 nofmterr;
 %mend restore_log;
 
 /* ---- fail_out: named macro, %abort cancel only here -------------------- */
+/* ods_excel_open is set to 1 by any later section that opens ODS EXCEL,   */
+/* so a failure before that point does not emit a spurious close warning.  */
+%global ods_excel_open;
+%let ods_excel_open = 0;
+
 %macro fail_out(msg=);
   %put ERROR: &msg;
-  ods excel close;
+  %if &ods_excel_open = 1 %then %do;
+    ods excel close;
+  %end;
   ods listing;
   %restore_log;
   %abort cancel;
@@ -94,11 +127,17 @@ options nodate nonumber ps=max ls=200 nofmterr;
 /* ---- Checkpoint 1 gate macro (for Sections 5 to 11 when written) ------- */
 %macro gate_stats;
   %if &DOMAIN_MAP_APPROVED ne 1 %then %do;
-    %put NOTE: Domain map awaiting Checkpoint 1 approval -- statistics sections skipped.;
-    %restore_log;
-    %abort cancel;
+    %fail_out(msg=Domain map awaiting Checkpoint 1 approval -- run stopped before the statistics sections);
   %end;
 %mend gate_stats;
+
+/* ---- Directory preconditions (logs first, before the log is routed) ---- */
+%macro check_dir(path=, label=);
+  %if %sysfunc(fileexist(&path)) = 0 %then %do;
+    %fail_out(msg=&label directory not found: &path);
+  %end;
+%mend check_dir;
+%check_dir(path=&logs_path, label=logs);
 
 %route_log;
 libname g "&g_path";
@@ -106,12 +145,6 @@ libname g "&g_path";
 %put NOTE: ==== Phase 17 summary-stats-by-domain starting ====;
 %put NOTE: SUPPRESS_MAX=&SUPPRESS_MAX SUPPRESS_LABEL=&SUPPRESS_LABEL;
 
-/* ---- Directory preconditions ------------------------------------------- */
-%macro check_dir(path=, label=);
-  %if %sysfunc(fileexist(&path)) = 0 %then %do;
-    %fail_out(msg=&label directory not found: &path);
-  %end;
-%mend check_dir;
 %check_dir(path=&docs_path, label=docs);
 %check_dir(path=&qc_path,   label=qc);
 
@@ -242,13 +275,47 @@ quit;
   %if &key_type_merged = char %then %do;
     %if %eval(&key_len_merged > &key_norm_len) %then %let key_norm_len = &key_len_merged;
   %end;
-  %put NOTE: [17-discovery] normalised key length = &key_norm_len;
 %mend set_key_len;
 %set_key_len;
 
+/* Observed key widths. The DECLARED length of a character key says nothing */
+/* about how wide the stored values are, and a numeric key wider than 12    */
+/* digits would be mangled by best12. Both feed key_norm_len, and the char  */
+/* side width is the zero-padding width tested in Section 1.                */
+%let key_obs_len_base   = 0;
+%let key_obs_len_merged = 0;
+
+%macro obs_key_len;
+  proc sql noprint;
+    %if &key_type_base = char %then %do;
+      select max(length(strip(PRECEDE_STUDY_ID))) into :key_obs_len_base trimmed
+      from g.analysis_base where not missing(PRECEDE_STUDY_ID);
+    %end;
+    %else %do;
+      select max(length(strip(put(PRECEDE_STUDY_ID, best32.)))) into :key_obs_len_base trimmed
+      from g.analysis_base where not missing(PRECEDE_STUDY_ID);
+    %end;
+    %if &key_type_merged = char %then %do;
+      select max(length(strip(PRECEDE_STUDY_ID))) into :key_obs_len_merged trimmed
+      from g.master_data_merged where not missing(PRECEDE_STUDY_ID);
+    %end;
+    %else %do;
+      select max(length(strip(put(PRECEDE_STUDY_ID, best32.)))) into :key_obs_len_merged trimmed
+      from g.master_data_merged where not missing(PRECEDE_STUDY_ID);
+    %end;
+  quit;
+  %if %length(&key_obs_len_base)   = 0 %then %let key_obs_len_base   = 0;
+  %if %length(&key_obs_len_merged) = 0 %then %let key_obs_len_merged = 0;
+  %if %eval(&key_obs_len_base   > &key_norm_len) %then %let key_norm_len = &key_obs_len_base;
+  %if %eval(&key_obs_len_merged > &key_norm_len) %then %let key_norm_len = &key_obs_len_merged;
+  %put NOTE: [17-discovery] observed key width base=&key_obs_len_base merged=&key_obs_len_merged;
+  %put NOTE: [17-discovery] normalised key length = &key_norm_len;
+%mend obs_key_len;
+%obs_key_len;
+
 /* ---- Sample 10 non-missing key values from each dataset ---------------- */
-/* MONOTONIC() removed: undocumented, unreliable in subqueries, and HAVING  */
-/* without GROUP BY forces a remerge. Dataset option (obs=) is supported.   */
+/* Stops after 10 OUTPUT rows, so a leading run of missing keys cannot     */
+/* leave the sample short.                                                  */
 %let key_sample_base   = ;
 %let key_sample_merged = ;
 
@@ -256,36 +323,38 @@ quit;
   data work._ksb;
     set g.analysis_base(keep=PRECEDE_STUDY_ID);
     length k $&key_norm_len;
+    if missing(PRECEDE_STUDY_ID) then delete;
     %if &key_type_base = num %then %do;
-      if missing(PRECEDE_STUDY_ID) then delete;
-      k = strip(put(PRECEDE_STUDY_ID, best12.));
+      k = strip(put(PRECEDE_STUDY_ID, best32.));
     %end;
     %else %do;
-      if missing(PRECEDE_STUDY_ID) then delete;
       k = strip(PRECEDE_STUDY_ID);
     %end;
+    output;
+    _nout + 1;
+    if _nout >= 10 then stop;
     keep k;
-    if _n_ > 5000 then stop;
   run;
 
   data work._ksm;
     set g.master_data_merged(keep=PRECEDE_STUDY_ID);
     length k $&key_norm_len;
+    if missing(PRECEDE_STUDY_ID) then delete;
     %if &key_type_merged = num %then %do;
-      if missing(PRECEDE_STUDY_ID) then delete;
-      k = strip(put(PRECEDE_STUDY_ID, best12.));
+      k = strip(put(PRECEDE_STUDY_ID, best32.));
     %end;
     %else %do;
-      if missing(PRECEDE_STUDY_ID) then delete;
       k = strip(PRECEDE_STUDY_ID);
     %end;
+    output;
+    _nout + 1;
+    if _nout >= 10 then stop;
     keep k;
-    if _n_ > 5000 then stop;
   run;
 
   proc sql noprint;
-    select k into :key_sample_base separated by '|'   from work._ksb(obs=10);
-    select k into :key_sample_merged separated by '|' from work._ksm(obs=10);
+    select k into :key_sample_base separated by '|'   from work._ksb;
+    select k into :key_sample_merged separated by '|' from work._ksm;
   quit;
 %mend sample_keys;
 %sample_keys;
@@ -313,6 +382,28 @@ proc sql noprint;
   where missing(PRECEDE_STUDY_ID);
 quit;
 
+/* Base-side key uniqueness is REPORTED, not enforced. Duplicate base keys  */
+/* do not inflate the left merge, but they tell the reviewer whether the    */
+/* unit of analysis is one row per patient before patient-level statistics */
+/* are planned.                                                             */
+%let n_base_key_dups    = 0;
+%let n_base_missing_key = 0;
+
+proc sql noprint;
+  select count(*) into :n_base_key_dups trimmed
+  from (
+    select PRECEDE_STUDY_ID
+    from g.analysis_base
+    where not missing(PRECEDE_STUDY_ID)
+    group by PRECEDE_STUDY_ID
+    having count(*) > 1
+  );
+
+  select count(*) into :n_base_missing_key trimmed
+  from g.analysis_base
+  where missing(PRECEDE_STUDY_ID);
+quit;
+
 
 /* ---- 4. YEAR VARIABLE: identify, decide, and quantify ------------------ */
 /* Discovery must produce a DECISION, not a candidate list. Downstream       */
@@ -327,11 +418,15 @@ proc sql;
        or index(name,'ENCOUNTER') > 0;
 quit;
 
+/* Deterministic order: names containing SURG first, then alphabetical, so */
+/* the first candidate is the same on every run and is the surgery year     */
+/* whenever one exists.                                                     */
 %let year_cand_list = ;
 proc sql noprint;
   select name into :year_cand_list separated by ' '
   from work.cols_base
-  where index(name,'YEAR') > 0 and vtype = 'num';
+  where index(name,'YEAR') > 0 and vtype = 'num'
+  order by (index(name,'SURG') = 0), name;
 quit;
 
 /* (an earlier pick_year draft was removed; %pick_year_safe below is the one used) */
@@ -353,7 +448,7 @@ quit;
   %else %do;
     %let year_variable = %scan(&year_cand_list, 1);
     %if &n_year_cands > 1 %then %do;
-      %let year_note = &n_year_cands numeric YEAR candidates found. Using &year_variable. Confirm the choice at Checkpoint 1.;
+      %let year_note = &n_year_cands numeric YEAR candidates found. Using &year_variable (SURG-containing names ranked first). Confirm the choice at Checkpoint 1.;
       %put WARNING: [17-discovery] &year_note;
     %end;
     %else %do;
@@ -557,6 +652,7 @@ quit;
     put "--- KEY METADATA ---";
     put "PRECEDE_STUDY_ID in g.analysis_base:      type=&key_type_base  length=&key_len_base";
     put "PRECEDE_STUDY_ID in g.master_data_merged: type=&key_type_merged  length=&key_len_merged";
+    put "Observed key width: base=&key_obs_len_base  merged=&key_obs_len_merged";
     put "Normalised join key length: $&key_norm_len";
     put " ";
     put "NOTE: a SAS variable has exactly one type per dataset. The CHAR vs";
@@ -573,6 +669,9 @@ quit;
     put "--- KEY UNIQUENESS ---";
     put "Duplicate PRECEDE_STUDY_ID count in g.master_data_merged (missing excluded): &n_key_dups";
     put "Rows with a MISSING PRECEDE_STUDY_ID in g.master_data_merged: &n_missing_key";
+    put "Duplicate PRECEDE_STUDY_ID count in g.analysis_base (missing excluded): &n_base_key_dups";
+    put "Rows with a MISSING PRECEDE_STUDY_ID in g.analysis_base: &n_base_missing_key";
+    put "REVIEW: duplicate base keys mean g.analysis_base is not one row per patient.";
     put " ";
     put "--- VARNN DEFECT SCAN ---";
     put "Columns with positional VAR+digits names in g.analysis_base: &n_varnn";
@@ -752,12 +851,19 @@ quit;
 
 
 /* ---- 4. Normalise the base key ----------------------------------------- */
-%macro norm_base_key;
+/* fmt=Z with width= is used only when the base key is numeric and the      */
+/* merged key is character and zero-padded (see %pick_key_format).          */
+%macro norm_base_key(fmt=BEST, width=12);
   data work.base_keyed;
     set g.analysis_base;
     length _key_c $&key_norm_len;
     %if &key_type_base = num %then %do;
-      _key_c = strip(put(PRECEDE_STUDY_ID, best12.));
+      %if &fmt = Z %then %do;
+        _key_c = put(PRECEDE_STUDY_ID, z&width..);
+      %end;
+      %else %do;
+        _key_c = strip(put(PRECEDE_STUDY_ID, best32.));
+      %end;
     %end;
     %else %do;
       _key_c = strip(PRECEDE_STUDY_ID);
@@ -766,7 +872,7 @@ quit;
     rename _key_c = PRECEDE_STUDY_ID;
   run;
 %mend norm_base_key;
-%norm_base_key;
+%norm_base_key(fmt=BEST);
 
 
 /* ---- 5. Normalise the extension key, choosing the format empirically --- */
@@ -774,19 +880,20 @@ quit;
 /* keys look like, but the program must not depend on anyone eyeballing     */
 /* them. When the merged key is numeric, both candidate representations are */
 /* tested against the base keys and the one that actually matches is used.  */
-/* best12. gives 123456789 and z12. gives 000123456789 -- picking wrong     */
-/* yields a join that matches nothing while the row count still passes.     */
-%macro build_ext_cols(fmt=);
+/* best32. gives 123456789 and z<w>. gives 000123456789 -- picking wrong    */
+/* yields a join that matches nothing while the row count still passes.    */
+/* The padding width is the OBSERVED width of the character side, not 12.  */
+%macro build_ext_cols(fmt=, width=12);
   data work.merged_ext_cols;
     set g.master_data_merged (keep=PRECEDE_STUDY_ID &extension_keep_list);
     length _key_c $&key_norm_len;
     if missing(PRECEDE_STUDY_ID) then delete;
     %if &key_type_merged = num %then %do;
       %if &fmt = Z %then %do;
-        _key_c = put(PRECEDE_STUDY_ID, z12.);
+        _key_c = put(PRECEDE_STUDY_ID, z&width..);
       %end;
       %else %do;
-        _key_c = strip(put(PRECEDE_STUDY_ID, best12.));
+        _key_c = strip(put(PRECEDE_STUDY_ID, best32.));
       %end;
     %end;
     %else %do;
@@ -810,32 +917,54 @@ quit;
   %let n_best = 0;
   %let n_z    = 0;
 
-  %if &key_type_merged = char %then %do;
-    %let key_fmt = CHAR;
-    %build_ext_cols(fmt=CHAR);
+  %if &key_type_merged = &key_type_base %then %do;
+    /* Same type on both sides: no representation choice to make. */
+    %let key_fmt = SAME_TYPE;
+    %build_ext_cols(fmt=BEST);
     %count_key_overlap(into=n_best);
-    %put NOTE: [17-S1] character key: &n_best extension rows match a base key.;
+    %put NOTE: [17-S1] same-type key (&key_type_base): &n_best extension rows match a base key.;
     %if &n_best = 0 %then %do;
-      %fail_out(msg=Character join key produced zero matches against g.analysis_base -- padding or case differs between the two datasets);
+      %fail_out(msg=Join key produced zero matches against g.analysis_base -- padding or case differs between the two datasets);
+    %end;
+  %end;
+  %else %if &key_type_merged = num %then %do;
+    /* Merged numeric, base character: pad the MERGED side to the base width */
+    %build_ext_cols(fmt=BEST);
+    %count_key_overlap(into=n_best);
+    %put NOTE: [17-S1] best32. representation of merged key: &n_best matches.;
+
+    %if &n_best = 0 %then %do;
+      %put WARNING: [17-S1] best32. matched nothing. Testing zero-padded z&key_obs_len_base. on the merged key.;
+      %build_ext_cols(fmt=Z, width=&key_obs_len_base);
+      %count_key_overlap(into=n_z);
+      %put NOTE: [17-S1] z&key_obs_len_base. representation: &n_z matches.;
+      %if &n_z = 0 %then %do;
+        %fail_out(msg=Neither best32. nor z&key_obs_len_base. matched any base key -- the numeric merged key cannot be reconciled with the character base key);
+      %end;
+      %let key_fmt = Z&key_obs_len_base._MERGED;
+    %end;
+    %else %do;
+      %let key_fmt = BEST_MERGED;
     %end;
   %end;
   %else %do;
-    %build_ext_cols(fmt=BEST);
+    /* Base numeric, merged character: pad the BASE side to the merged width */
+    %build_ext_cols(fmt=CHAR);
     %count_key_overlap(into=n_best);
-    %put NOTE: [17-S1] best12. representation: &n_best matches.;
+    %put NOTE: [17-S1] best32. representation of base key: &n_best matches.;
 
     %if &n_best = 0 %then %do;
-      %put WARNING: [17-S1] best12. matched nothing. Testing zero-padded z12.;
-      %build_ext_cols(fmt=Z);
+      %put WARNING: [17-S1] best32. matched nothing. Testing zero-padded z&key_obs_len_merged. on the base key.;
+      %norm_base_key(fmt=Z, width=&key_obs_len_merged);
       %count_key_overlap(into=n_z);
-      %put NOTE: [17-S1] z12. representation: &n_z matches.;
+      %put NOTE: [17-S1] z&key_obs_len_merged. representation: &n_z matches.;
       %if &n_z = 0 %then %do;
-        %fail_out(msg=Neither best12. nor z12. matched any base key -- the numeric key cannot be reconciled with the character key in g.analysis_base);
+        %fail_out(msg=Neither best32. nor z&key_obs_len_merged. matched any merged key -- the numeric base key cannot be reconciled with the character merged key);
       %end;
-      %let key_fmt = Z12;
+      %let key_fmt = Z&key_obs_len_merged._BASE;
     %end;
     %else %do;
-      %let key_fmt = BEST12;
+      %let key_fmt = BEST_BASE;
     %end;
   %end;
   %put NOTE: [17-S1] key format selected: &key_fmt;
@@ -871,27 +1000,37 @@ quit;
 
 
 /* ---- 8. Cognitive-score non-missing guard ------------------------------ */
+/* Every column matching COGNI and SCORE is tested. A single INTO without   */
+/* ORDER BY picked an arbitrary one and could pass while another was empty. */
 proc sql noprint;
-  select name into :cog_col trimmed
+  select name into :cog_col separated by ' '
   from work.ext_candidates
-  where index(upcase(name),'COGNI') > 0 and index(upcase(name),'SCORE') > 0;
+  where index(upcase(name),'COGNI') > 0 and index(upcase(name),'SCORE') > 0
+  order by name;
 quit;
 
 %macro check_cog_populated;
-  %if %length(&cog_col) = 0 %then %do;
+  %local n_cog i c n_this;
+  %let n_cog = %sysfunc(countw(&cog_col));
+  %if &n_cog = 0 %then %do;
     %put WARNING: [17-S1] No cognitive score column (COGNI and SCORE) in ext_candidates. Cognitive guard skipped.;
   %end;
   %else %do;
-    %let n_cog_nonmiss = 0;
-    proc sql noprint;
-      select count(*) into :n_cog_nonmiss trimmed
-      from work.analysis_base_ext
-      where not missing(&cog_col);
-    quit;
-    %if &n_cog_nonmiss = 0 %then %do;
-      %fail_out(msg=Cognitive score column &cog_col is all-missing in work.analysis_base_ext -- the join key silently failed to match);
+    %do i = 1 %to &n_cog;
+      %let c = %scan(&cog_col, &i);
+      %let n_this = 0;
+      proc sql noprint;
+        select count(*) into :n_this trimmed
+        from work.analysis_base_ext
+        where not missing(&c);
+      quit;
+      %if &n_this = 0 %then %do;
+        %fail_out(msg=Cognitive score column &c is all-missing in work.analysis_base_ext -- the join key silently failed to match);
+      %end;
+      %put NOTE: [17-S1] Cognitive guard: &c has &n_this non-missing values.;
+      %let n_cog_nonmiss = &n_this;
     %end;
-    %put NOTE: [17-S1] Cognitive guard passed: &cog_col has &n_cog_nonmiss non-missing values.;
+    %put NOTE: [17-S1] Cognitive guard passed on &n_cog column(s).;
   %end;
 %mend check_cog_populated;
 %check_cog_populated;
@@ -1013,6 +1152,25 @@ proc import datafile="&docs_path.\precede_dictionary.csv"
   guessingrows=max;
 run;
 
+/* Required columns must exist. A mis-headed CSV previously produced a     */
+/* RENAME warning, an all-missing sas_name, an empty dict_u, and a map in   */
+/* which every variable was OUT_OF_SCOPE -- and every guard passed.         */
+%let n_dict_cols = 0;
+proc sql noprint;
+  select count(*) into :n_dict_cols trimmed
+  from dictionary.columns
+  where libname='WORK' and memname='DICT_RAW'
+    and upcase(name) in ('SHEET','DICT_NAME','DICT_TYPE','DESCRIPTION','SAS_NAME');
+quit;
+
+%macro check_dict_cols;
+  %if &n_dict_cols ne 5 %then %do;
+    %fail_out(msg=precede_dictionary.csv must have columns sheet dict_name dict_type description sas_name -- found &n_dict_cols of 5);
+  %end;
+  %put NOTE: [17-S2] Dictionary column check passed.;
+%mend check_dict_cols;
+%check_dict_cols;
+
 data work.dict;
   length sheet $40 dict_name $60 dict_type $20 description $300 sas_name $32;
   set work.dict_raw (rename=(sheet=_s dict_name=_n dict_type=_t
@@ -1039,6 +1197,19 @@ data work.dict_u;
   by sas_name;
   if first.sas_name;
 run;
+
+%let n_dict_u = 0;
+proc sql noprint;
+  select count(*) into :n_dict_u trimmed from work.dict_u;
+quit;
+
+%macro check_dict_rows;
+  %if &n_dict_u = 0 %then %do;
+    %fail_out(msg=work.dict_u has no rows -- every sas_name in precede_dictionary.csv is blank);
+  %end;
+  %put NOTE: [17-S2] &n_dict_u documented names in work.dict_u.;
+%mend check_dict_rows;
+%check_dict_rows;
 
 %put NOTE: ==== Section 2 complete: work.dict_u ready ====;
 
@@ -1086,15 +1257,23 @@ data work.var_domain_raw;
   if first.varname;
 run;
 
-/* Match ties: two dictionary entries matching one column equally well */
+/* Match counts: dictionary entries matching each column at its best rank. */
+/* Carried into g.var_domain_map as n_dict_matches so ties are visible in  */
+/* the review CSV, not only in the log.                                     */
 %let n_ties_ext = 0;
 proc sql noprint;
-  create table work.match_ties_ext as
+  create table work.match_counts_ext as
     select a.varname, count(*) as n_at_best
     from work.doc_all_ext as a
     inner join work.var_domain_raw as b
       on a.varname = b.varname and a.match_rank = b.match_rank
-    group by a.varname having calculated n_at_best > 1;
+    group by a.varname;
+
+  create table work.match_ties_ext as
+    select varname, n_at_best
+    from work.match_counts_ext
+    where n_at_best > 1;
+
   select count(*) into :n_ties_ext trimmed from work.match_ties_ext;
 quit;
 
@@ -1133,6 +1312,13 @@ quit;
 
 %put NOTE: [17-S3] Match summary: &n_matched matched, &n_dict_only dict-only, &n_data_only data-only;
 
+%macro check_any_matched;
+  %if &n_matched = 0 %then %do;
+    %fail_out(msg=No column of work.analysis_base_ext matched any dictionary sas_name -- the dictionary and the data cannot be reconciled);
+  %end;
+%mend check_any_matched;
+%check_any_matched;
+
 
 /* =========================================================================
    SECTION 3c: NLEVELS pass for stat_route and the cardinality review flag
@@ -1160,7 +1346,7 @@ data work.data_only_oos;
   length varname $32 vtype $4 vlen 8 sas_label $256
          dict_name $60 dict_type $20 description $300 match_how $8
          domain $16 domain_rationale $200 assign_rule $20
-         source_dataset $32;
+         source_dataset $32 n_dict_matches 8;
   set work.data_only;
   domain           = 'OUT_OF_SCOPE';
   domain_rationale = 'not in PRECEDE dictionary';
@@ -1170,6 +1356,7 @@ data work.data_only_oos;
   description      = '';
   match_how        = 'NONE';
   source_dataset   = 'analysis_base_ext';
+  n_dict_matches   = 0;
 run;
 
 /* The previous version had an open-code %DO placeholder here. %DO is not   */
@@ -1179,7 +1366,8 @@ data work.domain_staging;
   length varname $32 vtype $4 vlen 8 sas_label $256
          dict_name $60 dict_type $20 description $300 match_how $8
          domain $16 domain_rationale $200 assign_rule $20
-         source_dataset $32 stat_route $8 n_levels 8 denominator_note $300;
+         source_dataset $32 stat_route $8 n_levels 8 n_levels_raw 8
+         n_dict_matches 8 denominator_note $300;
 
   set work.var_domain_raw (in=inmatched)
       work.data_only_oos  (in=indataonly);
@@ -1211,19 +1399,33 @@ data work.domain_staging2;
   drop src_ds;
 run;
 
-/* Join n_levels */
+/* Join n_levels, the sentinel flag, and the dictionary match count.       */
+/* NLEVELS was computed on the raw data, so -999 and literal NULL each      */
+/* count as one level. For a variable in work.sentinel_applicable that      */
+/* level will disappear at the Section 5 recode, so it is subtracted here   */
+/* before routing. The raw count is kept as n_levels_raw for review.        */
 proc sql;
   create table work.domain_staging3 as
-    select ds.*, nl.n_levels as n_levels_join
+    select ds.*,
+           nl.n_levels                  as n_levels_join,
+           (sa.varname is not null)     as has_sentinel,
+           mc.n_at_best                 as n_dict_matches_join
     from work.domain_staging2 as ds
     left join work.nlevels_ext as nl
-      on upcase(ds.varname) = nl.varname_u;
+      on upcase(ds.varname) = nl.varname_u
+    left join work.sentinel_applicable as sa
+      on upcase(ds.varname) = sa.varname
+    left join work.match_counts_ext as mc
+      on ds.varname = mc.varname;
 quit;
 
 data work.domain_staging3;
   set work.domain_staging3;
+  n_levels_raw = n_levels_join;
   if missing(n_levels) then n_levels = n_levels_join;
-  drop n_levels_join;
+  if has_sentinel = 1 and n_levels > . then n_levels = n_levels - 1;
+  if missing(n_dict_matches) then n_dict_matches = coalesce(n_dict_matches_join, 0);
+  drop n_levels_join has_sentinel n_dict_matches_join;
 run;
 
 
@@ -1277,8 +1479,11 @@ data work.domain_staging3;
   if domain ne 'OUT_OF_SCOPE' then do;
     if vtype = 'char' then stat_route = 'FREQ';
     else if vtype = 'num' then do;
-      if n_levels <= 10 then stat_route = 'FREQ';
-      else                   stat_route = 'MEANS';
+      /* A missing n_levels is less than 10 in SAS and would route to FREQ */
+      /* silently. It is left blank so GUARD 3 fails the run.              */
+      if      n_levels > . and n_levels <= 10 then stat_route = 'FREQ';
+      else if n_levels > 10                   then stat_route = 'MEANS';
+      else                                         stat_route = '';
     end;
   end;
   else stat_route = '';
@@ -1381,6 +1586,30 @@ ORAL_MORPHINE_EQUIV_MG_POD_DAY6,D5,analytic_role,postoperative opioid use realiz
 ;
 run;
 
+/* Lookup keys must be unique. A duplicated varname_u would duplicate rows  */
+/* through the left join below and every downstream guard would still pass. */
+%let n_lookup_dups = 0;
+proc sql noprint;
+  select count(*) into :n_lookup_dups trimmed
+  from (
+    select varname_u from work.domain_lookup
+    group by varname_u having count(*) > 1
+  );
+quit;
+
+%macro check_lookup_unique;
+  %if &n_lookup_dups > 0 %then %do;
+    %fail_out(msg=&n_lookup_dups varname_u values are duplicated in the Section 4 domain lookup DATALINES);
+  %end;
+  %put NOTE: [17-S4] Lookup key uniqueness passed.;
+%mend check_lookup_unique;
+%check_lookup_unique;
+
+%let n_stg3 = 0;
+proc sql noprint;
+  select count(*) into :n_stg3 trimmed from work.domain_staging3;
+quit;
+
 /* Apply the lookup. The ON clause scopes the join to rows that are not     */
 /* already OUT_OF_SCOPE, so identifier exclusions are not overridden.       */
 proc sql;
@@ -1417,26 +1646,47 @@ data work.domain_staging4;
   drop domain_final rationale_final rule_final;
 run;
 
-/* Denominator note on the extension-sourced blocks */
+/* Row-count assertion across the lookup join */
+%let n_stg4 = 0;
+proc sql noprint;
+  select count(*) into :n_stg4 trimmed from work.domain_staging4;
+quit;
+
+%macro check_lookup_rows;
+  %if &n_stg4 ne &n_stg3 %then %do;
+    %fail_out(msg=Row count changed across the domain lookup join: &n_stg3 before and &n_stg4 after);
+  %end;
+  %put NOTE: [17-S4] Lookup join row-count assertion passed: &n_stg4 rows.;
+%mend check_lookup_rows;
+%check_lookup_rows;
+
+/* Denominator note on the extension-sourced blocks. symget reads the macro */
+/* variable at run time, so the note text is never re-scanned for quotes or */
+/* macro triggers.                                                          */
 data work.domain_staging4;
   set work.domain_staging4;
   length denominator_note $300;
-  if source_dataset = 'master_data_merged' then denominator_note = "&D3_DENOM_NOTE";
+  if source_dataset = 'master_data_merged' then denominator_note = symget('D3_DENOM_NOTE');
   else denominator_note = '';
 run;
 
 /* ---- Write g.var_domain_map: the ONE permanent artifact of this phase --- */
 /* g.analysis_base and g.master_data_merged remain read-only. This dataset  */
 /* is the explicitly authorized exception (see 17-CONTEXT.md).              */
+/* map_status is INCOMPLETE until every Section 4 guard passes, then       */
+/* REVIEW. Sections 5 to 11 should test map_status as well as the           */
+/* DOMAIN_MAP_APPROVED flag, so a map left behind by a failed run cannot be  */
+/* mistaken for a reviewed one.                                              */
 data g.var_domain_map;
-  length varname $32 sas_label $256 vtype $4 n_levels 8 hi_cardinality_flag $3
-         stat_route $8 domain $16 domain_rationale $200
+  length varname $32 sas_label $256 vtype $4 n_levels 8 n_levels_raw 8
+         hi_cardinality_flag $3 stat_route $8 domain $16 domain_rationale $200
          assign_rule $20 source_dataset $32 denominator_note $300
-         dict_name $60 match_how $8;
+         dict_name $60 match_how $8 n_dict_matches 8 map_status $12;
   set work.domain_staging4;
-  keep varname sas_label vtype n_levels hi_cardinality_flag stat_route
-       domain domain_rationale assign_rule source_dataset denominator_note
-       dict_name match_how;
+  map_status = 'INCOMPLETE';
+  keep varname sas_label vtype n_levels n_levels_raw hi_cardinality_flag
+       stat_route domain domain_rationale assign_rule source_dataset
+       denominator_note dict_name match_how n_dict_matches map_status;
 run;
 
 proc sort data=g.var_domain_map; by domain varname; run;
@@ -1503,7 +1753,7 @@ quit;
 
 %macro check_blank_route;
   %if &n_blank_route > 0 %then %do;
-    %fail_out(msg=&n_blank_route in-scope variables have a stat_route that is neither MEANS nor FREQ);
+    %fail_out(msg=&n_blank_route in-scope variables have a stat_route that is neither MEANS nor FREQ -- a blank route on a numeric means n_levels was missing);
   %end;
   %put NOTE: [17-S4] Stat-route guard passed.;
 %mend check_blank_route;
@@ -1559,14 +1809,27 @@ quit;
 %mend check_unassigned;
 %check_unassigned;
 
+/* ---- All guards passed: promote map_status and refresh the review CSV --- */
+proc sql;
+  update g.var_domain_map set map_status = 'REVIEW';
+quit;
+
+proc export data=g.var_domain_map
+  outfile="&qc_path.\17_var_domain_map_review.csv"
+  dbms=csv replace;
+run;
+
+%put NOTE: [17-S4] All Section 4 guards passed. map_status=REVIEW. Review CSV refreshed.;
+
 
 /* =========================================================================
    END OF WAVE 1 (Sections 1 to 4)
    -------------------------------------------------------------------------
    Checkpoint 1: Gerard reviews qc\17_var_domain_map_review.csv
    variable-by-variable -- domain, domain_rationale, and stat_route, paying
-   closest attention to rows where assign_rule is analytic_role and to
-   numeric variables near the 10-level routing boundary.
+   closest attention to rows where assign_rule is analytic_role, to numeric
+   variables near the 10-level routing boundary (compare n_levels with
+   n_levels_raw), and to rows where n_dict_matches is greater than 1.
 
    Sections 5 to 11 (sentinel recode, PROC MEANS, PROC FREQ, suppression,
    ODS EXCEL workbook, QC artifact) are NOT in this file yet. Setting

@@ -1,0 +1,2832 @@
+NOTE: PROCEDURE PRINTTO used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+1562  libname g "&g_path";
+NOTE: Libref G was successfully assigned as follows: 
+      Engine:        V9 
+      Physical Name: P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge
+1563  
+1564  %put NOTE: ==== Phase 17 summary-stats-by-domain starting ====;
+NOTE: ==== Phase 17 summary-stats-by-domain starting ====
+1565  %put NOTE: SUPPRESS_MAX=&SUPPRESS_MAX SUPPRESS_LABEL=&SUPPRESS_LABEL;
+NOTE: SUPPRESS_MAX=11 SUPPRESS_LABEL=--
+1566  
+1567  /* ---- Directory preconditions ------------------------------------------- */
+1568  %macro check_dir(path=, label=);
+1569    %if %sysfunc(fileexist(&path)) = 0 %then %do;
+1570      %fail_out(msg=&label directory not found: &path);
+1571    %end;
+1572  %mend check_dir;
+1573  %check_dir(path=&docs_path, label=docs);
+1574  %check_dir(path=&qc_path,   label=qc);
+1575  
+1576  /* ---- Dictionary CSV precondition --------------------------------------- */
+1577  %macro check_dict_csv;
+1578    %if %sysfunc(fileexist(%bquote(&docs_path.\precede_dictionary.csv))) = 0 %then %do;
+1579      %fail_out(msg=docs precede_dictionary.csv not found);
+1580    %end;
+1581  %mend check_dict_csv;
+1582  %check_dict_csv;
+1583  
+1584  /* ---- Source dataset existence: g.analysis_base ------------------------- */
+1585  %let n_tab_base = 0;
+1586  proc sql noprint;
+1587    select count(*) into :n_tab_base trimmed
+1588    from dictionary.tables
+1589    where libname='G' and memname='ANALYSIS_BASE';
+1590  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.09 seconds
+      cpu time            0.03 seconds
+      
+
+1591  
+1592  %macro check_src_base;
+1593    %if &n_tab_base ne 1 %then %do;
+1594      %fail_out(msg=g.analysis_base not found in g library);
+1595    %end;
+1596  %mend check_src_base;
+1597  %check_src_base;
+1598  
+1599  /* ---- Source dataset existence: g.master_data_merged -------------------- */
+1600  %let n_tab_merged = 0;
+1601  proc sql noprint;
+1602    select count(*) into :n_tab_merged trimmed
+1603    from dictionary.tables
+1604    where libname='G' and memname='MASTER_DATA_MERGED';
+1605  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1606  
+1607  %macro check_src_merged;
+1608    %if &n_tab_merged ne 1 %then %do;
+1609      %fail_out(msg=g.master_data_merged not found in g library);
+1610    %end;
+1611  %mend check_src_merged;
+1612  %check_src_merged;
+1613  
+1614  /* ---- Row count: g.analysis_base ---------------------------------------- */
+1615  %let n_base_rows = 0;
+1616  proc sql noprint;
+1617    select count(*) into :n_base_rows trimmed from g.analysis_base;
+1618  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.14 seconds
+      cpu time            0.00 seconds
+      
+
+1619  
+1620  %macro check_rows;
+1621    %if &n_base_rows = 0 %then %do;
+1622      %fail_out(msg=g.analysis_base is empty or the row count query returned nothing);
+1623    %end;
+1624    %put NOTE: [17] &n_base_rows rows in g.analysis_base.;
+1625  %mend check_rows;
+1626  %check_rows;
+NOTE: [17] 41150 rows in g.analysis_base.
+1627  
+1628  
+1629  /* =========================================================================
+1630     SECTION 0b: Discovery
+1631     -------------------------------------------------------------------------
+1632     Answers every open question before any statistics are planned.
+1633     Writes results to qc\17_discovery.txt.
+1634     Produces NO permanent datasets and writes NOTHING to g.
+1635     work.ext_candidates is left in WORK for Section 1 to build the KEEP= list.
+1636     ========================================================================= */
+1637  
+1638  %put NOTE: ==== Section 0b: Discovery starting ====;
+NOTE: ==== Section 0b: Discovery starting ====
+1639  
+1640  /* ---- 1. Column inventory from dictionary.columns ----------------------- */
+1641  proc sql;
+1642    create table work.cols_base as
+1643      select upcase(name) as name     length=32,
+1644             type         as vtype    length=4,
+1645             length       as vlen,
+1646             label        as sas_label length=256
+1647      from dictionary.columns
+1648      where libname='G' and memname='ANALYSIS_BASE';
+NOTE: Table WORK.COLS_BASE created, with 125 rows and 4 columns.
+
+1649  
+1650    create table work.cols_merged as
+1651      select upcase(name) as name  length=32,
+1652             type         as vtype length=4,
+1653             length       as vlen
+1654      from dictionary.columns
+1655      where libname='G' and memname='MASTER_DATA_MERGED';
+NOTE: Table WORK.COLS_MERGED created, with 176 rows and 3 columns.
+
+1656  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.20 seconds
+      cpu time            0.00 seconds
+      
+
+1657  
+1658  
+1659  /* ---- 2. KEY METADATA: type and length of PRECEDE_STUDY_ID -------------- */
+1660  /* Every target initialised first: a zero-row query must leave the macro    */
+1661  /* variable EMPTY, not unresolved. An unresolved reference would survive    */
+1662  /* %length tests and then fail as a syntax error deep in a later step.      */
+1663  %let key_type_base   = ;
+1664  %let key_len_base    = ;
+1665  %let key_type_merged = ;
+1666  %let key_len_merged  = ;
+1667  
+1668  proc sql noprint;
+1669    select type, length
+1670      into :key_type_base trimmed, :key_len_base trimmed
+1671    from dictionary.columns
+1672    where libname='G' and memname='ANALYSIS_BASE'
+1673      and upcase(name)='PRECEDE_STUDY_ID';
+1674  
+1675    select type, length
+1676      into :key_type_merged trimmed, :key_len_merged trimmed
+1677    from dictionary.columns
+1678    where libname='G' and memname='MASTER_DATA_MERGED'
+1679      and upcase(name)='PRECEDE_STUDY_ID';
+1680  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+      
+
+1681  
+1682  %macro check_key_present;
+1683    %if %length(&key_type_base) = 0 %then %do;
+1684      %fail_out(msg=PRECEDE_STUDY_ID not found in g.analysis_base -- cannot build the D-01 join key);
+1685    %end;
+1686    %if %length(&key_type_merged) = 0 %then %do;
+1687      %fail_out(msg=PRECEDE_STUDY_ID not found in g.master_data_merged -- cannot build the D-01 join key);
+1688    %end;
+1689    %put NOTE: [17-discovery] key type base=&key_type_base len=&key_len_base merged=&key_type_merged len=&key_len_merged;
+1690  %mend check_key_present;
+1691  %check_key_present;
+NOTE: [17-discovery] key type base=char len=12 merged=char len=12
+1692  
+1693  /* Normalised key length: never truncate either side. */
+1694  %macro set_key_len;
+1695    %global key_norm_len;
+1696    %let key_norm_len = 12;
+1697    %if &key_type_base = char %then %do;
+1698      %if %eval(&key_len_base > &key_norm_len) %then %let key_norm_len = &key_len_base;
+1699    %end;
+1700    %if &key_type_merged = char %then %do;
+1701      %if %eval(&key_len_merged > &key_norm_len) %then %let key_norm_len = &key_len_merged;
+1702    %end;
+1703    %put NOTE: [17-discovery] normalised key length = &key_norm_len;
+1704  %mend set_key_len;
+1705  %set_key_len;
+NOTE: [17-discovery] normalised key length = 12
+1706  
+1707  /* ---- Sample 10 non-missing key values from each dataset ---------------- */
+1708  /* MONOTONIC() removed: undocumented, unreliable in subqueries, and HAVING  */
+1709  /* without GROUP BY forces a remerge. Dataset option (obs=) is supported.   */
+1710  %let key_sample_base   = ;
+1711  %let key_sample_merged = ;
+1712  
+1713  %macro sample_keys;
+1714    data work._ksb;
+1715      set g.analysis_base(keep=PRECEDE_STUDY_ID);
+1716      length k $&key_norm_len;
+1717      %if &key_type_base = num %then %do;
+1718        if missing(PRECEDE_STUDY_ID) then delete;
+1719        k = strip(put(PRECEDE_STUDY_ID, best12.));
+1720      %end;
+1721      %else %do;
+1722        if missing(PRECEDE_STUDY_ID) then delete;
+1723        k = strip(PRECEDE_STUDY_ID);
+1724      %end;
+1725      keep k;
+1726      if _n_ > 5000 then stop;
+1727    run;
+1728  
+1729    data work._ksm;
+1730      set g.master_data_merged(keep=PRECEDE_STUDY_ID);
+1731      length k $&key_norm_len;
+1732      %if &key_type_merged = num %then %do;
+1733        if missing(PRECEDE_STUDY_ID) then delete;
+1734        k = strip(put(PRECEDE_STUDY_ID, best12.));
+1735      %end;
+1736      %else %do;
+1737        if missing(PRECEDE_STUDY_ID) then delete;
+1738        k = strip(PRECEDE_STUDY_ID);
+1739      %end;
+1740      keep k;
+1741      if _n_ > 5000 then stop;
+1742    run;
+1743  
+1744    proc sql noprint;
+1745      select k into :key_sample_base separated by '|'   from work._ksb(obs=10);
+1746      select k into :key_sample_merged separated by '|' from work._ksm(obs=10);
+1747    quit;
+1748  %mend sample_keys;
+1749  %sample_keys;
+MPRINT(SAMPLE_KEYS):   data work._ksb;
+MPRINT(SAMPLE_KEYS):   set g.analysis_base(keep=PRECEDE_STUDY_ID);
+MPRINT(SAMPLE_KEYS):   length k $12;
+MPRINT(SAMPLE_KEYS):   if missing(PRECEDE_STUDY_ID) then delete;
+MPRINT(SAMPLE_KEYS):   k = strip(PRECEDE_STUDY_ID);
+MPRINT(SAMPLE_KEYS):   keep k;
+MPRINT(SAMPLE_KEYS):   if _n_ > 5000 then stop;
+MPRINT(SAMPLE_KEYS):   run;
+
+NOTE: There were 5001 observations read from the data set G.ANALYSIS_BASE.
+NOTE: The data set WORK._KSB has 5000 observations and 1 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.77 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(SAMPLE_KEYS):   data work._ksm;
+MPRINT(SAMPLE_KEYS):   set g.master_data_merged(keep=PRECEDE_STUDY_ID);
+MPRINT(SAMPLE_KEYS):   length k $12;
+MPRINT(SAMPLE_KEYS):   if missing(PRECEDE_STUDY_ID) then delete;
+MPRINT(SAMPLE_KEYS):   k = strip(PRECEDE_STUDY_ID);
+MPRINT(SAMPLE_KEYS):   keep k;
+MPRINT(SAMPLE_KEYS):   if _n_ > 5000 then stop;
+MPRINT(SAMPLE_KEYS):   run;
+
+NOTE: There were 5001 observations read from the data set G.MASTER_DATA_MERGED.
+NOTE: The data set WORK._KSM has 5000 observations and 1 variables.
+NOTE: DATA statement used (Total process time):
+      real time           1.37 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(SAMPLE_KEYS):   proc sql noprint;
+MPRINT(SAMPLE_KEYS):   select k into :key_sample_base separated by '|' from work._ksb(obs=10);
+MPRINT(SAMPLE_KEYS):   select k into :key_sample_merged separated by '|' from work._ksm(obs=10);
+MPRINT(SAMPLE_KEYS):   quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+      
+
+1750  
+1751  
+1752  /* ---- 3. KEY UNIQUENESS and MISSING KEYS -------------------------------- */
+1753  /* Missing keys must be excluded from the duplicate test. Two or more       */
+1754  /* missing values form one group with count > 1 and would abort the run     */
+1755  /* for the wrong reason. Missing keys are reported separately.              */
+1756  %let n_key_dups    = 0;
+1757  %let n_missing_key = 0;
+1758  
+1759  proc sql noprint;
+1760    select count(*) into :n_key_dups trimmed
+1761    from (
+1762      select PRECEDE_STUDY_ID
+1763      from g.master_data_merged
+1764      where not missing(PRECEDE_STUDY_ID)
+1765      group by PRECEDE_STUDY_ID
+1766      having count(*) > 1
+1767    );
+1768  
+1769    select count(*) into :n_missing_key trimmed
+1770    from g.master_data_merged
+1771    where missing(PRECEDE_STUDY_ID);
+1772  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           5.86 seconds
+      cpu time            0.04 seconds
+      
+
+1773  
+1774  
+1775  /* ---- 4. YEAR VARIABLE: identify, decide, and quantify ------------------ */
+1776  /* Discovery must produce a DECISION, not a candidate list. Downstream       */
+1777  /* waves read &year_variable and work.year_dist as committed facts.          */
+1778  proc sql;
+1779    create table work.year_candidates as
+1780      select name, vtype, sas_label
+1781      from work.cols_base
+1782      where index(name,'YEAR')      > 0
+1783         or index(name,'_DATE')     > 0
+1784         or index(name,'SURG')      > 0
+1785         or index(name,'ENCOUNTER') > 0;
+NOTE: Table WORK.YEAR_CANDIDATES created, with 7 rows and 3 columns.
+
+1786  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+1787  
+1788  %let year_cand_list = ;
+1789  proc sql noprint;
+1790    select name into :year_cand_list separated by ' '
+1791    from work.cols_base
+1792    where index(name,'YEAR') > 0 and vtype = 'num';
+1793  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1794  
+1795  /* (an earlier pick_year draft was removed; %pick_year_safe below is the one used) */
+1796  
+1797  /* The empty-dataset branch above must not reference an undefined variable. */
+1798  %macro pick_year_safe;
+1799    %global year_variable n_year_cands year_note;
+1800    %let n_year_cands = %sysfunc(countw(&year_cand_list));
+1801  
+1802    %if &n_year_cands = 0 %then %do;
+1803      %let year_variable = ;
+1804      %let year_note = NO NUMERIC YEAR COLUMN FOUND -- per-year stratification must derive year from a surgery date column. See the candidate list below.;
+1805      %put WARNING: [17-discovery] &year_note;
+1806      data work.year_dist;
+1807        length year_value 8 n_rows 8 percent 8;
+1808        stop;
+1809      run;
+1810    %end;
+1811    %else %do;
+1812      %let year_variable = %scan(&year_cand_list, 1);
+1813      %if &n_year_cands > 1 %then %do;
+1814        %let year_note = &n_year_cands numeric YEAR candidates found. Using &year_variable. Confirm the choice at Checkpoint 1.;
+1815        %put WARNING: [17-discovery] &year_note;
+1816      %end;
+1817      %else %do;
+1818        %let year_note = Year variable resolved to &year_variable.;
+1819        %put NOTE: [17-discovery] &year_note;
+1820      %end;
+1821  
+1822      proc freq data=g.analysis_base noprint;
+1823        tables &year_variable / missing out=work._yd(rename=(count=n_rows));
+1824      run;
+1825  
+1826      data work.year_dist;
+1827        set work._yd;
+1828        length year_value 8;
+1829        year_value = &year_variable;
+1830        keep year_value n_rows percent;
+1831      run;
+1832    %end;
+1833  %mend pick_year_safe;
+1834  %pick_year_safe;
+NOTE: [17-discovery] Year variable resolved to YEAR
+MPRINT(PICK_YEAR_SAFE):   proc freq data=g.analysis_base noprint;
+MPRINT(PICK_YEAR_SAFE):   tables YEAR / missing out=work._yd(rename=(count=n_rows));
+MPRINT(PICK_YEAR_SAFE):   run;
+
+NOTE: There were 41150 observations read from the data set G.ANALYSIS_BASE.
+NOTE: The data set WORK._YD has 5 observations and 3 variables.
+NOTE: PROCEDURE FREQ used (Total process time):
+      real time           5.28 seconds
+      cpu time            0.01 seconds
+      
+
+MPRINT(PICK_YEAR_SAFE):   data work.year_dist;
+MPRINT(PICK_YEAR_SAFE):   set work._yd;
+MPRINT(PICK_YEAR_SAFE):   length year_value 8;
+MPRINT(PICK_YEAR_SAFE):   year_value = YEAR;
+MPRINT(PICK_YEAR_SAFE):   keep year_value n_rows percent;
+MPRINT(PICK_YEAR_SAFE):   run;
+
+NOTE: There were 5 observations read from the data set WORK._YD.
+NOTE: The data set WORK.YEAR_DIST has 5 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1835  
+1836  
+1837  /* ---- 5. EXTENSION COLUMN LIST (D-01 KEEP=) ----------------------------- */
+1838  /* Columns in g.master_data_merged NOT in g.analysis_base, filtered to      */
+1839  /* frailty, cognitive, and intraop-physiologic concepts. MAC is matched by  */
+1840  /* an anchored pattern only -- a bare index for MAC hits PHARMACY, STOMACH. */
+1841  /* NOTE: this concept filter is a heuristic. A frailty, cognitive, or       */
+1842  /* intraoperative variable whose name contains none of these fragments will */
+1843  /* be missed. The resolved list is written to the discovery report for      */
+1844  /* review at Checkpoint 1 -- treat it as a proposal, not an authority.      */
+1845  proc sql;
+1846    create table work.ext_candidates as
+1847      select m.name, m.vtype
+1848      from work.cols_merged m
+1849      where m.name not in (select name from work.cols_base)
+1850        and m.name ne 'PRECEDE_STUDY_ID_1'   /* md6 duplicate -- pitfall 5 */
+1851        and (
+1852              index(m.name,'FRAIL')          > 0
+1853           or index(m.name,'COGNI')          > 0
+1854           or index(m.name,'FEELS')          > 0
+1855           or index(m.name,'WEIGHT_LOSS')    > 0
+1856           or index(m.name,'GRIP')           > 0
+1857           or index(m.name,'WALK')           > 0
+1858           or index(m.name,'PHYSICAL_ACTIV') > 0
+1859           or index(m.name,'ABP')            > 0
+1860           or index(m.name,'BIS_')           > 0
+1861           or index(m.name,'NIBP')           > 0
+1862           or index(m.name,'MIDAZOLAM')      > 0
+1863           or prxmatch('/(^|_)MAC(_|$)/', strip(m.name)) > 0
+1864           or index(m.name,'ISO_SEV')        > 0
+1865        );
+NOTE: Table WORK.EXT_CANDIDATES created, with 23 rows and 2 columns.
+
+1866  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+1867  
+1868  %let n_ext_cols = 0;
+1869  proc sql noprint;
+1870    select count(*) into :n_ext_cols trimmed from work.ext_candidates;
+1871  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1872  
+1873  
+1874  /* ---- 6. IDENTIFIER CANDIDATES ------------------------------------------ */
+1875  /* Anchored pattern only. A bare index for ID_ matches COVID_STATUS,        */
+1876  /* RAPID_TEST and VALID_FLAG. This is the SAME pattern Section 3b applies,  */
+1877  /* so the report and the exclusion cannot disagree.                         */
+1878  proc sql;
+1879    create table work.id_candidates as
+1880      select name, vtype, vlen
+1881      from work.cols_base
+1882      where name in ('PRECEDE_STUDY_ID','PRECEDE_STUDY_ID_1',
+1883                     'ENCRYPTED_MRN','ENCRYPTED_ENCOUNTER')
+1884         or prxmatch('/(^|_)(ID|MRN)(_|$)/', strip(name)) > 0;
+NOTE: Table WORK.ID_CANDIDATES created, with 3 rows and 3 columns.
+
+1885  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1886  
+1887  /* ---- High-cardinality character variables: REVIEW FLAG ONLY ------------ */
+1888  /* These are NOT excluded. CPT codes, procedure names and ZIP codes all     */
+1889  /* exceed 200 levels and are legitimate analytic variables. Cardinality is  */
+1890  /* reported so the reviewer can sort on it at Checkpoint 1.                 */
+1891  proc freq data=g.analysis_base nlevels;
+1892    tables _character_ / noprint;
+1893    ods output nlevels=work.char_nlevels;
+1894  run;
+
+NOTE: The data set WORK.CHAR_NLEVELS has 40 observations and 5 variables.
+NOTE: There were 41150 observations read from the data set G.ANALYSIS_BASE.
+NOTE: PROCEDURE FREQ used (Total process time):
+      real time           0.22 seconds
+      cpu time            0.21 seconds
+      
+
+1895  
+1896  proc sql;
+1897    create table work.hi_card_chars as
+1898      select upcase(strip(tablevar)) as name length=32, nlevels
+1899      from work.char_nlevels
+1900      where nlevels > 200;
+NOTE: Table WORK.HI_CARD_CHARS created, with 9 rows and 2 columns.
+
+1901  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1902  
+1903  
+1904  /* ---- 7. SENTINEL APPLICABILITY ----------------------------------------- */
+1905  /* Single pass with arrays. The previous per-variable PROC SQL loop made    */
+1906  /* roughly one network read per column against the P: drive.               */
+1907  /* Output name and values match what Wave 2 (Section 5) will read:          */
+1908  /*   work.sentinel_applicable, sentinel_kind in NUM_-999 / CHAR_NULL        */
+1909  /* Wave 2 keeps its own work.sentinel_log for recode counts -- do not       */
+1910  /* reuse that name here.                                                    */
+1911  %let sent_num_all = ;
+1912  %let sent_chr_all = ;
+1913  proc sql noprint;
+1914    select name into :sent_num_all separated by ' '
+1915    from work.cols_base where vtype = 'num';
+1916    select name into :sent_chr_all separated by ' '
+1917    from work.cols_base where vtype = 'char';
+1918  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1919  
+1920  %macro scan_sentinels;
+1921    %local n_num n_chr;
+1922    %let n_num = %sysfunc(countw(&sent_num_all));
+1923    %let n_chr = %sysfunc(countw(&sent_chr_all));
+1924  
+1925    %if &n_num = 0 and &n_chr = 0 %then %do;
+1926      data work.sentinel_applicable;
+1927        length varname $32 sentinel_kind $10 n_sentinel 8;
+1928        stop;
+1929      run;
+1930      %put WARNING: [17-discovery] g.analysis_base has no columns to scan for sentinels.;
+1931    %end;
+1932    %else %do;
+1933      data work.sentinel_applicable(keep=_vn _sk _ns
+1934                                    rename=(_vn=varname _sk=sentinel_kind _ns=n_sentinel));
+1935        length _vn $32 _sk $10 _ns 8;
+1936        set g.analysis_base end=_eof;
+1937  
+1938        %if &n_num > 0 %then %do;
+1939          array _sn {*} &sent_num_all;
+1940          array _cn {&n_num} _temporary_;
+1941          do _i = 1 to dim(_sn);
+1942            if _sn{_i} = -999 then _cn{_i} + 1;
+1943          end;
+1944        %end;
+1945  
+1946        %if &n_chr > 0 %then %do;
+1947          array _sc {*} &sent_chr_all;
+1948          array _cc {&n_chr} _temporary_;
+1949          do _j = 1 to dim(_sc);
+1950            if upcase(strip(_sc{_j})) = 'NULL' then _cc{_j} + 1;
+1951          end;
+1952        %end;
+1953  
+1954        if _eof then do;
+1955          %if &n_num > 0 %then %do;
+1956            do _i = 1 to &n_num;
+1957              if _cn{_i} > 0 then do;
+1958                _vn = upcase(vname(_sn{_i}));
+1959                _sk = 'NUM_-999';
+1960                _ns = _cn{_i};
+1961                output;
+1962              end;
+1963            end;
+1964          %end;
+1965          %if &n_chr > 0 %then %do;
+1966            do _j = 1 to &n_chr;
+1967              if _cc{_j} > 0 then do;
+1968                _vn = upcase(vname(_sc{_j}));
+1969                _sk = 'CHAR_NULL';
+1970                _ns = _cc{_j};
+1971                output;
+1972              end;
+1973            end;
+1974          %end;
+1975        end;
+1976      run;
+1977    %end;
+1978  %mend scan_sentinels;
+1979  %scan_sentinels;
+MPRINT(SCAN_SENTINELS):   data work.sentinel_applicable(keep=_vn _sk _ns rename=(_vn=varname _sk=sentinel_kind _ns=n_sentinel));
+MPRINT(SCAN_SENTINELS):   length _vn $32 _sk $10 _ns 8;
+MPRINT(SCAN_SENTINELS):   set g.analysis_base end=_eof;
+MPRINT(SCAN_SENTINELS):   array _sn {*} YEAR RT_ANCHOR_TO_ADMIT_DAYS RT_ANCHOR_TO_SURGERY_DAYS RT_ANCHOR_TO_DISCHG_DAYS RT_ADMIT_TO_AN_START_MINS RT_ADMIT_TO_AN_END_MINS RT_ADMIT_TO_BLOCK_START_MINS 
+RT_ADMIT_TO_BLOCK_END_MINS RT_ADMIT_TO_RM_START_MINS RT_ADMIT_TO_RM_END_MINS RT_ADMIT_TO_INCISION_MINS RT_ADMIT_TO_DRESS_MINS RT_INCISE_TO_DRESS_MINS RT_RM_START_TO_RM_END_MINS 
+RT_RM_START_TO_DRESS_MINS RT_RM_START_TO_AN_START_MINS RT_RM_START_TO_INCISION_MINS RT_AN_START_TO_AN_END_MINS RT_BLOCK_START_TO_BLOCK_END_MINS RT_RM_START_TO_INDUCTION_MINS 
+RT_RM_START_TO_EMERGENCE_MINS DAY_OF_WEEK__NUM_ AGE_AT_ENCOUNTER EMPLOYEECODE ADMIT_BMI ASA__ANESTH_RECORD_ CPT1_CLASS LOS LOS_IN_HOURS CHARGES CHARLSON_COMORBIDITY_INDEX COMP10_T80 COMP10_T81 
+COMP10_T82 COMP10_T83 COMP10_T84 COMP10_T85 COMP10_T86 COMP10_T87 COMP10_T88 COMPLICATION_SUM DEATH_DAYS_AFTER_SURGERY COGNITIVE_SCORE FRAILTY_SCORE FEELS_EXAUSTED_VALUE LOW_PHYSICAL_ACTIVITY_VALUE 
+SLOW_WALKING_SPEED_VALUE UNINTENDED_WEIGHT_LOSS_VALUE WEEK_GRIP_STRENGTH_VALUE BRADEN_ACTIVITY BRADEN_MOBILITY BRADEN_SENSORY_PERCEPTION LATITUDE LONGITUDE PROPOFOL_MG_INTRAOP_TOTAL 
+KETAMINE_MG_INTRAOP_TOTAL FENTANYL_SUBLIMAZE_MG_INTRAOP_TO SUFENTANIL_MG_INTRAOP_TOTAL HYDROMORPHONE_MG_INTRAOP_TOTAL LIDOCAINE_MG_INTRAOP_TOTAL ORAL_MORPHINE_EQUIV_INTRAOP_TOTA ISO_EXP_INTRAOP_TOTAL 
+ISO_EXP_INTRAOP_MAC_AVERAGE ISO_EXP_INTRAOP_MAC_MINUTES_TOTA ISO_EXP_INTRAOP_MAC_TOTAL SEV_EXP_INTRAOP_TOTAL SEV_EXP_INTRAOP_MAC_AVERAGE SEV_EXP_INTRAOP_MAC_MINUTES_TOTA SEV_EXP_INTRAOP_MAC_TOTAL 
+ISO_SEV_EXP_INTRAOP_MAC_AVERAGE PROPOFOL_MG_1_7_TOTAL KETAMINE_MG_1_7_TOTAL FENTANYL_SUBLIMAZE_MG__1_7_TOTAL SUFENTANIL_MG__1_7_TOTAL HYDROMORPHONE_MG__1_7_TOTAL LIDOCAINE_MG_1_7_TOTAL 
+ORAL_MORPHINE_EQUIV_GIVEN__1_7_T ORAL_MORPHINE_EQUIV_MG_POD_DAY1 ORAL_MORPHINE_EQUIV_MG_POD_DAY2 ORAL_MORPHINE_EQUIV_MG_POD_DAY3 ORAL_MORPHINE_EQUIV_MG_POD_DAY4 ORAL_MORPHINE_EQUIV_MG_POD_DAY5 
+ORAL_MORPHINE_EQUIV_MG_POD_DAY6 ORAL_MORPHINE_EQUIV_MG_POD_DAY7 ICU_LOS_TOTAL_TIME_HOURS;
+MPRINT(SCAN_SENTINELS):   array _cn {85} _temporary_;
+MPRINT(SCAN_SENTINELS):   do _i = 1 to dim(_sn);
+MPRINT(SCAN_SENTINELS):   if _sn{_i} = -999 then _cn{_i} + 1;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   array _sc {*} PRECEDE_STUDY_ID ENCRYPTED_MRN ENCRYPTED_ENCOUNTER DAY_OF_WEEK__CHAR_ HOLIDAYS WEEKEND_INDICATOR EMPLOYEESTATUS EDUCATION RACE ETHNICITY SEX MARITAL_STATUS 
+SERVICE ROOM_TYPE EMERGENT BASE_PROCEDURE_1 BASE_PROCEDURE_CODE_1 CPT_1 CPT_1_DESCRIPTION CPT1_LABEL PATIENT_TYPE PAYER ICD10_PRINCIPAL_DIAGNOSIS_DESC ICD10_PRINCIPAL_DIAGNOSIS INTRAOP_KETAMINE 
+PREOP_BLOCK ADMIT_SOURCE DISCHG_DISPOSITION DEATH_DATE_Y_N SSDI_DEATH_DATE_Y_N ANESTHESIA_TYPE SLEEP_APNEA_YN DIABETES_YN HYPERLIPIDEMIA_YN HYPERTENSION_YN MOVEMENTDISORDER_YN COGNITIVEDISORDER_YN 
+COGNITIVE_CATEGORY FRAILTY_CATEGORY _30_DAY_MORTALITY;
+MPRINT(SCAN_SENTINELS):   array _cc {40} _temporary_;
+MPRINT(SCAN_SENTINELS):   do _j = 1 to dim(_sc);
+MPRINT(SCAN_SENTINELS):   if upcase(strip(_sc{_j})) = 'NULL' then _cc{_j} + 1;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   if _eof then do;
+MPRINT(SCAN_SENTINELS):   do _i = 1 to 85;
+MPRINT(SCAN_SENTINELS):   if _cn{_i} > 0 then do;
+MPRINT(SCAN_SENTINELS):   _vn = upcase(vname(_sn{_i}));
+MPRINT(SCAN_SENTINELS):   _sk = 'NUM_-999';
+MPRINT(SCAN_SENTINELS):   _ns = _cn{_i};
+MPRINT(SCAN_SENTINELS):   output;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   do _j = 1 to 40;
+MPRINT(SCAN_SENTINELS):   if _cc{_j} > 0 then do;
+MPRINT(SCAN_SENTINELS):   _vn = upcase(vname(_sc{_j}));
+MPRINT(SCAN_SENTINELS):   _sk = 'CHAR_NULL';
+MPRINT(SCAN_SENTINELS):   _ns = _cc{_j};
+MPRINT(SCAN_SENTINELS):   output;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   end;
+MPRINT(SCAN_SENTINELS):   run;
+
+NOTE: There were 41150 observations read from the data set G.ANALYSIS_BASE.
+NOTE: The data set WORK.SENTINEL_APPLICABLE has 0 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.07 seconds
+      
+
+1980  
+1981  %let n_sent_vars = 0;
+1982  proc sql noprint;
+1983    select count(*) into :n_sent_vars trimmed from work.sentinel_applicable;
+1984  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1985  
+1986  
+1987  /* ---- 8. VARnn positional-name defect scan ------------------------------ */
+1988  %let n_varnn = 0;
+1989  proc sql noprint;
+1990    select count(*) into :n_varnn trimmed
+1991    from work.cols_base
+1992    where prxmatch('/^VAR\d+$/', strip(name)) > 0;
+1993  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+1994  
+1995  
+1996  /* ---- 9. Write qc\17_discovery.txt -------------------------------------- */
+1997  /* The PROC EXPORT that previously sat between these DATA steps has been    */
+1998  /* deleted. It rewrote the same path and destroyed everything written above */
+1999  /* it, and the DATA step below already emits the candidate list.            */
+2000  %macro write_discovery;
+2001    %local dt_run;
+2002    %let dt_run = %sysfunc(datetime(), datetime20.);
+2003  
+2004    data _null_;
+2005      file "&qc_path.\17_discovery.txt" lrecl=200;
+2006      put "=================================================================";
+2007      put "Phase 17 Discovery Report";
+2008      put "Run: &dt_run";
+2009      put "Program: 17_summary_stats_by_domain.sas (Section 0b)";
+2010      put "=================================================================";
+2011      put " ";
+2012      put "--- BASE ROW COUNT ---";
+2013      put "g.analysis_base rows: &n_base_rows";
+2014      put " ";
+2015      put "--- KEY METADATA ---";
+2016      put "PRECEDE_STUDY_ID in g.analysis_base:      type=&key_type_base  length=&key_len_base";
+2017      put "PRECEDE_STUDY_ID in g.master_data_merged: type=&key_type_merged  length=&key_len_merged";
+2018      put "Normalised join key length: $&key_norm_len";
+2019      put " ";
+2020      put "NOTE: a SAS variable has exactly one type per dataset. The CHAR vs";
+2021      put "NUM8 history describes the md1 to md8 SOURCE files, not the merged";
+2022      put "dataset, which now holds a single resolved type.";
+2023      put " ";
+2024      put "Sampled key values from g.analysis_base (up to 10, pipe-separated):";
+2025      put "&key_sample_base";
+2026      put "Sampled key values from g.master_data_merged (up to 10, pipe-separated):";
+2027      put "&key_sample_merged";
+2028      put "Inspect these for zero-padding before trusting the join format.";
+2029      put "Section 1 additionally tests the format empirically by match count.";
+2030      put " ";
+2031      put "--- KEY UNIQUENESS ---";
+2032      put "Duplicate PRECEDE_STUDY_ID count in g.master_data_merged (missing excluded): &n_key_dups";
+2033      put "Rows with a MISSING PRECEDE_STUDY_ID in g.master_data_merged: &n_missing_key";
+2034      put " ";
+2035      put "--- VARNN DEFECT SCAN ---";
+2036      put "Columns with positional VAR+digits names in g.analysis_base: &n_varnn";
+2037      put " ";
+2038    run;
+2039  
+2040    /* Year variable: decision, candidates, distribution */
+2041    data _null_;
+2042      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2043      put "--- YEAR VARIABLE ---";
+2044      put "Resolved year variable: &year_variable";
+2045      put "&year_note";
+2046      put " ";
+2047      put "Candidate columns considered:";
+2048    run;
+2049  
+2050    data _null_;
+2051      set work.year_candidates;
+2052      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2053      put "  " name "  type=" vtype "  label=" sas_label;
+2054    run;
+2055  
+2056    data _null_;
+2057      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2058      put " ";
+2059      put "Per-year row counts (missing included):";
+2060    run;
+2061  
+2062    data _null_;
+2063      set work.year_dist;
+2064      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2065      put "  year=" year_value "  n_rows=" n_rows;
+2066    run;
+2067  
+2068    /* Extension column list */
+2069    data _null_;
+2070      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2071      put " ";
+2072      put "--- EXTENSION COLUMN LIST (D-01 KEEP=) ---";
+2073      put "Columns in g.master_data_merged NOT in g.analysis_base, concept-filtered.";
+2074      put "PRECEDE_STUDY_ID_1 explicitly excluded (md6 duplicate).";
+2075      put "Count: &n_ext_cols";
+2076      put "REVIEW: the concept filter is a name heuristic. A frailty, cognitive";
+2077      put "or intraoperative variable named outside these fragments is missed.";
+2078      put "Confirm this list against the dictionary at Checkpoint 1.";
+2079      put " ";
+2080    run;
+2081  
+2082    data _null_;
+2083      set work.ext_candidates;
+2084      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2085      put "  " name "  type=" vtype;
+2086    run;
+2087  
+2088    /* Identifier candidates */
+2089    data _null_;
+2090      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2091      put " ";
+2092      put "--- IDENTIFIER CANDIDATES (marked OUT_OF_SCOPE in Wave 1) ---";
+2093      put "Matched on the anchored pattern (^ or underscore) ID or MRN (underscore or end).";
+2094    run;
+2095  
+2096    data _null_;
+2097      set work.id_candidates;
+2098      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2099      put "  " name;
+2100    run;
+2101  
+2102    /* High-cardinality character variables: review flag only */
+2103    data _null_;
+2104      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2105      put " ";
+2106      put "--- HIGH-CARDINALITY CHARACTER VARIABLES (>200 levels) ---";
+2107      put "REVIEW FLAG ONLY -- these are NOT excluded. CPT codes, procedure";
+2108      put "names and ZIP codes legitimately exceed 200 levels.";
+2109    run;
+2110  
+2111    data _null_;
+2112      set work.hi_card_chars;
+2113      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2114      put "  " name "  nlevels=" nlevels;
+2115    run;
+2116  
+2117    /* Sentinel applicability */
+2118    data _null_;
+2119      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2120      put " ";
+2121      put "--- SENTINEL APPLICABILITY (Wave 2 recodes ONLY these variables) ---";
+2122      put "Variables with at least one observed sentinel value: &n_sent_vars";
+2123      put "A variable here that nobody expected to carry a sentinel is a finding.";
+2124      put " ";
+2125      put "  -999 sentinel (numeric):";
+2126    run;
+2127  
+2128    data _null_;
+2129      set work.sentinel_applicable;
+2130      where sentinel_kind = 'NUM_-999';
+2131      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2132      put "    " varname "  n=" n_sentinel;
+2133    run;
+2134  
+2135    data _null_;
+2136      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2137      put "  literal NULL sentinel (character):";
+2138    run;
+2139  
+2140    data _null_;
+2141      set work.sentinel_applicable;
+2142      where sentinel_kind = 'CHAR_NULL';
+2143      file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2144      put "    " varname "  n=" n_sentinel;
+2145    run;
+2146  
+2147    %put NOTE: [17] Discovery report written to &qc_path.\17_discovery.txt;
+2148  %mend write_discovery;
+2149  %write_discovery;
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200;
+MPRINT(WRITE_DISCOVERY):   put "=================================================================";
+MPRINT(WRITE_DISCOVERY):   put "Phase 17 Discovery Report";
+MPRINT(WRITE_DISCOVERY):   put "Run: 10SEP2026:13:00:04";
+MPRINT(WRITE_DISCOVERY):   put "Program: 17_summary_stats_by_domain.sas (Section 0b)";
+MPRINT(WRITE_DISCOVERY):   put "=================================================================";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- BASE ROW COUNT ---";
+MPRINT(WRITE_DISCOVERY):   put "g.analysis_base rows: 41150";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- KEY METADATA ---";
+MPRINT(WRITE_DISCOVERY):   put "PRECEDE_STUDY_ID in g.analysis_base:      type=char  length=12";
+MPRINT(WRITE_DISCOVERY):   put "PRECEDE_STUDY_ID in g.master_data_merged: type=char  length=12";
+MPRINT(WRITE_DISCOVERY):   put "Normalised join key length: $12";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "NOTE: a SAS variable has exactly one type per dataset. The CHAR vs";
+MPRINT(WRITE_DISCOVERY):   put "NUM8 history describes the md1 to md8 SOURCE files, not the merged";
+MPRINT(WRITE_DISCOVERY):   put "dataset, which now holds a single resolved type.";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "Sampled key values from g.analysis_base (up to 10, pipe-separated):";
+MPRINT(WRITE_DISCOVERY):   put "Precede00001|Precede00002|Precede00003|Precede00004|Precede00005|Precede00006|Precede00007|Precede00008|Precede00009|Precede00010";
+MPRINT(WRITE_DISCOVERY):   put "Sampled key values from g.master_data_merged (up to 10, pipe-separated):";
+MPRINT(WRITE_DISCOVERY):   put "Precede00001|Precede00002|Precede00003|Precede00004|Precede00005|Precede00006|Precede00007|Precede00008|Precede00009|Precede00010";
+MPRINT(WRITE_DISCOVERY):   put "Inspect these for zero-padding before trusting the join format.";
+MPRINT(WRITE_DISCOVERY):   put "Section 1 additionally tests the format empirically by match count.";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- KEY UNIQUENESS ---";
+MPRINT(WRITE_DISCOVERY):   put "Duplicate PRECEDE_STUDY_ID count in g.master_data_merged (missing excluded): 0";
+MPRINT(WRITE_DISCOVERY):   put "Rows with a MISSING PRECEDE_STUDY_ID in g.master_data_merged: 0";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- VARNN DEFECT SCAN ---";
+MPRINT(WRITE_DISCOVERY):   put "Columns with positional VAR+digits names in g.analysis_base: 0";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=0,
+      Last Modified=10Sep2026:13:00:03,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 32 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 129.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "--- YEAR VARIABLE ---";
+MPRINT(WRITE_DISCOVERY):   put "Resolved year variable: YEAR";
+MPRINT(WRITE_DISCOVERY):   put "Year variable resolved to YEAR";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "Candidate columns considered:";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=1482,
+      Last Modified=10Sep2026:13:00:03,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 5 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 30.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.year_candidates;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "  " name "  type=" vtype "  label=" sas_label;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=1601,
+      Last Modified=10Sep2026:13:00:03,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 7 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 30.
+      The maximum record length was 72.
+NOTE: There were 7 observations read from the data set WORK.YEAR_CANDIDATES.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "Per-year row counts (missing included):";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=2014,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 2 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 39.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.year_dist;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "  year=" year_value "  n_rows=" n_rows;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=2058,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 5 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 24.
+      The maximum record length was 26.
+NOTE: There were 5 observations read from the data set WORK.YEAR_DIST.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- EXTENSION COLUMN LIST (D-01 KEEP=) ---";
+MPRINT(WRITE_DISCOVERY):   put "Columns in g.master_data_merged NOT in g.analysis_base, concept-filtered.";
+MPRINT(WRITE_DISCOVERY):   put "PRECEDE_STUDY_ID_1 explicitly excluded (md6 duplicate).";
+MPRINT(WRITE_DISCOVERY):   put "Count: 23";
+MPRINT(WRITE_DISCOVERY):   put "REVIEW: the concept filter is a name heuristic. A frailty, cognitive";
+MPRINT(WRITE_DISCOVERY):   put "or intraoperative variable named outside these fragments is missed.";
+MPRINT(WRITE_DISCOVERY):   put "Confirm this list against the dictionary at Checkpoint 1.";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=2193,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 9 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 73.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.ext_candidates;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "  " name "  type=" vtype;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=2584,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 23 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 24.
+      The maximum record length was 40.
+NOTE: There were 23 observations read from the data set WORK.EXT_CANDIDATES.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- IDENTIFIER CANDIDATES (marked OUT_OF_SCOPE in Wave 1) ---";
+MPRINT(WRITE_DISCOVERY):   put "Matched on the anchored pattern (^ or underscore) ID or MRN (underscore or end).";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=3351,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 3 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 80.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.id_candidates;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "  " name;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=3499,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 3 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 15.
+      The maximum record length was 21.
+NOTE: There were 3 observations read from the data set WORK.ID_CANDIDATES.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- HIGH-CARDINALITY CHARACTER VARIABLES (>200 levels) ---";
+MPRINT(WRITE_DISCOVERY):   put "REVIEW FLAG ONLY -- these are NOT excluded. CPT codes, procedure";
+MPRINT(WRITE_DISCOVERY):   put "names and ZIP codes legitimately exceed 200 levels.";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=3559,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 4 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 64.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.hi_card_chars;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "  " name "  nlevels=" nlevels;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=3741,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 9 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 22.
+      The maximum record length was 47.
+NOTE: There were 9 observations read from the data set WORK.HI_CARD_CHARS.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "--- SENTINEL APPLICABILITY (Wave 2 recodes ONLY these variables) ---";
+MPRINT(WRITE_DISCOVERY):   put "Variables with at least one observed sentinel value: 0";
+MPRINT(WRITE_DISCOVERY):   put "A variable here that nobody expected to carry a sentinel is a finding.";
+MPRINT(WRITE_DISCOVERY):   put " ";
+MPRINT(WRITE_DISCOVERY):   put "  -999 sentinel (numeric):";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=4077,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 6 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 70.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.sentinel_applicable;
+MPRINT(WRITE_DISCOVERY):   where sentinel_kind = 'NUM_-999';
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "    " varname "  n=" n_sentinel;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=4309,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 0 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+NOTE: There were 0 observations read from the data set WORK.SENTINEL_APPLICABLE.
+      WHERE sentinel_kind='NUM_-999';
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "  literal NULL sentinel (character):";
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=4309,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 1 record was written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 36.
+      The maximum record length was 36.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(WRITE_DISCOVERY):   data _null_;
+MPRINT(WRITE_DISCOVERY):   set work.sentinel_applicable;
+MPRINT(WRITE_DISCOVERY):   where sentinel_kind = 'CHAR_NULL';
+MPRINT(WRITE_DISCOVERY):   file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" lrecl=200 mod;
+MPRINT(WRITE_DISCOVERY):   put "    " varname "  n=" n_sentinel;
+MPRINT(WRITE_DISCOVERY):   run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=4347,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 0 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+NOTE: There were 0 observations read from the data set WORK.SENTINEL_APPLICABLE.
+      WHERE sentinel_kind='CHAR_NULL';
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.00 seconds
+      
+
+NOTE: [17] Discovery report written to P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt
+2150  
+2151  %put NOTE: ==== Section 0b complete ====;
+NOTE: ==== Section 0b complete ====
+2152  
+2153  
+2154  /* =========================================================================
+2155     SECTION 1: Build work.analysis_base_ext (D-01 join)
+2156     -------------------------------------------------------------------------
+2157     1. Defensive globals
+2158     2. Key uniqueness gate (missing keys already excluded from the test)
+2159     3. Macro-time key type resolution
+2160     4. KEEP= list from work.ext_candidates, with a row-count check
+2161     5. Normalise BOTH keys to CHAR; test the numeric format empirically
+2162     6. Sort and left merge
+2163     7. Row-count and cognitive-score assertions
+2164     8. Per-column coverage, appended to the discovery report
+2165     ========================================================================= */
+2166  
+2167  %put NOTE: ==== Section 1: build work.analysis_base_ext starting ====;
+NOTE: ==== Section 1: build work.analysis_base_ext starting ====
+2168  
+2169  /* ---- 1. Defensive globals ---------------------------------------------- */
+2170  /* Declared and emptied here so no later step can reference an undefined    */
+2171  /* macro variable if an upstream branch was skipped.                        */
+2172  %global D3_DENOM_NOTE cog_col n_cog_nonmiss key_fmt extension_keep_list
+2173          ext_num_list ext_chr_list;
+2174  %let D3_DENOM_NOTE     = ;
+2175  %let cog_col           = ;
+2176  %let n_cog_nonmiss     = .;
+2177  %let key_fmt           = ;
+2178  %let extension_keep_list = ;
+2179  %let ext_num_list      = ;
+2180  %let ext_chr_list      = ;
+2181  
+2182  
+2183  /* ---- 2. Key uniqueness gate -------------------------------------------- */
+2184  %macro check_key_unique;
+2185    %if &n_key_dups > 0 %then %do;
+2186      %fail_out(msg=&n_key_dups duplicate PRECEDE_STUDY_ID values in g.master_data_merged -- the extension merge requires a unique key or an explicit collapse rule);
+2187    %end;
+2188    %put NOTE: [17-S1] PRECEDE_STUDY_ID uniqueness confirmed (dups=&n_key_dups missing=&n_missing_key).;
+2189  %mend check_key_unique;
+2190  %check_key_unique;
+NOTE: [17-S1] PRECEDE_STUDY_ID uniqueness confirmed (dups=0 missing=0).
+2191  
+2192  
+2193  /* ---- 3. KEEP= list from work.ext_candidates ---------------------------- */
+2194  /* Check the ROW COUNT, not merely that the table exists. An empty table    */
+2195  /* would leave extension_keep_list empty and break the KEEP= below.         */
+2196  %macro check_ext_candidates;
+2197    %if &n_ext_cols = 0 %then %do;
+2198      %fail_out(msg=work.ext_candidates has no rows -- the concept filter matched nothing and the D-01 extension cannot be built);
+2199    %end;
+2200  %mend check_ext_candidates;
+2201  %check_ext_candidates;
+2202  
+2203  proc sql noprint;
+2204    select name into :extension_keep_list separated by ' ' from work.ext_candidates;
+2205    select name into :ext_num_list separated by ' ' from work.ext_candidates where vtype='num';
+2206    select name into :ext_chr_list separated by ' ' from work.ext_candidates where vtype='char';
+2207  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2208  
+2209  %put NOTE: [17-S1] extension_keep_list: &extension_keep_list;
+NOTE: [17-S1] extension_keep_list: FEELS_EXAUSTED LOW_PHYSICAL_ACTIVITY SLOW_WALKING_SPEED UNINTENDED_WEIGHT_LOSS WEEK_GRIP_STRENGTH COGNITIVE_DISORDER ISO_SEV_INTRAOP_MAC_AVERAGE 
+ISO_SEV_MAC_TOTAL_EXP ABP_LESS_THAN_60_COUNT ABP_LESS_THAN_70_COUNT ABP_LESS_THAN_80_COUNT BIS_INDEX_LESS_30_COUNT BIS_INDEX_LESS_40_COUNT NIBP_LESS_60_COUNT NIBP_LESS_70_COUNT NIBP_LESS_80_COUNT 
+SD_ABP_MEAN SD_NIBP_MEAN SD_BIS_INDEX AVG_ABP_MEAN AVG_NIBP_MEAN AVG_BIS_INDEX TOTAL_MIDAZOLAM_MG
+2210  
+2211  
+2212  /* ---- 4. Normalise the base key ----------------------------------------- */
+2213  %macro norm_base_key;
+2214    data work.base_keyed;
+2215      set g.analysis_base;
+2216      length _key_c $&key_norm_len;
+2217      %if &key_type_base = num %then %do;
+2218        _key_c = strip(put(PRECEDE_STUDY_ID, best12.));
+2219      %end;
+2220      %else %do;
+2221        _key_c = strip(PRECEDE_STUDY_ID);
+2222      %end;
+2223      drop PRECEDE_STUDY_ID;
+2224      rename _key_c = PRECEDE_STUDY_ID;
+2225    run;
+2226  %mend norm_base_key;
+2227  %norm_base_key;
+MPRINT(NORM_BASE_KEY):   data work.base_keyed;
+MPRINT(NORM_BASE_KEY):   set g.analysis_base;
+MPRINT(NORM_BASE_KEY):   length _key_c $12;
+MPRINT(NORM_BASE_KEY):   _key_c = strip(PRECEDE_STUDY_ID);
+MPRINT(NORM_BASE_KEY):   drop PRECEDE_STUDY_ID;
+MPRINT(NORM_BASE_KEY):   rename _key_c = PRECEDE_STUDY_ID;
+MPRINT(NORM_BASE_KEY):   run;
+
+NOTE: There were 41150 observations read from the data set G.ANALYSIS_BASE.
+NOTE: The data set WORK.BASE_KEYED has 41150 observations and 125 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+      
+
+2228  
+2229  
+2230  /* ---- 5. Normalise the extension key, choosing the format empirically --- */
+2231  /* The sampled values in the discovery report tell the reviewer what the    */
+2232  /* keys look like, but the program must not depend on anyone eyeballing     */
+2233  /* them. When the merged key is numeric, both candidate representations are */
+2234  /* tested against the base keys and the one that actually matches is used.  */
+2235  /* best12. gives 123456789 and z12. gives 000123456789 -- picking wrong     */
+2236  /* yields a join that matches nothing while the row count still passes.     */
+2237  %macro build_ext_cols(fmt=);
+2238    data work.merged_ext_cols;
+2239      set g.master_data_merged (keep=PRECEDE_STUDY_ID &extension_keep_list);
+2240      length _key_c $&key_norm_len;
+2241      if missing(PRECEDE_STUDY_ID) then delete;
+2242      %if &key_type_merged = num %then %do;
+2243        %if &fmt = Z %then %do;
+2244          _key_c = put(PRECEDE_STUDY_ID, z12.);
+2245        %end;
+2246        %else %do;
+2247          _key_c = strip(put(PRECEDE_STUDY_ID, best12.));
+2248        %end;
+2249      %end;
+2250      %else %do;
+2251        _key_c = strip(PRECEDE_STUDY_ID);
+2252      %end;
+2253      drop PRECEDE_STUDY_ID;
+2254      rename _key_c = PRECEDE_STUDY_ID;
+2255    run;
+2256  %mend build_ext_cols;
+2257  
+2258  %macro count_key_overlap(into=);
+2259    proc sql noprint;
+2260      select count(*) into :&into trimmed
+2261      from work.merged_ext_cols
+2262      where PRECEDE_STUDY_ID in (select PRECEDE_STUDY_ID from work.base_keyed);
+2263    quit;
+2264  %mend count_key_overlap;
+2265  
+2266  %macro pick_key_format;
+2267    %local n_best n_z;
+2268    %let n_best = 0;
+2269    %let n_z    = 0;
+2270  
+2271    %if &key_type_merged = char %then %do;
+2272      %let key_fmt = CHAR;
+2273      %build_ext_cols(fmt=CHAR);
+2274      %count_key_overlap(into=n_best);
+2275      %put NOTE: [17-S1] character key: &n_best extension rows match a base key.;
+2276      %if &n_best = 0 %then %do;
+2277        %fail_out(msg=Character join key produced zero matches against g.analysis_base -- padding or case differs between the two datasets);
+2278      %end;
+2279    %end;
+2280    %else %do;
+2281      %build_ext_cols(fmt=BEST);
+2282      %count_key_overlap(into=n_best);
+2283      %put NOTE: [17-S1] best12. representation: &n_best matches.;
+2284  
+2285      %if &n_best = 0 %then %do;
+2286        %put WARNING: [17-S1] best12. matched nothing. Testing zero-padded z12.;
+2287        %build_ext_cols(fmt=Z);
+2288        %count_key_overlap(into=n_z);
+2289        %put NOTE: [17-S1] z12. representation: &n_z matches.;
+2290        %if &n_z = 0 %then %do;
+2291          %fail_out(msg=Neither best12. nor z12. matched any base key -- the numeric key cannot be reconciled with the character key in g.analysis_base);
+2292        %end;
+2293        %let key_fmt = Z12;
+2294      %end;
+2295      %else %do;
+2296        %let key_fmt = BEST12;
+2297      %end;
+2298    %end;
+2299    %put NOTE: [17-S1] key format selected: &key_fmt;
+2300  %mend pick_key_format;
+2301  %pick_key_format;
+MPRINT(BUILD_EXT_COLS):   data work.merged_ext_cols;
+MPRINT(BUILD_EXT_COLS):   set g.master_data_merged (keep=PRECEDE_STUDY_ID FEELS_EXAUSTED LOW_PHYSICAL_ACTIVITY SLOW_WALKING_SPEED UNINTENDED_WEIGHT_LOSS WEEK_GRIP_STRENGTH COGNITIVE_DISORDER 
+ISO_SEV_INTRAOP_MAC_AVERAGE ISO_SEV_MAC_TOTAL_EXP ABP_LESS_THAN_60_COUNT ABP_LESS_THAN_70_COUNT ABP_LESS_THAN_80_COUNT BIS_INDEX_LESS_30_COUNT BIS_INDEX_LESS_40_COUNT NIBP_LESS_60_COUNT 
+NIBP_LESS_70_COUNT NIBP_LESS_80_COUNT SD_ABP_MEAN SD_NIBP_MEAN SD_BIS_INDEX AVG_ABP_MEAN AVG_NIBP_MEAN AVG_BIS_INDEX TOTAL_MIDAZOLAM_MG);
+MPRINT(BUILD_EXT_COLS):   length _key_c $12;
+MPRINT(BUILD_EXT_COLS):   if missing(PRECEDE_STUDY_ID) then delete;
+MPRINT(BUILD_EXT_COLS):   _key_c = strip(PRECEDE_STUDY_ID);
+MPRINT(BUILD_EXT_COLS):   drop PRECEDE_STUDY_ID;
+MPRINT(BUILD_EXT_COLS):   rename _key_c = PRECEDE_STUDY_ID;
+MPRINT(BUILD_EXT_COLS):   run;
+
+NOTE: There were 41150 observations read from the data set G.MASTER_DATA_MERGED.
+NOTE: The data set WORK.MERGED_EXT_COLS has 41150 observations and 24 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+MPRINT(PICK_KEY_FORMAT):  ;
+MPRINT(COUNT_KEY_OVERLAP):   proc sql noprint;
+MPRINT(COUNT_KEY_OVERLAP):   select count(*) into :n_best trimmed from work.merged_ext_cols where PRECEDE_STUDY_ID in (select PRECEDE_STUDY_ID from work.base_keyed);
+MPRINT(COUNT_KEY_OVERLAP):   quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+      
+
+MPRINT(PICK_KEY_FORMAT):  ;
+NOTE: [17-S1] character key: 41150 extension rows match a base key.
+NOTE: [17-S1] key format selected: CHAR
+2302  
+2303  
+2304  /* ---- 6. Sort and left merge -------------------------------------------- */
+2305  proc sort data=work.merged_ext_cols; by PRECEDE_STUDY_ID; run;
+
+NOTE: There were 41150 observations read from the data set WORK.MERGED_EXT_COLS.
+NOTE: The data set WORK.MERGED_EXT_COLS has 41150 observations and 24 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+2306  proc sort data=work.base_keyed out=work.analysis_base_sorted; by PRECEDE_STUDY_ID; run;
+
+NOTE: There were 41150 observations read from the data set WORK.BASE_KEYED.
+NOTE: The data set WORK.ANALYSIS_BASE_SORTED has 41150 observations and 125 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.06 seconds
+      
+
+2307  
+2308  data work.analysis_base_ext;
+2309    merge work.analysis_base_sorted (in=inbase)
+2310          work.merged_ext_cols;
+2311    by PRECEDE_STUDY_ID;
+2312    if inbase;
+2313  run;
+
+NOTE: There were 41150 observations read from the data set WORK.ANALYSIS_BASE_SORTED.
+NOTE: There were 41150 observations read from the data set WORK.MERGED_EXT_COLS.
+NOTE: The data set WORK.ANALYSIS_BASE_EXT has 41150 observations and 148 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.04 seconds
+      
+
+2314  
+2315  
+2316  /* ---- 7. Row-count assertion -------------------------------------------- */
+2317  %let n_ext_rows = 0;
+2318  proc sql noprint;
+2319    select count(*) into :n_ext_rows trimmed from work.analysis_base_ext;
+2320  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2321  
+2322  %macro check_ext_rows;
+2323    %if &n_ext_rows ne &n_base_rows %then %do;
+2324      %fail_out(msg=Row count mismatch after the D-01 join: work.analysis_base_ext has &n_ext_rows rows against &n_base_rows in g.analysis_base);
+2325    %end;
+2326    %put NOTE: [17-S1] Row-count assertion passed: &n_ext_rows rows.;
+2327  %mend check_ext_rows;
+2328  %check_ext_rows;
+NOTE: [17-S1] Row-count assertion passed: 41150 rows.
+2329  
+2330  
+2331  /* ---- 8. Cognitive-score non-missing guard ------------------------------ */
+2332  proc sql noprint;
+2333    select name into :cog_col trimmed
+2334    from work.ext_candidates
+2335    where index(upcase(name),'COGNI') > 0 and index(upcase(name),'SCORE') > 0;
+NOTE: No rows were selected.
+2336  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2337  
+2338  %macro check_cog_populated;
+2339    %if %length(&cog_col) = 0 %then %do;
+2340      %put WARNING: [17-S1] No cognitive score column (COGNI and SCORE) in ext_candidates. Cognitive guard skipped.;
+2341    %end;
+2342    %else %do;
+2343      %let n_cog_nonmiss = 0;
+2344      proc sql noprint;
+2345        select count(*) into :n_cog_nonmiss trimmed
+2346        from work.analysis_base_ext
+2347        where not missing(&cog_col);
+2348      quit;
+2349      %if &n_cog_nonmiss = 0 %then %do;
+2350        %fail_out(msg=Cognitive score column &cog_col is all-missing in work.analysis_base_ext -- the join key silently failed to match);
+2351      %end;
+2352      %put NOTE: [17-S1] Cognitive guard passed: &cog_col has &n_cog_nonmiss non-missing values.;
+2353    %end;
+2354  %mend check_cog_populated;
+2355  %check_cog_populated;
+WARNING: [17-S1] No cognitive score column (COGNI and SCORE) in ext_candidates. Cognitive guard skipped.
+2356  
+2357  
+2358  /* ---- 9. Per-column extension coverage ---------------------------------- */
+2359  /* Computed on work.analysis_base_ext AFTER the join, so the denominator is */
+2360  /* the base row count and the figure is meaningful. The previous Section 0b */
+2361  /* version counted in g.master_data_merged but divided by the base row      */
+2362  /* count, which could exceed 100 percent.                                   */
+2363  /* Single pass with arrays, split by type -- a SAS array cannot mix types.  */
+2364  %macro ext_coverage;
+2365    %local n_en n_ec;
+2366    %let n_en = %sysfunc(countw(&ext_num_list));
+2367    %let n_ec = %sysfunc(countw(&ext_chr_list));
+2368  
+2369    data work.ext_coverage(keep=_vn _nm rename=(_vn=varname _nm=n_nonmiss));
+2370      length _vn $32 _nm 8;
+2371      set work.analysis_base_ext end=_eof;
+2372  
+2373      %if &n_en > 0 %then %do;
+2374        array _en {*} &ext_num_list;
+2375        array _kn {&n_en} _temporary_;
+2376        do _i = 1 to dim(_en);
+2377          if not missing(_en{_i}) then _kn{_i} + 1;
+2378        end;
+2379      %end;
+2380  
+2381      %if &n_ec > 0 %then %do;
+2382        array _ec {*} &ext_chr_list;
+2383        array _kc {&n_ec} _temporary_;
+2384        do _j = 1 to dim(_ec);
+2385          if not missing(_ec{_j}) then _kc{_j} + 1;
+2386        end;
+2387      %end;
+2388  
+2389      if _eof then do;
+2390        %if &n_en > 0 %then %do;
+2391          do _i = 1 to &n_en;
+2392            _vn = upcase(vname(_en{_i}));
+2393            _nm = coalesce(_kn{_i}, 0);
+2394            output;
+2395          end;
+2396        %end;
+2397        %if &n_ec > 0 %then %do;
+2398          do _j = 1 to &n_ec;
+2399            _vn = upcase(vname(_ec{_j}));
+2400            _nm = coalesce(_kc{_j}, 0);
+2401            output;
+2402          end;
+2403        %end;
+2404      end;
+2405    run;
+2406  
+2407    data work.ext_coverage;
+2408      set work.ext_coverage;
+2409      length coverage_flag $40;
+2410      pct_of_base = 100 * n_nonmiss / &n_base_rows;
+2411      if pct_of_base < 90 then coverage_flag = 'PARTIAL';
+2412      else coverage_flag = 'FULL';
+2413    run;
+2414  %mend ext_coverage;
+2415  %ext_coverage;
+MPRINT(EXT_COVERAGE):   data work.ext_coverage(keep=_vn _nm rename=(_vn=varname _nm=n_nonmiss));
+MPRINT(EXT_COVERAGE):   length _vn $32 _nm 8;
+MPRINT(EXT_COVERAGE):   set work.analysis_base_ext end=_eof;
+MPRINT(EXT_COVERAGE):   array _en {*} ISO_SEV_INTRAOP_MAC_AVERAGE ISO_SEV_MAC_TOTAL_EXP ABP_LESS_THAN_60_COUNT ABP_LESS_THAN_70_COUNT ABP_LESS_THAN_80_COUNT BIS_INDEX_LESS_30_COUNT 
+BIS_INDEX_LESS_40_COUNT NIBP_LESS_60_COUNT NIBP_LESS_70_COUNT NIBP_LESS_80_COUNT SD_ABP_MEAN SD_NIBP_MEAN SD_BIS_INDEX AVG_ABP_MEAN AVG_NIBP_MEAN AVG_BIS_INDEX TOTAL_MIDAZOLAM_MG;
+MPRINT(EXT_COVERAGE):   array _kn {17} _temporary_;
+MPRINT(EXT_COVERAGE):   do _i = 1 to dim(_en);
+MPRINT(EXT_COVERAGE):   if not missing(_en{_i}) then _kn{_i} + 1;
+MPRINT(EXT_COVERAGE):   end;
+MPRINT(EXT_COVERAGE):   array _ec {*} FEELS_EXAUSTED LOW_PHYSICAL_ACTIVITY SLOW_WALKING_SPEED UNINTENDED_WEIGHT_LOSS WEEK_GRIP_STRENGTH COGNITIVE_DISORDER;
+MPRINT(EXT_COVERAGE):   array _kc {6} _temporary_;
+MPRINT(EXT_COVERAGE):   do _j = 1 to dim(_ec);
+MPRINT(EXT_COVERAGE):   if not missing(_ec{_j}) then _kc{_j} + 1;
+MPRINT(EXT_COVERAGE):   end;
+MPRINT(EXT_COVERAGE):   if _eof then do;
+MPRINT(EXT_COVERAGE):   do _i = 1 to 17;
+MPRINT(EXT_COVERAGE):   _vn = upcase(vname(_en{_i}));
+MPRINT(EXT_COVERAGE):   _nm = coalesce(_kn{_i}, 0);
+MPRINT(EXT_COVERAGE):   output;
+MPRINT(EXT_COVERAGE):   end;
+MPRINT(EXT_COVERAGE):   do _j = 1 to 6;
+MPRINT(EXT_COVERAGE):   _vn = upcase(vname(_ec{_j}));
+MPRINT(EXT_COVERAGE):   _nm = coalesce(_kc{_j}, 0);
+MPRINT(EXT_COVERAGE):   output;
+MPRINT(EXT_COVERAGE):   end;
+MPRINT(EXT_COVERAGE):   end;
+MPRINT(EXT_COVERAGE):   run;
+
+NOTE: There were 41150 observations read from the data set WORK.ANALYSIS_BASE_EXT.
+NOTE: The data set WORK.EXT_COVERAGE has 23 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+      
+
+MPRINT(EXT_COVERAGE):   data work.ext_coverage;
+MPRINT(EXT_COVERAGE):   set work.ext_coverage;
+MPRINT(EXT_COVERAGE):   length coverage_flag $40;
+MPRINT(EXT_COVERAGE):   pct_of_base = 100 * n_nonmiss / 41150;
+MPRINT(EXT_COVERAGE):   if pct_of_base < 90 then coverage_flag = 'PARTIAL';
+MPRINT(EXT_COVERAGE):   else coverage_flag = 'FULL';
+MPRINT(EXT_COVERAGE):   run;
+
+NOTE: There were 23 observations read from the data set WORK.EXT_COVERAGE.
+NOTE: The data set WORK.EXT_COVERAGE has 23 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2416  
+2417  %let n_partial_cov = 0;
+2418  proc sql noprint;
+2419    select count(*) into :n_partial_cov trimmed
+2420    from work.ext_coverage where coverage_flag = 'PARTIAL';
+2421  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+      
+
+2422  
+2423  /* Denominator note. It does NOT claim a single N for both blocks: coverage */
+2424  /* differs by extension variable, and the cognitive-score count is not the  */
+2425  /* frailty denominator. Per-variable N appears in the results themselves.   */
+2426  %macro set_denom_note;
+2427    %if &n_partial_cov > 0 %then %do;
+2428      %let D3_DENOM_NOTE = Coverage varies by variable in this block. Statistics use the non-missing observations available for each variable rather than the &n_base_rows row base. See the
+2428! per-variable N column and the QC sheet coverage table.;
+2429      %put NOTE: [17-S1] PARTIAL coverage on &n_partial_cov extension columns. Denominator note set.;
+2430    %end;
+2431    %else %do;
+2432      %let D3_DENOM_NOTE = ;
+2433      %put NOTE: [17-S1] Full coverage on all extension columns.;
+2434    %end;
+2435  %mend set_denom_note;
+2436  %set_denom_note;
+NOTE: [17-S1] PARTIAL coverage on 23 extension columns. Denominator note set.
+2437  
+2438  /* Append the coverage block to the discovery report */
+2439  data _null_;
+2440    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2441    put " ";
+2442    put "--- EXTENSION COVERAGE (post-join, denominator = &n_base_rows base rows) ---";
+2443    put "Columns flagged PARTIAL: &n_partial_cov";
+2444  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=4347,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 3 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 69.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+2445  
+2446  data _null_;
+2447    set work.ext_coverage;
+2448    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2449    put "  " varname "  n_nonmiss=" n_nonmiss "  pct_of_base=" pct_of_base 6.1 "  " coverage_flag;
+2450  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=4450,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 23 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 60.
+      The maximum record length was 76.
+NOTE: There were 23 observations read from the data set WORK.EXT_COVERAGE.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+2451  
+2452  data _null_;
+2453    file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+2454    put " ";
+2455    put "=================================================================";
+2456    put "End of Phase 17 Discovery Report";
+2457    put "=================================================================";
+2458  run;
+
+NOTE: The file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt" is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt,
+      RECFM=V,LRECL=200,File Size (bytes)=6043,
+      Last Modified=10Sep2026:13:00:04,
+      Create Time=03Sep2026:12:54:03
+
+NOTE: 4 records were written to the file "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_discovery.txt".
+      The minimum record length was 1.
+      The maximum record length was 65.
+NOTE: DATA statement used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.00 seconds
+      
+
+2459  
+2460  %put NOTE: ==== Section 1 complete: work.analysis_base_ext ready ====;
+NOTE: ==== Section 1 complete: work.analysis_base_ext ready ====
+2461  
+2462  
+2463  /* =========================================================================
+2464     SECTION 2: Import PRECEDE dictionary
+2465     ========================================================================= */
+2466  
+2467  %put NOTE: ==== Section 2: import PRECEDE dictionary starting ====;
+NOTE: ==== Section 2: import PRECEDE dictionary starting ====
+2468  
+2469  proc import datafile="&docs_path.\precede_dictionary.csv"
+2470      out=work.dict_raw dbms=csv replace;
+2471    guessingrows=max;
+2472  run;
+
+2473   /**********************************************************************
+2474   *   PRODUCT:   SAS
+2475   *   VERSION:   9.4
+2476   *   CREATOR:   External File Interface
+2477   *   DATE:      10SEP26
+2478   *   DESC:      Generated SAS Datastep Code
+2479   *   TEMPLATE SOURCE:  (None Specified.)
+2480   ***********************************************************************/
+2481      data WORK.DICT_RAW    ;
+2482      %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
+2483      infile 'C:\Master_Renamed_same_format_accross\docs\precede_dictionary.csv' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=2 ;
+2484         informat sheet $31. ;
+2485         informat dict_name $41. ;
+2486         informat dict_type $11. ;
+2487         informat description $292. ;
+2488         informat source $99. ;
+2489         informat note $48. ;
+2490         informat sas_name $32. ;
+2491         format sheet $31. ;
+2492         format dict_name $41. ;
+2493         format dict_type $11. ;
+2494         format description $292. ;
+2495         format source $99. ;
+2496         format note $48. ;
+2497         format sas_name $32. ;
+2498      input
+2499                  sheet  $
+2500                  dict_name  $
+2501                  dict_type  $
+2502                  description  $
+2503                  source  $
+2504                  note  $
+2505                  sas_name  $
+2506      ;
+2507      if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
+2508      run;
+
+NOTE: The infile 'C:\Master_Renamed_same_format_accross\docs\precede_dictionary.csv' is:
+      Filename=C:\Master_Renamed_same_format_accross\docs\precede_dictionary.csv,
+      RECFM=V,LRECL=32767,File Size (bytes)=39763,
+      Last Modified=28Aug2026:14:40:26,
+      Create Time=28Aug2026:14:40:26
+
+NOTE: 314 records were read from the infile 'C:\Master_Renamed_same_format_accross\docs\precede_dictionary.csv'.
+      The minimum record length was 15.
+      The maximum record length was 355.
+NOTE: The data set WORK.DICT_RAW has 314 observations and 7 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+314 rows created in WORK.DICT_RAW from C:\Master_Renamed_same_format_accross\docs\precede_dictionary.csv.
+  
+  
+  
+NOTE: WORK.DICT_RAW data set was successfully created.
+NOTE: The data set WORK.DICT_RAW has 314 observations and 7 variables.
+NOTE: PROCEDURE IMPORT used (Total process time):
+      real time           0.42 seconds
+      cpu time            0.06 seconds
+      
+
+2509  
+2510  data work.dict;
+2511    length sheet $40 dict_name $60 dict_type $20 description $300 sas_name $32;
+2512    set work.dict_raw (rename=(sheet=_s dict_name=_n dict_type=_t
+2513                               description=_d sas_name=_a));
+2514    sheet       = strip(cats(_s));
+2515    dict_name   = strip(cats(_n));
+2516    dict_type   = strip(cats(_t));
+2517    description = strip(cats(_d));
+2518    /* UPCASE before sort: BY-group processing is case-sensitive */
+2519    sas_name    = upcase(strip(cats(_a)));
+2520    if missing(sas_name) then delete;
+2521    /* MASTER_DATASET first, DERIVED second, so the authoritative sheet wins */
+2522    if      sheet = 'MASTER_DATASET'           then sheet_rank = 1;
+2523    else if sheet = 'DERIVED_VARIABLES_MASTER' then sheet_rank = 2;
+2524    else                                            sheet_rank = 3;
+2525    keep sheet dict_name dict_type description sas_name sheet_rank;
+2526  run;
+
+NOTE: There were 314 observations read from the data set WORK.DICT_RAW.
+NOTE: The data set WORK.DICT has 310 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2527  
+2528  proc sort data=work.dict; by sas_name sheet_rank sheet; run;
+
+NOTE: There were 310 observations read from the data set WORK.DICT.
+NOTE: The data set WORK.DICT has 310 observations and 6 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2529  
+2530  /* One row per documented name: the dictionary repeats names across sheets */
+2531  data work.dict_u;
+2532    set work.dict;
+2533    by sas_name;
+2534    if first.sas_name;
+2535  run;
+
+NOTE: There were 310 observations read from the data set WORK.DICT.
+NOTE: The data set WORK.DICT_U has 200 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+2536  
+2537  %put NOTE: ==== Section 2 complete: work.dict_u ready ====;
+NOTE: ==== Section 2 complete: work.dict_u ready ====
+2538  
+2539  
+2540  /* =========================================================================
+2541     SECTION 3: Match dictionary against work.analysis_base_ext
+2542     -------------------------------------------------------------------------
+2543     Two-tier match: exact then squash (underscores compressed).
+2544     Matched against ANALYSIS_BASE_EXT, not ANALYSIS_BASE, so the extension
+2545     columns are documented too.
+2546     ========================================================================= */
+2547  
+2548  %put NOTE: ==== Section 3: dictionary match starting ====;
+NOTE: ==== Section 3: dictionary match starting ====
+2549  
+2550  proc sql;
+2551    create table work.actual_ext as
+2552      select upcase(name) as var_u     length=32,
+2553             upcase(name) as varname   length=32,
+2554             type         as vtype     length=4,
+2555             length       as vlen,
+2556             label        as sas_label length=256,
+2557             varnum
+2558      from dictionary.columns
+2559      where libname='WORK' and memname='ANALYSIS_BASE_EXT';
+NOTE: Table WORK.ACTUAL_EXT created, with 148 rows and 6 columns.
+
+2560  
+2561    create table work.doc_all_ext as
+2562      select a.varnum, a.varname, a.vtype, a.vlen, a.sas_label,
+2563             d.dict_name, d.dict_type, d.description, d.sheet, d.sas_name,
+2564             case when a.var_u = upcase(d.sas_name) then 'EXACT'
+2565                  else 'SQUASH' end as match_how length=8,
+2566             case when a.var_u = upcase(d.sas_name) then 1
+2567                  else 3 end as match_rank
+2568      from work.actual_ext as a
+2569      inner join work.dict_u as d
+2570        on a.var_u = upcase(d.sas_name)
+2571           or compress(a.var_u,'_') = compress(upcase(d.sas_name),'_');
+NOTE: The execution of this query involves performing one or more Cartesian product joins that can not be optimized.
+NOTE: Table WORK.DOC_ALL_EXT created, with 85 rows and 12 columns.
+
+2572  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+2573  
+2574  proc sort data=work.doc_all_ext; by varname match_rank dict_name; run;
+
+NOTE: There were 85 observations read from the data set WORK.DOC_ALL_EXT.
+NOTE: The data set WORK.DOC_ALL_EXT has 85 observations and 12 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2575  
+2576  /* Keep the strongest match per variable */
+2577  data work.var_domain_raw;
+2578    set work.doc_all_ext;
+2579    by varname;
+2580    if first.varname;
+2581  run;
+
+NOTE: There were 85 observations read from the data set WORK.DOC_ALL_EXT.
+NOTE: The data set WORK.VAR_DOMAIN_RAW has 85 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+2582  
+2583  /* Match ties: two dictionary entries matching one column equally well */
+2584  %let n_ties_ext = 0;
+2585  proc sql noprint;
+2586    create table work.match_ties_ext as
+2587      select a.varname, count(*) as n_at_best
+2588      from work.doc_all_ext as a
+2589      inner join work.var_domain_raw as b
+2590        on a.varname = b.varname and a.match_rank = b.match_rank
+2591      group by a.varname having calculated n_at_best > 1;
+NOTE: Table WORK.MATCH_TIES_EXT created, with 0 rows and 2 columns.
+
+2592    select count(*) into :n_ties_ext trimmed from work.match_ties_ext;
+2593  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+2594  
+2595  %macro report_ties_ext;
+2596    %if &n_ties_ext > 0 %then %do;
+2597      %put WARNING: [17-S3] &n_ties_ext columns match two dictionary entries equally well. Alphabetically first was used. See work.match_ties_ext.;
+2598    %end;
+2599  %mend report_ties_ext;
+2600  %report_ties_ext;
+2601  
+2602  /* Reconciliation buckets.                                                  */
+2603  /* dict_only is derived from the dictionary names that actually MATCHED,    */
+2604  /* not from exact uppercase membership. A dictionary entry matched by the   */
+2605  /* squash rule would otherwise be reported as dictionary-only as well.      */
+2606  %let n_data_only = 0;
+2607  %let n_dict_only = 0;
+2608  %let n_matched   = 0;
+2609  
+2610  proc sql noprint;
+2611    create table work.dict_only as
+2612      select sas_name as varname length=32
+2613      from work.dict_u
+2614      where upcase(sas_name) not in
+2615            (select upcase(sas_name) from work.doc_all_ext);
+NOTE: Table WORK.DICT_ONLY created, with 115 rows and 1 columns.
+
+2616  
+2617    create table work.data_only as
+2618      select varname, vtype, vlen, sas_label
+2619      from work.actual_ext
+2620      where varname not in
+2621            (select varname from work.var_domain_raw);
+NOTE: Table WORK.DATA_ONLY created, with 63 rows and 4 columns.
+
+2622  
+2623    select count(*) into :n_data_only trimmed from work.data_only;
+2624    select count(*) into :n_dict_only trimmed from work.dict_only;
+2625    select count(*) into :n_matched   trimmed from work.var_domain_raw;
+2626  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+2627  
+2628  %put NOTE: [17-S3] Match summary: &n_matched matched, &n_dict_only dict-only, &n_data_only data-only;
+NOTE: [17-S3] Match summary: 85 matched, 115 dict-only, 63 data-only
+2629  
+2630  
+2631  /* =========================================================================
+2632     SECTION 3c: NLEVELS pass for stat_route and the cardinality review flag
+2633     -------------------------------------------------------------------------
+2634     Routing on vtype alone sends every numeric to PROC MEANS, which is wrong
+2635     for 0/1 and small-integer-coded categoricals (_30_DAY_MORTALITY, sex,
+2636     ASA class, emergent Y/N). Type AND cardinality decide the route.
+2637     ========================================================================= */
+2638  
+2639  proc freq data=work.analysis_base_ext nlevels;
+2640    tables _all_ / noprint;
+2641    ods output nlevels=work.nlevels_raw;
+2642  run;
+
+NOTE: The data set WORK.NLEVELS_RAW has 148 observations and 5 variables.
+NOTE: There were 41150 observations read from the data set WORK.ANALYSIS_BASE_EXT.
+NOTE: PROCEDURE FREQ used (Total process time):
+      real time           0.74 seconds
+      cpu time            0.71 seconds
+      
+
+2643  
+2644  data work.nlevels_ext;
+2645    set work.nlevels_raw;
+2646    length varname_u $32;
+2647    varname_u = upcase(strip(tablevar));
+2648    rename nlevels = n_levels;
+2649    keep varname_u nlevels;
+2650  run;
+
+NOTE: There were 148 observations read from the data set WORK.NLEVELS_RAW.
+NOTE: The data set WORK.NLEVELS_EXT has 148 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2651  
+2652  /* ---- Build the staging table: matched rows plus data-only rows --------- */
+2653  data work.data_only_oos;
+2654    length varname $32 vtype $4 vlen 8 sas_label $256
+2655           dict_name $60 dict_type $20 description $300 match_how $8
+2656           domain $16 domain_rationale $200 assign_rule $20
+2657           source_dataset $32;
+2658    set work.data_only;
+2659    domain           = 'OUT_OF_SCOPE';
+2660    domain_rationale = 'not in PRECEDE dictionary';
+2661    assign_rule      = 'data_only';
+2662    dict_name        = '';
+2663    dict_type        = '';
+2664    description      = '';
+2665    match_how        = 'NONE';
+2666    source_dataset   = 'analysis_base_ext';
+2667  run;
+
+NOTE: There were 63 observations read from the data set WORK.DATA_ONLY.
+NOTE: The data set WORK.DATA_ONLY_OOS has 63 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2668  
+2669  /* The previous version had an open-code %DO placeholder here. %DO is not   */
+2670  /* valid outside a macro definition and would abort the run. It was also    */
+2671  /* redundant: the SQL join below assigns source_dataset properly.           */
+2672  data work.domain_staging;
+2673    length varname $32 vtype $4 vlen 8 sas_label $256
+2674           dict_name $60 dict_type $20 description $300 match_how $8
+2675           domain $16 domain_rationale $200 assign_rule $20
+2676           source_dataset $32 stat_route $8 n_levels 8 denominator_note $300;
+2677  
+2678    set work.var_domain_raw (in=inmatched)
+2679        work.data_only_oos  (in=indataonly);
+2680  
+2681    if inmatched then do;
+2682      source_dataset   = 'analysis_base';
+2683      domain           = '';
+2684      domain_rationale = '';
+2685      assign_rule      = '';
+2686    end;
+2687    if indataonly then source_dataset = 'analysis_base_ext';
+2688  run;
+
+NOTE: Variable stat_route is uninitialized.
+NOTE: Variable n_levels is uninitialized.
+NOTE: Variable denominator_note is uninitialized.
+NOTE: There were 85 observations read from the data set WORK.VAR_DOMAIN_RAW.
+NOTE: There were 63 observations read from the data set WORK.DATA_ONLY_OOS.
+NOTE: The data set WORK.DOMAIN_STAGING has 148 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2689  
+2690  /* source_dataset for extension columns, by join rather than by macro loop */
+2691  proc sql;
+2692    create table work.domain_staging2 as
+2693      select ds.*,
+2694             case when ec.name is not null              then 'master_data_merged'
+2695                  when ds.source_dataset = 'analysis_base_ext' then 'analysis_base_ext'
+2696                  else 'analysis_base' end as src_ds length=32
+2697      from work.domain_staging as ds
+2698      left join work.ext_candidates as ec
+2699        on upcase(ds.varname) = upcase(ec.name);
+NOTE: Table WORK.DOMAIN_STAGING2 created, with 148 rows and 20 columns.
+
+2700  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+2701  
+2702  data work.domain_staging2;
+2703    set work.domain_staging2;
+2704    source_dataset = src_ds;
+2705    drop src_ds;
+2706  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING2.
+NOTE: The data set WORK.DOMAIN_STAGING2 has 148 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2707  
+2708  /* Join n_levels */
+2709  proc sql;
+2710    create table work.domain_staging3 as
+2711      select ds.*, nl.n_levels as n_levels_join
+2712      from work.domain_staging2 as ds
+2713      left join work.nlevels_ext as nl
+2714        on upcase(ds.varname) = nl.varname_u;
+NOTE: Table WORK.DOMAIN_STAGING3 created, with 148 rows and 20 columns.
+
+2715  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.01 seconds
+      
+
+2716  
+2717  data work.domain_staging3;
+2718    set work.domain_staging3;
+2719    if missing(n_levels) then n_levels = n_levels_join;
+2720    drop n_levels_join;
+2721  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING3.
+NOTE: The data set WORK.DOMAIN_STAGING3 has 148 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2722  
+2723  
+2724  /* =========================================================================
+2725     SECTION 3b: Identifier exclusion (BEFORE domain assignment)
+2726     -------------------------------------------------------------------------
+2727     Identifiers and technical keys must never reach statistics: a character
+2728     ID routed to PROC FREQ yields a table with tens of thousands of levels.
+2729  
+2730     CARDINALITY IS NOT AN EXCLUSION CRITERION. The previous version also
+2731     excluded any character variable with more than 200 levels, which silently
+2732     removed CPT_CODE, PROCEDURE_NAME and ZIP_CODE -- all of which are in the
+2733     Section 4 domain lookup. Because the lookup join is scoped to rows that
+2734     are not already OUT_OF_SCOPE, the domain assignment could not rescue
+2735     them and every guard still passed. Cardinality is now a review flag
+2736     carried on n_levels for Checkpoint 1.
+2737     ========================================================================= */
+2738  
+2739  data work.domain_staging3;
+2740    set work.domain_staging3;
+2741    length hi_cardinality_flag $3;
+2742  
+2743    if domain = '' then do;
+2744      if varname in ('PRECEDE_STUDY_ID','PRECEDE_STUDY_ID_1',
+2745                     'ENCRYPTED_MRN','ENCRYPTED_ENCOUNTER')
+2746         or prxmatch('/(^|_)(ID|MRN)(_|$)/', strip(upcase(varname))) > 0
+2747      then do;
+2748        domain           = 'OUT_OF_SCOPE';
+2749        domain_rationale = 'identifier or technical key; not an analytic variable';
+2750        assign_rule      = 'identifier_exclusion';
+2751      end;
+2752    end;
+2753  
+2754    /* Review flag only -- never an exclusion */
+2755    if vtype = 'char' and n_levels > 200 then hi_cardinality_flag = 'YES';
+2756    else hi_cardinality_flag = 'NO';
+2757  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING3.
+NOTE: The data set WORK.DOMAIN_STAGING3 has 148 observations and 20 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+2758  
+2759  %let n_id_excluded = 0;
+2760  proc sql noprint;
+2761    select count(*) into :n_id_excluded trimmed
+2762    from work.domain_staging3 where assign_rule = 'identifier_exclusion';
+2763  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2764  %put NOTE: [17-S3b] &n_id_excluded variables marked OUT_OF_SCOPE as identifiers.;
+NOTE: [17-S3b] 3 variables marked OUT_OF_SCOPE as identifiers.
+2765  
+2766  
+2767  /* ---- stat_route: type AND cardinality ---------------------------------- */
+2768  data work.domain_staging3;
+2769    set work.domain_staging3;
+2770  
+2771    if domain ne 'OUT_OF_SCOPE' then do;
+2772      if vtype = 'char' then stat_route = 'FREQ';
+2773      else if vtype = 'num' then do;
+2774        if n_levels <= 10 then stat_route = 'FREQ';
+2775        else                   stat_route = 'MEANS';
+2776      end;
+2777    end;
+2778    else stat_route = '';
+2779  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING3.
+NOTE: The data set WORK.DOMAIN_STAGING3 has 148 observations and 20 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2780  
+2781  
+2782  /* =========================================================================
+2783     SECTION 4: Domain assignment with rationales, g.var_domain_map, guards,
+2784                and the Checkpoint 1 crosswalk export
+2785     -------------------------------------------------------------------------
+2786     Lookup keyed on upcased varname. The quotes that previously wrapped each
+2787     rationale have been removed: INFILE DSD does not strip single quotes, so
+2788     they were being stored literally and exported into the review CSV. They
+2789     were never needed -- DATALINES does not resolve macro triggers, and no
+2790     rationale contains a comma.
+2791  
+2792     assign_rule for frailty is 'timing', not 'instrument'. The locked rule
+2793     defines instrument membership as the override to D3 for named COGNITIVE
+2794     instruments. Tagging frailty the same way would mix the two in the QC
+2795     sheet's per-rule counts.
+2796     ========================================================================= */
+2797  
+2798  %put NOTE: ==== Section 4: domain assignment starting ====;
+NOTE: ==== Section 4: domain assignment starting ====
+2799  
+2800  data work.domain_lookup;
+2801    length varname_u $32 domain $16 assign_rule $20 domain_rationale $200;
+2802    infile datalines dsd dlm=',' truncover;
+2803    input varname_u :$32. domain :$16. assign_rule :$20. domain_rationale :$200.;
+2804  datalines;
+
+NOTE: The data set WORK.DOMAIN_LOOKUP has 0 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2805  AGE_AT_SURGERY,D1,timing,captured at surgery registration;
+      --------------
+      180
+
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2805                                                             sociodemographic descriptor
+                                                                 ----------------
+                                                                 180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2806  AGE_AT_ENCOUNTER,D1,timing,captured at encounter;
+
+2806!                                                   sociodemographic descriptor
+                                                        ----------------
+                                                        180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2807  SEX,D1,timing,recorded at registration;
+
+2807!                                         sociodemographic descriptor
+                                              ----------------
+                                              180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2808  RACE,D1,timing,recorded at registration;
+
+2808!                                          sociodemographic descriptor
+                                               ----------------
+                                               180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2809  ETHNICITY,D1,timing,recorded at registration;
+
+2809!                                               sociodemographic descriptor
+                                                    ----------------
+                                                    180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2810  INSURANCE_TYPE,D1,analytic_role,payer type known preoperatively;
+
+2810!                                                                  sociodemographic proxy
+                                                                       ----------------
+                                                                       180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2811  PAYER,D1,analytic_role,payer type known preoperatively;
+
+2811!                                                         sociodemographic proxy
+                                                              ----------------
+                                                              180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2812  MARITAL_STATUS,D1,timing,recorded at registration;
+
+2812!                                                    sociodemographic descriptor
+                                                         ----------------
+                                                         180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2813  MARITAL,D1,timing,recorded at registration;
+
+2813!                                             sociodemographic descriptor
+                                                  ----------------
+                                                  180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2814  ZIP_CODE,D1,timing,geographic locator recorded at registration;
+
+2814!                                                                 sociodemographic
+2814  ZIP_CODE,D1,timing,geographic locator recorded at registration; sociodemographic
+                                                                      ----------------
+                                                                      180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2815  ZIPCODE,D1,timing,geographic locator recorded at registration;
+
+2815!                                                                sociodemographic
+2815  ZIPCODE,D1,timing,geographic locator recorded at registration; sociodemographic
+                                                                     ----------------
+                                                                     180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2816  STATE,D1,timing,geographic locator recorded at registration;
+
+2816!                                                              sociodemographic
+2816  STATE,D1,timing,geographic locator recorded at registration; sociodemographic
+                                                                   ----------------
+                                                                   180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2817  ADMIT_BMI,D2,timing,captured at preoperative admission;
+
+2817!                                                         preoperative physiologic assessment
+                                                              ------------
+                                                              180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2818  BMI,D2,timing,measured preoperatively;
+
+2818!                                        standard preoperative assessment variable
+                                             --------
+                                             180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2819  FRAILTY_SCORE,D2,timing,frailty assessed before surgery;
+
+2819!                                                          preoperative assessment
+                                                               ------------
+                                                               180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2820  FRAILTY_CATEGORY,D2,timing,frailty assessed before surgery;
+
+2820!                                                             preoperative assessment
+                                                                  ------------
+                                                                  180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2821  FEELS_EXHAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria)
+2822  FEELS_EXAUSTED,D2,timing,frailty component captured preoperatively (Fried criteria;
+
+2822!                                                                                     source spelling)
+                                                                                          ------
+                                                                                          180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2823  WEIGHT_LOSS,D2,timing,frailty component captured preoperatively (Fried criteria)
+2824  GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria)
+2825  WEAK_GRIP_STRENGTH,D2,timing,frailty component captured preoperatively (Fried criteria)
+2826  WALK_TIME,D2,timing,frailty component captured preoperatively (Fried criteria)
+2827  SLOW_WALKING_SPEED,D2,timing,frailty component captured preoperatively (Fried criteria)
+2828  PHYSICAL_ACTIVITY,D2,timing,frailty component captured preoperatively (Fried criteria)
+2829  LOW_PHYSICAL_ACTIVITY,D2,timing,frailty component captured preoperatively (Fried criteria)
+2830  ASA_CLASS,D2,analytic_role,preoperative risk classification assigned before surgery
+2831  ASA,D2,analytic_role,preoperative risk classification assigned before surgery
+2832  SMOKING_STATUS,D2,timing,preoperative habit assessment;
+
+2832!                                                         standard preoperative variable
+                                                              --------
+                                                              180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2833  SMOKING,D2,timing,preoperative habit assessment;
+
+2833!                                                  standard preoperative variable
+                                                       --------
+                                                       180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2834  HYPERTENSION,D2,timing,comorbidity documented in preoperative assessment
+2835  DIABETES,D2,timing,comorbidity documented in preoperative assessment
+2836  COPD,D2,timing,comorbidity documented in preoperative assessment
+2837  CHF,D2,timing,comorbidity documented in preoperative assessment
+2838  CAD,D2,timing,comorbidity documented in preoperative assessment
+2839  AFIB,D2,timing,comorbidity documented in preoperative assessment
+2840  CKD,D2,timing,comorbidity documented in preoperative assessment
+2841  CANCER,D2,timing,comorbidity documented in preoperative assessment
+2842  COGNITIVE_SCORE,D3,instrument,named cognitive instrument score;
+
+2842!                                                                 instrument membership overrides timing
+                                                                      ----------
+                                                                      180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2843  COGNITIVE_CATEGORY,D3,instrument,named cognitive instrument category;
+
+2843!                                                                       instrument membership overrides timing
+                                                                            ----------
+                                                                            180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2844  CLOCK_SCORE,D3,instrument,clock-drawing instrument score;
+
+2844!                                                           instrument membership overrides timing
+                                                                ----------
+                                                                180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2845  DCDT_SCORE,D3,instrument,dCDT instrument score;
+
+2845!                                                 instrument membership overrides timing
+                                                      ----------
+                                                      180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2846  DCDT_COMMAND,D3,instrument,dCDT command clock subscale;
+
+2846!                                                         instrument membership overrides timing
+                                                              ----------
+                                                              180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2847  DCDT_COPY,D3,instrument,dCDT copy clock subscale;
+
+2847!                                                   instrument membership overrides timing
+                                                        ----------
+                                                        180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2848  PROCEDURE_NAME,D4,timing,surgical procedure recorded at time of operation
+2849  BASE_PROCEDURE_1,D4,timing,surgical procedure recorded at time of operation
+2850  CPT_CODE,D4,timing,procedure CPT code assigned at time of operation
+2851  CPT_1,D4,timing,procedure CPT code assigned at time of operation
+2852  SERVICE_LINE,D4,timing,surgical service recorded at time of operation
+2853  ANESTHESIA_TYPE,D4,timing,anesthesia type administered intraoperatively
+2854  CASE_DURATION,D4,timing,elapsed operative time;
+
+2854!                                                 intraoperative variable by timing
+                                                      --------------
+                                                      180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2855  OPERATIVE_TIME,D4,timing,elapsed operative time;
+
+2855!                                                  intraoperative variable by timing
+                                                       --------------
+                                                       180
+ERROR 180-322: Statement is not valid or it is used out of proper order.
+
+2856  EMERGENT,D4,timing,emergent case flag set at time of surgery
+2857  EMERGENT_CASE,D4,timing,emergent case flag set at time of surgery
+2858  AVG_ABP_MEAN,D4,timing,intraoperative arterial blood pressure mean
+2859  ABP_LESS_THAN_60_COUNT,D4,timing,count of intraoperative low arterial pressure events
+2860  BIS_INDEX_LESS_30_COUNT,D4,timing,count of intraoperative low BIS index events
+2861  SD_BIS_INDEX,D4,timing,intraoperative BIS index variability
+2862  TOTAL_MIDAZOLAM_MG,D4,timing,total intraoperative midazolam dose
+2863  ISO_SEV_TOTAL,D4,timing,total volatile anesthetic exposure
+2864  ISO_SEV_AVG,D4,timing,average volatile anesthetic exposure
+2865  _30_DAY_MORTALITY,D5,analytic_role,postoperative outcome realized after surgery
+2866  MORTALITY_30,D5,analytic_role,30-day mortality outcome realized postoperatively
+2867  LOS,D5,analytic_role,length of stay determined postoperatively
+2868  LENGTH_OF_STAY,D5,analytic_role,length of stay determined postoperatively
+2869  READMISSION_30,D5,analytic_role,30-day readmission outcome realized postoperatively
+2870  READMISSION,D5,analytic_role,readmission outcome realized postoperatively
+2871  DISCHARGE_DISPOSITION,D5,analytic_role,disposition known only at discharge
+2872  DISCHARGE_DISPO,D5,analytic_role,disposition known only at discharge
+2873  COMPLICATIONS,D5,analytic_role,postoperative complication status
+2874  ORAL_MORPHINE_EQUIV_MG_POD_DAY6,D5,analytic_role,postoperative opioid use realized after surgery
+2875  ;
+
+2876  run;
+2877  
+2878  /* Apply the lookup. The ON clause scopes the join to rows that are not     */
+2879  /* already OUT_OF_SCOPE, so identifier exclusions are not overridden.       */
+2880  proc sql;
+2881    create table work.domain_staging4 as
+2882      select ds.*,
+2883             coalesce(dl.domain,           ds.domain)           as domain_final    length=16,
+2884             coalesce(dl.domain_rationale, ds.domain_rationale) as rationale_final length=200,
+2885             coalesce(dl.assign_rule,      ds.assign_rule)      as rule_final      length=20
+2886      from work.domain_staging3 as ds
+2887      left join work.domain_lookup as dl
+2888        on upcase(ds.varname) = dl.varname_u
+2889       and ds.domain not in ('OUT_OF_SCOPE');
+NOTE: Table WORK.DOMAIN_STAGING4 created, with 148 rows and 23 columns.
+
+2890  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+      
+
+2891  
+2892  data work.domain_staging4;
+2893    set work.domain_staging4;
+2894    domain           = domain_final;
+2895    domain_rationale = rationale_final;
+2896    assign_rule      = rule_final;
+2897  
+2898    /* A matched, dictionary-documented variable with no lookup entry is an
+2899       INCOMPLETE MAP, not an out-of-scope variable. It is parked here and
+2900       GUARD 5 below fails the run so the omission cannot pass review. */
+2901    if domain = '' then do;
+2902      domain           = 'OUT_OF_SCOPE';
+2903      domain_rationale = 'not in domain lookup; lookup is incomplete';
+2904      assign_rule      = 'unrecognised';
+2905      stat_route       = '';
+2906    end;
+2907  
+2908    /* Any row demoted to OUT_OF_SCOPE must not carry a statistic route */
+2909    if domain = 'OUT_OF_SCOPE' then stat_route = '';
+2910  
+2911    drop domain_final rationale_final rule_final;
+2912  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING4.
+NOTE: The data set WORK.DOMAIN_STAGING4 has 148 observations and 20 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2913  
+2914  /* Denominator note on the extension-sourced blocks */
+2915  data work.domain_staging4;
+2916    set work.domain_staging4;
+2917    length denominator_note $300;
+2918    if source_dataset = 'master_data_merged' then denominator_note = "&D3_DENOM_NOTE";
+2919    else denominator_note = '';
+2920  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING4.
+NOTE: The data set WORK.DOMAIN_STAGING4 has 148 observations and 20 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+2921  
+2922  /* ---- Write g.var_domain_map: the ONE permanent artifact of this phase --- */
+2923  /* g.analysis_base and g.master_data_merged remain read-only. This dataset  */
+2924  /* is the explicitly authorized exception (see 17-CONTEXT.md).              */
+2925  data g.var_domain_map;
+2926    length varname $32 sas_label $256 vtype $4 n_levels 8 hi_cardinality_flag $3
+2927           stat_route $8 domain $16 domain_rationale $200
+2928           assign_rule $20 source_dataset $32 denominator_note $300
+2929           dict_name $60 match_how $8;
+2930    set work.domain_staging4;
+2931    keep varname sas_label vtype n_levels hi_cardinality_flag stat_route
+2932         domain domain_rationale assign_rule source_dataset denominator_note
+2933         dict_name match_how;
+2934  run;
+
+NOTE: There were 148 observations read from the data set WORK.DOMAIN_STAGING4.
+NOTE: The data set G.VAR_DOMAIN_MAP has 148 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.12 seconds
+      cpu time            0.00 seconds
+      
+
+2935  
+2936  proc sort data=g.var_domain_map; by domain varname; run;
+
+NOTE: There were 148 observations read from the data set G.VAR_DOMAIN_MAP.
+NOTE: The data set G.VAR_DOMAIN_MAP has 148 observations and 13 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.33 seconds
+      cpu time            0.01 seconds
+      
+
+2937  
+2938  %put NOTE: [17-S4] g.var_domain_map written.;
+NOTE: [17-S4] g.var_domain_map written.
+2939  
+2940  
+2941  /* ---- Export the crosswalk BEFORE the guards ---------------------------- */
+2942  /* The export runs first deliberately. GUARD 5 is expected to fail on the   */
+2943  /* first pass while the lookup is incomplete, and the reviewer needs the    */
+2944  /* CSV in hand to see exactly which variables still need lookup entries.    */
+2945  proc export data=g.var_domain_map
+2946    outfile="&qc_path.\17_var_domain_map_review.csv"
+2947    dbms=csv replace;
+2948  run;
+
+2949   /**********************************************************************
+2950   *   PRODUCT:   SAS
+2951   *   VERSION:   9.4
+2952   *   CREATOR:   External File Interface
+2953   *   DATE:      10SEP26
+2954   *   DESC:      Generated SAS Datastep Code
+2955   *   TEMPLATE SOURCE:  (None Specified.)
+2956   ***********************************************************************/
+2957      data _null_;
+2958      %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
+2959      %let _EFIREC_ = 0;     /* clear export record count macro variable */
+2960      file 'P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_var_domain_map_review.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+2961      if _n_ = 1 then        /* write column names or labels */
+2962       do;
+2963         put
+2964            "varname"
+2965         ','
+2966            "sas_label"
+2967         ','
+2968            "vtype"
+2969         ','
+2970            "n_levels"
+2971         ','
+2972            "hi_cardinality_flag"
+2973         ','
+2974            "stat_route"
+2975         ','
+2976            "domain"
+2977         ','
+2978            "domain_rationale"
+2979         ','
+2980            "assign_rule"
+2981         ','
+2982            "source_dataset"
+2983         ','
+2984            "denominator_note"
+2985         ','
+2986            "dict_name"
+2987         ','
+2988            "match_how"
+2989         ;
+2990       end;
+2991     set  G.VAR_DOMAIN_MAP   end=EFIEOD;
+2992         format varname $32. ;
+2993         format sas_label $256. ;
+2994         format vtype $4. ;
+2995         format n_levels best12. ;
+2996         format hi_cardinality_flag $3. ;
+2997         format stat_route $8. ;
+2998         format domain $16. ;
+2999         format domain_rationale $200. ;
+3000         format assign_rule $20. ;
+3001         format source_dataset $32. ;
+3002         format denominator_note $300. ;
+3003         format dict_name $60. ;
+3004         format match_how $8. ;
+3005       do;
+3006         EFIOUT + 1;
+3007         put varname $ @;
+3008         put sas_label $ @;
+3009         put vtype $ @;
+3010         put n_levels @;
+3011         put hi_cardinality_flag $ @;
+3012         put stat_route $ @;
+3013         put domain $ @;
+3014         put domain_rationale $ @;
+3015         put assign_rule $ @;
+3016         put source_dataset $ @;
+3017         put denominator_note $ @;
+3018         put dict_name $ @;
+3019         put match_how $ ;
+3020         ;
+3021       end;
+3022      if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
+3023      if EFIEOD then call symputx('_EFIREC_',EFIOUT);
+3024      run;
+
+NOTE: The file 'P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_var_domain_map_review.csv' is:
+      Filename=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_var_domain_map_review.csv,
+      RECFM=V,LRECL=32767,File Size (bytes)=0,
+      Last Modified=10Sep2026:13:00:07,
+      Create Time=10Sep2026:13:00:07
+
+NOTE: 149 records were written to the file 'P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_var_domain_map_review.csv'.
+      The minimum record length was 93.
+      The maximum record length was 400.
+NOTE: There were 148 observations read from the data set G.VAR_DOMAIN_MAP.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+148 records created in P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_var_domain_map_review.csv from G.VAR_DOMAIN_MAP.
+  
+  
+NOTE: "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc\17_var_domain_map_review.csv" file was successfully created.
+NOTE: PROCEDURE EXPORT used (Total process time):
+      real time           0.42 seconds
+      cpu time            0.03 seconds
+      
+
+3025  
+3026  %put NOTE: [17-S4] qc\17_var_domain_map_review.csv exported for Checkpoint 1 review.;
+NOTE: [17-S4] qc\17_var_domain_map_review.csv exported for Checkpoint 1 review.
+3027  
+3028  
+3029  /* =========================================================================
+3030     SECTION 4 GUARDS: hard exit criteria
+3031     ========================================================================= */
+3032  
+3033  /* GUARD 1: blank rationale on any assigned variable */
+3034  %let n_blank = 0;
+3035  proc sql noprint;
+3036    select count(*) into :n_blank trimmed
+3037    from g.var_domain_map
+3038    where missing(domain_rationale) and domain ne 'OUT_OF_SCOPE';
+3039  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+3040  
+3041  %macro check_blank_rationale;
+3042    %if &n_blank > 0 %then %do;
+3043      %fail_out(msg=&n_blank assigned variables have a blank domain_rationale -- Checkpoint 1 cannot proceed);
+3044    %end;
+3045    %put NOTE: [17-S4] Blank-rationale guard passed.;
+3046  %mend check_blank_rationale;
+3047  %check_blank_rationale;
+NOTE: [17-S4] Blank-rationale guard passed.
+3048  
+3049  /* GUARD 2: VARnn positional name survivor */
+3050  %let n_varnn_map = 0;
+3051  proc sql noprint;
+3052    select count(*) into :n_varnn_map trimmed
+3053    from g.var_domain_map
+3054    where prxmatch('/^VAR\d+$/', strip(varname)) > 0;
+3055  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+3056  
+3057  %macro check_varnn_map;
+3058    %if &n_varnn_map > 0 %then %do;
+3059      %fail_out(msg=&n_varnn_map VARnn positional names survived into g.var_domain_map -- the dictionary match is defective);
+3060    %end;
+3061    %put NOTE: [17-S4] VARnn guard passed.;
+3062  %mend check_varnn_map;
+3063  %check_varnn_map;
+NOTE: [17-S4] VARnn guard passed.
+3064  
+3065  /* GUARD 3: stat_route set on every in-scope variable */
+3066  %let n_blank_route = 0;
+3067  proc sql noprint;
+3068    select count(*) into :n_blank_route trimmed
+3069    from g.var_domain_map
+3070    where domain ne 'OUT_OF_SCOPE'
+3071      and stat_route not in ('MEANS','FREQ');
+3072  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+3073  
+3074  %macro check_blank_route;
+3075    %if &n_blank_route > 0 %then %do;
+3076      %fail_out(msg=&n_blank_route in-scope variables have a stat_route that is neither MEANS nor FREQ);
+3077    %end;
+3078    %put NOTE: [17-S4] Stat-route guard passed.;
+3079  %mend check_blank_route;
+3080  %check_blank_route;
+NOTE: [17-S4] Stat-route guard passed.
+3081  
+3082  /* GUARD 4: identifier leak into statistics */
+3083  %let n_id_leak = 0;
+3084  proc sql noprint;
+3085    select count(*) into :n_id_leak trimmed
+3086    from g.var_domain_map
+3087    where stat_route ne ''
+3088      and domain ne 'OUT_OF_SCOPE'
+3089      and (
+3090        varname in ('PRECEDE_STUDY_ID','PRECEDE_STUDY_ID_1',
+3091                    'ENCRYPTED_MRN','ENCRYPTED_ENCOUNTER')
+3092        or prxmatch('/(^|_)(ID|MRN)(_|$)/', strip(upcase(varname))) > 0
+3093      );
+3094  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+3095  
+3096  %macro check_id_leak;
+3097    %if &n_id_leak > 0 %then %do;
+3098      %fail_out(msg=&n_id_leak identifier variables have a stat_route set and are not OUT_OF_SCOPE);
+3099    %end;
+3100    %put NOTE: [17-S4] Identifier-leak guard passed.;
+3101  %mend check_id_leak;
+3102  %check_id_leak;
+NOTE: [17-S4] Identifier-leak guard passed.
+3103  
+3104  /* GUARD 5: dictionary-documented variables with no domain assignment
+3105     -----------------------------------------------------------------
+3106     A variable that matched the PRECEDE dictionary but is absent from the
+3107     Section 4 lookup is an incomplete map. Previously it became OUT_OF_SCOPE
+3108     with a non-blank rationale, so GUARD 1 and GUARD 3 both passed and the
+3109     omission was invisible. This guard makes it a hard failure. */
+3110  %let n_unassigned = 0;
+3111  proc sql noprint;
+3112    select count(*) into :n_unassigned trimmed
+3113    from g.var_domain_map
+3114    where assign_rule = 'unrecognised' and match_how ne 'NONE';
+3115  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.00 seconds
+      cpu time            0.00 seconds
+      
+
+3116  
+3117  %macro check_unassigned;
+3118    %if &n_unassigned > 0 %then %do;
+3119      %put ERROR: [17-S4] The following documented variables have no lookup entry.;
+3120      proc print data=g.var_domain_map noobs;
+3121        where assign_rule = 'unrecognised' and match_how ne 'NONE';
+3122        var varname sas_label vtype n_levels;
+3123        title "Documented variables missing from the Section 4 domain lookup";
+3124      run;
+3125      title;
+3126      %fail_out(msg=&n_unassigned dictionary-documented variables have no entry in the Section 4 domain lookup -- filter the review CSV on assign_rule=unrecognised and add them before Checkpoint
+3126! 1);
+3127    %end;
+3128    %put NOTE: [17-S4] Unassigned-documented guard passed.;
+3129  %mend check_unassigned;
+3130  %check_unassigned;
+ERROR: [17-S4] The following documented variables have no lookup entry.
+MPRINT(CHECK_UNASSIGNED):   proc print data=g.var_domain_map noobs;
+MPRINT(CHECK_UNASSIGNED):   where assign_rule = 'unrecognised' and match_how ne 'NONE';
+MPRINT(CHECK_UNASSIGNED):   var varname sas_label vtype n_levels;
+MPRINT(CHECK_UNASSIGNED):   title "Documented variables missing from the Section 4 domain lookup";
+MPRINT(CHECK_UNASSIGNED):   run;
+
+NOTE: There were 82 observations read from the data set G.VAR_DOMAIN_MAP.
+      WHERE (assign_rule='unrecognised') and (match_how not = 'NONE');
+NOTE: PROCEDURE PRINT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.00 seconds
+      
+
+MPRINT(CHECK_UNASSIGNED):   title;
+ERROR: 82 dictionary-documented variables have no entry in the Section 4 domain lookup -- filter the review CSV on assign_rule=unrecognised and add them before Checkpoint 1
+MPRINT(FAIL_OUT):   ods excel close;
+MPRINT(FAIL_OUT):   ods listing;
+MPRINT(RESTORE_LOG):   proc printto;
+MPRINT(RESTORE_LOG):   run;
+

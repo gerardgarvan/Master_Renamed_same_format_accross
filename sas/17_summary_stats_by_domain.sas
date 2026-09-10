@@ -94,6 +94,11 @@
           only after the first table on the tab has been written.
         - Suppressed continuous cells display as -- via formats, not as dot.
         - year_variable must be non-empty before Section 6.
+        - Numeric FREQ variables format their missing level as a dot; it
+          is mapped to blank so missing() sees it.
+        - Duplicate varname-year-level keys fail before the wide UPDATE.
+        - Year values are checked to be four-digit integers.
+        - n_suppressed is labelled as rows/blocks, not cells.
 ==========================================================================*/
 
 
@@ -2424,6 +2429,8 @@ quit;
       if substr(vname(_fcols{_k}),1,2) = 'F_' and not missing(_fcols{_k})
         then level = strip(_fcols{_k});
     end;
+    /* A numeric variable's missing level is formatted as a dot, not blank */
+    if level = '.' then level = '';
     keep varname level Frequency;
     rename Frequency=frequency;
   run;
@@ -2475,6 +2482,7 @@ quit;
          and not missing(_fcols2{_k})
         then level = strip(_fcols2{_k});
     end;
+    if level = '.' then level = '';
     keep varname level year_val Frequency;
     rename Frequency=frequency;
   run;
@@ -2509,6 +2517,19 @@ quit;
     set work.freq_pooled_out
         work.freq_year_out;
   run;
+
+  /* Levels must be unique within varname x year_val: the Section 9 wide      */
+  /* UPDATE uses a correlated subquery that errors on more than one row.       */
+  %local n_dup_lvl;
+  %let n_dup_lvl = 0;
+  proc sql noprint;
+    select count(*) into :n_dup_lvl trimmed
+    from (select varname, year_val, level from &out
+          group by varname, year_val, level having count(*) > 1);
+  quit;
+  %if &n_dup_lvl > 0 %then %do;
+    %fail_out(msg=&n_dup_lvl duplicate varname-year-level keys in &out -- two raw values format to the same level string);
+  %end;
 
   %put NOTE: [17-S7] PROC FREQ for domain &domain complete: &nv variables.;
 %mend run_freq;
@@ -2548,7 +2569,10 @@ quit;
       is suppressed and the block total is printed, suppress the next-
       smallest level too.
 
-   Accumulates total suppressed cells into :n_suppressed.
+   Accumulates suppressed ROWS into :n_suppressed -- one categorical level
+   row (n and pct) or one continuous block (all nine statistics) counts 1.
+   Complementary suppression takes every unsuppressed level tied at the
+   minimum count; that over-suppresses on ties and is deliberate.
    Adds suppressed=1 flag on every affected cell.
    ========================================================================= */
 
@@ -2807,8 +2831,16 @@ quit;
 %let n_years = %nwords(&year_list);
 
 %macro check_years;
+  %local i yr;
   %if &n_years = 0 %then %do;
     %fail_out(msg=work.year_dist has no non-missing year values -- per-year column blocks cannot be built);
+  %end;
+  /* Year values become variable-name suffixes (n_2019); they must be integers */
+  %do i = 1 %to &n_years;
+    %let yr = %scan(&year_list, &i);
+    %if %sysfunc(prxmatch(/^\d{4}$/, &yr)) = 0 %then %do;
+      %fail_out(msg=Year value &yr is not a four-digit integer -- it cannot be used as a column suffix);
+    %end;
   %end;
 %mend check_years;
 %check_years;
@@ -3269,7 +3301,7 @@ data work.qc_summary;
   item="Assign_rule instrument"; value="&n_rule_instrument";                     output;
   item="";                      value="";                                         output;
   item="Total sentinel recodes";value="&n_total_recodes";                        output;
-  item="Total suppressed cells";value="&n_suppressed";                           output;
+  item="Suppressed rows (categorical level rows + continuous blocks)";value="&n_suppressed"; output;
   item="  -- level_count";      value="&n_supp_level";                           output;
   item="  -- n_missing";        value="&n_supp_nmiss";                           output;
   item="  -- complementary";    value="&n_supp_comp";                            output;
@@ -3349,7 +3381,7 @@ data _null_;
   put "total_sentinel_recodes=&n_total_recodes";
   put " ";
   put "SUPPRESSION SUMMARY";
-  put "total_suppressed_cells=&n_suppressed";
+  put "total_suppressed_rows=&n_suppressed";
   put "suppressed_level_count=&n_supp_level";
   put "suppressed_n_missing=&n_supp_nmiss";
   put "suppressed_complementary=&n_supp_comp";

@@ -24,12 +24,13 @@ key_files:
 decisions:
   - "PREP-08 revised to flag-dont-null: negative operative intervals RETAINED in g.prep_mdN; Phase 4 (MRG-07) derives rt_INCISE_to_DRESS_neg, rt_RM_START_to_INCISION_neg, rt_RM_START_to_RM_END_neg flag columns. Consistent with PCM-D-08 -- cannot identify which timestamp is wrong without destroying good values."
   - "PREP-09 implemented as report-only scan: derives rt_* variable list from dictionary.columns at run time; IS NOT MISSING guard on every count (PCM-T-11); logs/03_negtime_mdN.txt written per source."
-  - "PCM-D-10 remains open -- awaiting SAS run to produce logs/03_negtime_md1..8.txt with actual negative counts per rt_* variable."
+  - "PCM-D-10 CLOSED: PREP-09 report shows only rt_ANCHOR_to_*_days negatives (expected, legitimate offsets). No other rt_*_mins variable had negatives. Retain-with-doc, no further action."
+  - "Phase 3->4->5 re-run verified clean: QC-01 through QC-07 all pass; MRG-07 flag counts 52/15/0 confirmed; rt_envelope_flag=1 on 9 rows confirmed."
 metrics:
-  duration_minutes: 30
-  completed_date: "2026-08-26T21:28:33Z"
-  tasks_completed: 2
-  tasks_pending_human: 1
+  duration_minutes: 45
+  completed_date: "2026-09-14T00:00:00Z"
+  tasks_completed: 3
+  tasks_pending_human: 0
   files_created: 0
   files_modified: 8
 ---
@@ -47,7 +48,9 @@ metrics:
 | 1 | PREP-08 -- negative operative intervals in all eight prep programs | 6748020 (original null) then revised via 6157c83 | sas/03_prep_md1..8.sas |
 | 2 | PREP-09 -- report-only negative scan of every other rt_* variable | f2e9c47, then 00d2f6d (md8 mdnum fix) | sas/03_prep_md1..8.sas |
 
-**Task 3 (checkpoint:human-verify):** Awaiting SAS re-run of Phase 3 → Phase 4 → Phase 5 and review of logs/03_negtime_md*.txt.
+| 3 | Re-run Phase 3->4->5, read PREP-09 report, close PCM-D-10 | de0f00e (SUMMARY commit) | logs/03_negtime_md1..8.txt (runtime), docs/DECISIONS.md |
+
+**Task 3 result (human-verified 2026-09-14):** Phase 3 (03_prep_all.sas), Phase 4 (04_merge.sas), and Phase 5 (05_qc_merge.sas) all ran clean. QC-01 through QC-07 pass. MRG-07 flag counts: rt_INCISE_to_DRESS_neg=52, rt_RM_START_to_INCISION_neg=15, rt_RM_START_to_RM_END_neg=0. PREP-09 review: only rt_ANCHOR_to_*_days variables show negatives — expected (offsets, not durations). No other rt_*_mins variable had negatives. PCM-D-10 closed as retain-with-doc, no Phase 3->4->5 re-run triggered.
 
 ---
 
@@ -115,9 +118,7 @@ Each prep program appends a `%scan_negtime` macro (SECTION 5d):
 
 ## Known Stubs
 
-**PCM-D-10 (open):** The PREP-09 report cannot be evaluated until the SAS pipeline runs and produces `logs/03_negtime_md1..8.txt`. Negatives in `rt_ANCHOR_to_*_days` are expected and correct. Any other `rt_*_mins` variable showing negatives requires a domain decision before being added to the flag list.
-
-**Task 3 checkpoint:** Phase 3 → Phase 4 → Phase 5 re-run is required (with SAS session restart between each). Until that completes, `g.prep_mdN`, `g.master_data_merged`, and all Phase 5 QC results are stale relative to the revised PREP-08 / MRG-07 design.
+None. All three tasks complete. PCM-D-10 closed. Pipeline verified clean through Phase 5.
 
 ---
 

@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: executing
-last_updated: "2026-09-14T18:04:28.221Z"
+last_updated: "2026-09-14T18:22:07.969Z"
 last_activity: 2026-09-14
 progress:
   total_phases: 12
@@ -15,7 +15,7 @@ progress:
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-14T18:04:28.216Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-14T18:22:07.964Z
 
 ---
 
@@ -59,16 +59,14 @@ Plan: 2 of 3
 |---|---|---|
 | 1 | Source Verification & Freeze | ✅ Complete (2 of 2 plans) |
 | 2 | Ownership Map | ✅ Complete (2 of 2 plans) |
-| 3 | Per-Source Normalization | 🔄 Reopened — 5 of 6 plans; 03-06 pending |
-| 4 | Merge | ⚠️ Complete but STALE — must re-run after 03-06 |
-| 5 | Merge QC | ✅ Complete (3 of 3 plans) |
+| 3 | Per-Source Normalization | ✅ Complete (6 of 6 plans) |
+| 4 | Merge | ✅ Complete — re-run after 03-06 verified clean (41,150 rows, MRG-07 counts confirmed) |
+| 5 | Merge QC | ✅ Complete (3 of 3 plans) — QC-01 through QC-07 all pass |
 | 6 | Variable Reconciliation | ✅ Complete (3 of 3 plans) |
 | 7 | Cohort & Missingness | ⬜ Not planned |
 | 8 | Documentation & Handoff | ⬜ Not planned |
 
-**Why Phase 3 reopened:** PREP-08 changes `g.prep_mdN`, which makes `g.master_data_merged`
-and every Phase 5 result stale. The chain is 03-06 → Phase 4 → Phase 5, with a SAS session
-restart between each.
+**Phase 3 closure (2026-09-14):** 03-06 complete. PREP-08 flag-dont-null + MRG-07 + PREP-09 scan verified. Phase 3->4->5 re-run clean. PCM-D-10 closed (only anchor-offset negatives in rt_* scan; no additional variables of concern).
 
 ---
 
@@ -225,8 +223,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   may not want the admitted restriction at all, while anything using BMI has no choice.
   This is a question for Price, not a settled default.
 
-- **PCM-D-10** — Negatives in other `rt_*` variables: needs the PREP-09 report from 03-06.
-  `rt_ANCHOR_to_*_days` CAN legitimately be negative — offsets, not durations
+- **PCM-D-10** — CLOSED 2026-09-14: PREP-09 scan showed only rt_ANCHOR_to_*_days negatives (expected offsets). No other rt_*_mins variable had negatives. Retain-with-doc, no further action. See docs/DECISIONS.md.
 
 **Phase 6 is no longer blocked on Price.** D-01 and D-02 were its entry conditions and both are
 resolved as keep-separate, which is a valid resolution. Phase 6 is now largely a documentation

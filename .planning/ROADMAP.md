@@ -58,7 +58,7 @@ Plans:
 - [x] 03-03-PLAN.md -- md1/md2/md3 structural prep (md3 spine 41,150 asserted) (PREP-01, PREP-02, PREP-05, PREP-06)
 - [x] 03-04-PLAN.md -- md4/md5/md6 structural prep; prove-then-drop PRECEDE_Study_ID_1 from md6; Base_Procedure_Code_1 to CHAR (PREP-01, PREP-02, PREP-04, PREP-05, PREP-06, PREP-07)
 - [x] 03-05-PLAN.md -- md7 structural prep + 03_prep_all.sas driver and consolidated summary (PREP-01, PREP-02, PREP-05, PREP-06, PREP-07)
-- [ ] 03-06-PLAN.md -- AMENDMENT-01: null negative operative intervals across all eight; report-only negative scan of every other `rt_*` (PREP-08, PREP-09)
+- [x] 03-06-PLAN.md -- AMENDMENT-01: null negative operative intervals across all eight; report-only negative scan of every other `rt_*` (PREP-08, PREP-09)
 
 ### Phase 4: Merge
 **Goal**: Produce `g.master_data_merged` with exactly 41,150 rows and 41,150 distinct IDs by merging all eight normalized prep outputs on md3 as the spine, with provenance flags for each source and no silent last-wins overwrites
@@ -172,7 +172,7 @@ suppression (<=11). Descriptive only -- no inferential testing, no cohort restri
 g.analysis_base.
 **Requirements**: SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK
 **Depends on:** Phase 16
-**Plans:** 4/4 plans complete
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 17-01-PLAN.md -- Wave 0 discovery: program scaffold (config, log routing, preconditions) + discover year variable, extension KEEP= list, per-year N (SUMM-DOMAIN-DISC)

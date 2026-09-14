@@ -230,7 +230,10 @@ Plans:
   2. A written rule states which pipeline-derived columns are carried and which dropped, and the rule is enforced in code. It must address the twelve columns that carry no information: `in_md3` (constant -- md3 is the spine) and the eleven `h_*_src` companions (each a single repeated value, because the redundancy proof showed no secondary source ever fires) (HARM-07)
   3. `g.master_data_merged` is confirmed unmodified after the run -- 176 columns, 41,150 rows
   4. Any newly dropped alias is PROVEN redundant in the run, not assumed: zero rows added and zero disagreements where both are populated
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 15-01-PLAN.md -- HARM-04: human confirms SSDI/CPT1 (and any label-similarity) concepts, appends to concept_decisions.csv, records PCM-D-13 attribution in DECISIONS.md (HARM-04)
+- [ ] 15-02-PLAN.md -- HARM-07: add pipeline-column rule + drop_pipeline_noinfo DROP block + assertions to 10b_concept_harmonize.sas (in_md3 + eleven h_*_src), src_changed in_md3 fix, 176-column merged assertion; fresh-session re-run (HARM-07, HARM-04)
 
 ### Phase 16: Rebuild the Analytic Cohort
 **Goal**: `g.analytic_cohort` is rebuilt from `g.master_data_harmonized` so all three datasets are in step, and the cohort decision itself is settled

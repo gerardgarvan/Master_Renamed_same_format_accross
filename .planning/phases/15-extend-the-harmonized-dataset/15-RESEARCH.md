@@ -12,7 +12,7 @@
 | ID | Description | Research Support |
 |----|-------------|------------------|
 | HARM-04 | Every canonical-name decision recorded in `concept_decisions.csv`, attributed and dated, applied by program rather than by hand | Existing `10b_concept_harmonize.sas` reads `concept_decisions.csv` and applies it; Phase 15 extends the same file with the EXT template rows; the attribution/date convention must be established in the CSV itself |
-| HARM-07 | A written rule states which pipeline-derived columns are carried vs. dropped and is enforced in code; the rule must address the 12 no-information columns: `in_md3` (constant) + eleven `h_*_src` companions (each single-value) | These 12 columns currently appear in `g.master_data_harmonized`; the rule should be encoded as a `%let drop_pipeline_noinfo = 1;` gate in `10b_concept_harmonize.sas` with explicit DROP statements and a post-run assertion |
+| HARM-07 | A written rule states which pipeline-derived columns are carried vs. dropped and is enforced in code; the rule must address the no-information columns: `in_md3` (constant) + every `h_*_src` companion (single-valued when no secondary fires) | Currently 12 such columns appear in `g.master_data_harmonized` (in_md3 + 11 companions); the count grows with every confirmed concept. Encode as a `%let drop_pipeline_noinfo = 1;` gate in `10b_concept_harmonize.sas` with a `drop=` dataset option, a `work.src_check` side output, a single-value premise assertion, and an absence assertion |
 </phase_requirements>
 
 ---
@@ -23,7 +23,9 @@ Phase 15 has two independent deliverables that can be developed in parallel but 
 
 **Deliverable A (HARM-04):** Extend `docs/concept_decisions.csv` with the SSDI death family and CPT1 code/label entries from `docs/concept_decisions_EXT_TEMPLATE.csv`, after a human has filled CONFIRMED=YES. The existing `10b_concept_harmonize.sas` machinery reads this file, validates it with thirteen hard gates, proves redundancy in-run, and produces `g.master_data_harmonized`. No new SAS code is needed for the core harmonization step — only the CSV population and a re-run.
 
-**Deliverable B (HARM-07):** State and enforce the pipeline-derived column rule. The twelve no-information columns (`in_md3` + eleven `h_*_src` companions) must be named in a written rule inside the program and dropped via a guarded DROP block in the DATA step. Dropping them does NOT require a redundancy proof (they are not alias columns — they are derivations with a structural reason to drop); the enforcement is a direct DROP with an assertion that all twelve are absent from the harmonized output.
+**Deliverable B (HARM-07):** State and enforce the pipeline-derived column rule. `in_md3` and every `h_*_src` companion must be named in a written rule inside the program and dropped via a guarded `drop=` dataset option on the DATA statement. `in_md3` needs no proof (structurally constant). The companions DO need one: the "single repeated value" premise was proven for the original 11 concepts only, and Phase 15 adds concepts whose secondaries may fire. The DATA step therefore writes the companions to a `work.src_check` side output and SECTION 6 asserts each is single-valued before the run passes, followed by an assertion that none remain in the harmonized output.
+
+**Deliverable C (attribution):** HARM-04 decisions are attributed as PCM-D-13 (Plan 15-01); the HARM-07 rule is attributed separately as PCM-D-14 (Plan 15-02).
 
 **Primary recommendation:** Run `10b_concept_harmonize.sas` twice — first with only the EXT rows added (proves the new concepts, generates the new `h_` columns, re-proves the existing eleven redundancies), then verify the HARM-07 rule is enforced. Both can live in the same re-run if the program is extended first.
 
@@ -82,28 +84,36 @@ The human opens `concept_decisions_EXT_TEMPLATE.csv`, reviews `CONCEPT_EVIDENCE_
 
 **Example DECISIONS.md entry pattern (from existing D-01 through D-11):**
 ```
-**PCM-D-13 — SSDI concept harmonization: CONFIRMED 2026-09-NN by [reviewer]**
-SSDI_DEATH_DATE_Y_N (priority 1) chosen as canonical h_ssdi_death_date_yn ...
+**PCM-D-13 — SSDI/CPT1/label-sweep concept harmonization: CONFIRMED 2026-09-NN by [reviewer]**
+SSDI_DEATH_DATE_Y_N (priority 1) chosen as canonical h_ssdi_death ...
+Deferred: <concept> (gate (m) — value contains quote / & / %) or "none"
+```
+
+**Pinned names:** `h_ssdi_death` (SSDI family), `h_cpt1` (CPT1 pair). The plan pins these so the reviewer is not choosing at the checkpoint; gate (c) is still checked in-run.
+
+**Gate (m) is a screen, not a review item.** VALUE_TXT must equal the observed value exactly (SECTION 3 coverage), so a value containing a quote, `&`, or `%` cannot be mapped by the current 10b at all — substituting the character breaks coverage. Any concept with such a value is deferred and recorded in D-13; CPT labels make CPT1 the likely case. Plan 15-01 runs the screen before the reviewer judges anything.
+```
 ```
 
 ### Pattern 2: HARM-07 Pipeline-Derived Column Rule
 
 **What:** A written rule in the program header plus a conditional DROP block in the DATA step.
 
-**The twelve columns to address:**
+**The columns to address:**
 - `in_md3` — constant 1 for all 41,150 rows (md3 is the spine; every row is in md3)
-- Eleven `h_*_src` companions — each holds a single repeated value because no secondary source ever fires (all eleven secondaries were proven redundant and dropped in Phase 10; force_src=1 emitted them anyway)
+- Every `h_*_src` companion — currently eleven. Each holds a single repeated value *if* no secondary source ever fires. That was proven for the original eleven concepts (all secondaries redundant and dropped in Phase 10; force_src=1 emitted the companions anyway). It is NOT automatically true for concepts added in Phase 15: if SECTION 4b does not prove a new secondary redundant, that secondary stays in the file, can fire, and its companion then carries provenance. The rule must therefore assert the premise per companion, per run.
 
 **Rule statement (to embed in program header):**
 ```
 Pipeline-derived column rule (HARM-07):
   CARRY: in_md1, in_md2, in_md4..in_md8, n_sources, rt_envelope_flag, rt_*
          (these carry information: source membership, row count, clinical timing)
-  DROP:  in_md3 (constant -- md3 is the spine; value is 1 for all 41,150 rows)
-         h_*_src companions (each a single repeated value -- the redundancy proof
-         showed no secondary source ever fires; these columns carry no information)
-  ENFORCEMENT: DROP statements in the DATA step; assertion that all 12 are absent
-               from g.master_data_harmonized after the DATA step completes.
+  DROP:  in_md3 (constant -- md3 is the spine; value is 1 for every row)
+         every h_*_src companion (each must hold a single repeated value because no
+         secondary source fires; ASSERTED in-run for every companion, not assumed)
+  ENFORCEMENT: drop= dataset option on the SECTION 5 DATA statement; work.src_check
+               side output; SECTION 6 assert_src_single (premise) and assert_harm07
+               (absence); assert_merged_unchanged re-queries the merged file post-run.
 ```
 
 **Implementation in 10b_concept_harmonize.sas:**
@@ -120,43 +130,32 @@ The program already has `%let force_src = 1;` which emits all `h_*_src` companio
    Set drop_pipeline_noinfo=0 to retain them for diagnostic purposes.       */
 ```
 
-The DROP itself must go in the DATA step alongside the existing `drop &droplist;`:
+The drop is a `drop=` DATASET OPTION on the DATA statement, not a DROP statement: a DROP statement applies to every output dataset, and the DATA step now has a second output (`work.src_check`) that must KEEP the companions for the premise proof.
 
 ```sas
-data g.master_data_harmonized;
+data g.master_data_harmonized
+  %if &drop_pipeline_noinfo = 1 %then %do;
+    (drop=in_md3 %do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+  %end;
+  %if &n_h > 0 %then %do;
+    work.src_check (keep=%do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+  %end;
+  ;
   set g.master_data_merged;
   %if %length(&droplist) > 0 %then %do;
-    drop &droplist;
-  %end;
-  %if &drop_pipeline_noinfo = 1 %then %do;
-    drop in_md3
-    /* h_*_src list: built from &hnames at compile time */
-    %do i = 1 %to &n_h;
-      %scan(&hnames, &i)._src
-    %end;
-    ;
+    drop &droplist;          /* unchanged: applies to both outputs; keep= wins on src_check */
   %end;
   ...
 ```
+Every row goes to both outputs (no explicit OUTPUT statement). The side output costs one 41,150-row WORK table with a handful of $32 columns — trivial.
 
-**Assertion pattern (SECTION 6, extend existing assert_all macro):**
+**Assertion pattern (SECTION 6, three new macros called after %assert_all):**
 
-```sas
-/* HARM-07 assertion: the twelve no-information columns must be absent */
-%if &drop_pipeline_noinfo = 1 %then %do;
-  proc sql noprint;
-    select count(*) into :n_noinfo_present trimmed
-    from dictionary.columns
-    where libname='G' and memname='MASTER_DATA_HARMONIZED'
-      and upcase(name) in ('IN_MD3'
-        %do i = 1 %to &n_h; , upcase("%scan(&hnames,&i)_SRC") %end; );
-  quit;
-  %if &n_noinfo_present > 0 %then %do;
-    %fail_out(msg=&n_noinfo_present no-information pipeline columns remain in the harmonized file);
-  %end;
-  %put NOTE: [10b] HARM-07 OK -- in_md3 and all h_*_src columns dropped.;
-%end;
-```
+1. `%assert_src_single` — premise. For each `%scan(&hnames,&_pi)._src`, `select count(distinct &_v) from work.src_check where not missing(&_v)`; any count > 1 means a secondary fired; %fail_out after the loop with the number of offenders. Runs regardless of the gate. See Example 2.
+2. `%assert_harm07` — absence. Counts IN_MD3 + every `_SRC` in `dictionary.columns` for MASTER_DATA_HARMONIZED; %fail_out if > 0. Gated. See Example 3.
+3. `%assert_merged_unchanged` — re-queries `dictionary.columns` (176) AND `dictionary.tables` nobs (= &n_rows) for MASTER_DATA_MERGED post-run. See Example 5.
+
+If `%assert_src_single` fires, the remedy is in concept_decisions.csv (that concept's PRIORITY order or mapping), never in weakening the rule.
 
 **CRITICAL SUBTLETY:** The `src_changed` assertion in SECTION 6 currently checks that no column vanishes from `g.master_data_harmonized` unless it was in `work.drop_ok`. The `h_*_src` columns were ADDED by this same program (they are not in `g.master_data_merged`), so the assertion queries `dictionary.columns WHERE libname='G' AND memname='MASTER_DATA_MERGED'` for the "before" list. The `h_*_src` and `in_md3` columns appear in merged, so they will be flagged as dropped without proof if the assertion is not updated. The fix: add the HARM-07 drop list to the exclusion clause alongside `work.drop_ok`.
 
@@ -170,19 +169,7 @@ The `src_changed` query must exclude `in_md3` when `drop_pipeline_noinfo=1`. Thi
 
 **What:** The program reads `g.master_data_merged` with `set g.master_data_merged` and writes `g.master_data_harmonized` — they are separate datasets. The merged file is never written.
 
-**Assertion (already in SECTION 6):** The program queries `n_rows` from `g.master_data_merged` before any DATA step and asserts `n_out = n_rows` after. This covers row count. Column count for `g.master_data_merged` is not currently asserted post-run; HARM-07's success criterion 3 ("176 columns, 41,150 rows confirmed unmodified") requires a post-run column count assertion on `g.master_data_merged`.
-
-Add to SECTION 6:
-```sas
-proc sql noprint;
-  select count(*) into :n_merged_cols trimmed
-  from dictionary.columns
-  where libname='G' and memname='MASTER_DATA_MERGED';
-quit;
-%if &n_merged_cols ne 176 %then %do;
-  %fail_out(msg=g.master_data_merged has &n_merged_cols columns after run -- expected 176);
-%end;
-```
+**Assertion (existing SECTION 6):** The program queries `n_rows` from `g.master_data_merged` BEFORE the DATA step and asserts `n_out = n_rows` after. That proves the harmonized row count, not the post-run state of the merged file. Success criterion 3 ("176 columns, 41,150 rows confirmed unmodified") needs BOTH counts re-queried AFTER the DATA step — see Example 5. Do not report `&n_rows` in the post-run NOTE as if it were re-measured.
 
 ### Anti-Patterns to Avoid
 
@@ -190,7 +177,11 @@ quit;
 - **Do NOT use `data g.master_data_merged; set g.master_data_merged;`** (PCM-T-02 — destroys dataset).
 - **Do NOT use PROC SQL UPDATE** (PCM-T-01 — silent truncation).
 - **Do NOT drop `in_md3` without the exclusion fix to `src_changed`.** The assertion will fail with a spurious "column dropped without proof" error.
-- **Do NOT rely on `force_src=1` and `drop_pipeline_noinfo=1` simultaneously without reconciling the LENGTH block.** If `h_*_src` columns are declared in the LENGTH block but then dropped, SAS is fine (DROP removes from output, not PDV). But the `src_changed` exclusion must account for them being absent from the final file.
+- **Do NOT rely on `force_src=1` and `drop_pipeline_noinfo=1` simultaneously without reconciling the LENGTH block.** If `h_*_src` columns are declared in the LENGTH block but then dropped, SAS is fine (`drop=` removes from that output, not the PDV).
+- **Do NOT drop the `h_*_src` companions on the strength of the Phase 10 proof alone.** The proof covered eleven concepts; every run must re-prove the premise for whatever `&hnames` contains (`%assert_src_single`).
+- **Do NOT use a DROP statement for the HARM-07 drop.** It would apply to `work.src_check` too and defeat the premise proof; use the `drop=` dataset option.
+- **Do NOT sanitize VALUE_TXT to get past gate (m).** VALUE_TXT must equal the observed value for coverage; defer the concept instead.
+- **Do NOT copy `&qc_path/10b_harmonize_report.txt` into the repo `qc/` folder.** QC outputs live on P: and are not version-controlled; cite the path in the SUMMARY.
 
 ---
 
@@ -233,6 +224,8 @@ and a.name ne 'IN_MD3'
 
 **Warning signs:** "N concepts are only PARTIALLY confirmed" in the SAS log.
 
+**Related — gate (m) on CPT1:** CPT labels routinely contain `&`, `%`, and quotes. Because VALUE_TXT must match the observed value exactly for SECTION 3 coverage, any such value makes the whole concept unmappable by the current 10b. Plan 15-01 Task 2 screens every EXT row for `["&%]` BEFORE the reviewer judges anything; concepts with hits are deferred and recorded in D-13. Warning sign if the screen was skipped: a gate (m) abort naming the offending value.
+
 ### Pitfall 3: concept_decisions.csv Still Uses the Gitignore-Excluded Path
 
 **What goes wrong:** The updated `concept_decisions.csv` is not committed because it matches `*.csv` in `.gitignore`. The next clean-session run of 10b uses the old file (or finds no file and aborts).
@@ -265,64 +258,106 @@ and a.name ne 'IN_MD3'
 
 **How to avoid:** Before beginning Phase 15 plan execution, verify that `docs/label_similarity_candidates.csv` and `docs/concept_decisions_EXT_TEMPLATE.csv` exist on disk (not necessarily committed — but present so the human can review them). If absent, run `sas/14_label_similarity.sas` in a fresh SAS 9.4 session first.
 
+### Pitfall 7: A New Secondary Fires and the h_*_src Drop Destroys Provenance
+
+**What goes wrong:** A Phase 15 concept (e.g. the three-source SSDI family) has a secondary that SECTION 4b does NOT prove redundant. The secondary stays in the file and populates the harmonized column on some rows; its `_src` companion then holds two or more distinct values. The blanket `_src` drop silently discards which source supplied each row.
+
+**Why it happens:** The rule's premise ("no secondary ever fires") was established on the original eleven concepts and does not transfer automatically.
+
+**How to avoid:** `%assert_src_single` (Example 2) runs every time and fails the run if any companion has more than one distinct non-missing value. The fix on failure is in concept_decisions.csv (PRIORITY order or the mapping), not in the rule.
+
+**Warning signs:** "HARM-07 premise violated -- N h_*_src companion(s) not single-valued" in the SAS log.
+
 ---
 
 ## Code Examples
 
-### Example 1: HARM-07 Drop Block in 10b DATA Step
+### Example 1: HARM-07 drop= and work.src_check side output (SECTION 5)
 
 ```sas
-/* HARM-07: drop no-information pipeline columns --------------------------------
-   in_md3 is constant (md3 is the spine; value=1 for all &n_rows rows).
-   h_*_src companions each carry one distinct value: all secondaries were proven
-   redundant and never fire, so the source provenance string is the same on
-   every populated row. Both classes carry no information.
-   g.master_data_merged is untouched by this DROP.
-   Set drop_pipeline_noinfo=0 to retain for diagnostic purposes.               */
+/* HARM-07: pipeline-derived column rule -------------------------------------
+   in_md3 is constant (md3 is the spine). Every h_*_src companion is asserted
+   single-valued in SECTION 6 (assert_src_single) and dropped from the harmonized
+   output here. g.master_data_merged is untouched by this drop.
+   Set drop_pipeline_noinfo=0 to retain the columns for diagnostics.            */
 %let drop_pipeline_noinfo = 1;
-/* ... (after SECTION 4: rule extraction) ... */
+/* ... inside build_harmonized, %local i k h emit_src _pi; ... */
 
-data g.master_data_harmonized;
+data g.master_data_harmonized
+  %if &drop_pipeline_noinfo = 1 %then %do;
+    (drop=in_md3 %do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+  %end;
+  %if &n_h > 0 %then %do;
+    work.src_check (keep=%do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+  %end;
+  ;
   set g.master_data_merged;
   %if %length(&droplist) > 0 %then %do;
     drop &droplist;
-  %end;
-  %if &drop_pipeline_noinfo = 1 %then %do;
-    drop in_md3
-    %do _pi = 1 %to &n_h;
-      %scan(&hnames, &_pi)._src
-    %end;
-    ;
   %end;
   length ... ;
   /* ... rules ... */
 run;
 ```
 
-### Example 2: HARM-07 Assertion in assert_all
+### Example 2: Premise assertion -- every h_*_src single-valued
 
 ```sas
-/* HARM-07: confirm 12 no-information columns are absent */
-%if &drop_pipeline_noinfo = 1 %then %do;
-  proc sql noprint;
-    create table work.noinfo_present as
-    select name from dictionary.columns
-    where libname='G' and memname='MASTER_DATA_HARMONIZED'
-      and ( upcase(name) = 'IN_MD3'
-            %do _pi = 1 %to &n_h;
-            or upcase(name) = upcase("%scan(&hnames,&_pi)_SRC")
-            %end; );
-    select count(*) into :n_noinfo_present trimmed from work.noinfo_present;
-  quit;
-  %if &n_noinfo_present > 0 %then %do;
-    %put ERROR: &n_noinfo_present no-information pipeline column(s) still present.;
-    %fail_out(msg=HARM-07 violation -- no-information columns not dropped);
+%macro assert_src_single;
+  %local _pi _v n_dist n_bad;
+  %let n_bad = 0;
+  %if &n_h > 0 %then %do;
+    %do _pi = 1 %to &n_h;
+      %let _v = %scan(&hnames, &_pi)._src;
+      proc sql noprint;
+        select count(distinct &_v) into :n_dist trimmed
+        from work.src_check
+        where not missing(&_v);
+      quit;
+      %if &n_dist > 1 %then %do;
+        %put ERROR: [10b] &_v holds &n_dist distinct values -- a secondary source fires -- cannot be dropped by rule.;
+        %let n_bad = %eval(&n_bad + 1);
+      %end;
+    %end;
   %end;
-  %put NOTE: [10b] HARM-07 OK -- in_md3 and all h_*_src companions dropped.;
-%end;
+  %if &n_bad > 0 %then %do;
+    %fail_out(msg=HARM-07 premise violated -- &n_bad h_*_src companion(s) not single-valued);
+  %end;
+  %put NOTE: [10b] HARM-07 premise OK -- every h_*_src companion is single-valued.;
+%mend assert_src_single;
+%assert_src_single;
 ```
 
-### Example 3: src_changed Exclusion Fix
+### Example 3: Absence assertion
+
+```sas
+%macro assert_harm07;
+  %local _pi n_noinfo_present;
+  %if &drop_pipeline_noinfo = 1 %then %do;
+    proc sql noprint;
+      create table work.noinfo_present as
+      select name from dictionary.columns
+      where libname='G' and memname='MASTER_DATA_HARMONIZED'
+        and ( upcase(name) = 'IN_MD3'
+              %do _pi = 1 %to &n_h;
+              or upcase(name) = upcase("%scan(&hnames,&_pi)_SRC")
+              %end; );
+      select count(*) into :n_noinfo_present trimmed from work.noinfo_present;
+    quit;
+    %if &n_noinfo_present > 0 %then %do;
+      %put ERROR: [10b] &n_noinfo_present no-information pipeline column(s) still present.;
+      %fail_out(msg=HARM-07 violation -- in_md3 or h_*_src columns not dropped);
+    %end;
+    %put NOTE: [10b] HARM-07 OK -- in_md3 and every h_*_src companion dropped.;
+  %end;
+  %else %do;
+    %put NOTE: [10b] HARM-07 gate is 0 -- no-information columns RETAINED for diagnostics.;
+  %end;
+%mend assert_harm07;
+%assert_harm07;
+```
+
+### Example 4: src_changed exclusion fix
 
 ```sas
 /* In SECTION 6, the src_changed WHERE clause -- extend the exclusion: */
@@ -339,20 +374,26 @@ create table work.src_changed as
   ;
 ```
 
-### Example 4: Post-Run Merged Column Count Assertion
+### Example 5: Post-run merged unchanged -- columns AND rows re-queried
 
 ```sas
-/* Confirm g.master_data_merged unchanged: 176 columns */
-proc sql noprint;
-  select count(*) into :n_merged_cols trimmed
-  from dictionary.columns
-  where libname='G' and memname='MASTER_DATA_MERGED';
-quit;
 %macro assert_merged_unchanged;
+  %local n_merged_cols n_merged_rows;
+  proc sql noprint;
+    select count(*) into :n_merged_cols trimmed
+    from dictionary.columns
+    where libname='G' and memname='MASTER_DATA_MERGED';
+    select nobs into :n_merged_rows trimmed
+    from dictionary.tables
+    where libname='G' and memname='MASTER_DATA_MERGED';
+  quit;
   %if &n_merged_cols ne 176 %then %do;
-    %fail_out(msg=g.master_data_merged has &n_merged_cols columns -- expected 176 -- it was modified);
+    %fail_out(msg=g.master_data_merged has &n_merged_cols columns post-run -- expected 176 -- it was modified);
   %end;
-  %put NOTE: [10b] g.master_data_merged confirmed 176 columns and &n_rows rows -- unmodified.;
+  %if &n_merged_rows ne &n_rows %then %do;
+    %fail_out(msg=g.master_data_merged has &n_merged_rows rows post-run -- expected &n_rows -- it was modified);
+  %end;
+  %put NOTE: [10b] g.master_data_merged confirmed post-run -- 176 columns and &n_merged_rows rows -- unmodified.;
 %mend assert_merged_unchanged;
 %assert_merged_unchanged;
 ```
@@ -363,8 +404,8 @@ quit;
 
 | Before Phase 15 | After Phase 15 | Impact |
 |----------------|---------------|--------|
-| `g.master_data_harmonized`: 187 cols, 11 h_ columns, 11 aliases dropped | + new h_ columns for SSDI and CPT1 groups confirmed in Phase 14; `in_md3` and eleven `h_*_src` columns dropped | HARM-04 and HARM-07 closed |
-| No written rule for pipeline-derived columns | Rule in program header, enforced by DROP + assertion | HARM-07 provably satisfied |
+| `g.master_data_harmonized`: 187 cols, 11 h_ columns, 11 aliases dropped | + new h_ columns for concepts confirmed in 15-01; `in_md3` and every `h_*_src` dropped, premise asserted per run | HARM-04 and HARM-07 closed |
+| No written rule for pipeline-derived columns | Rule in program header (PCM-D-14), enforced by drop= + premise + absence assertions | HARM-07 provably satisfied |
 | `concept_decisions.csv` covers 11 original concepts | Extends to cover SSDI + CPT1 (if confirmed) | HARM-04 satisfied |
 
 ---
@@ -384,12 +425,12 @@ quit;
 3. **How many new h_ columns will result from the SSDI and CPT1 confirmations?**
    - What we know: Two concept groups are in the template; SSDI_DEATH_FLAG and CPT1_CODE_LABEL; each will produce one h_ column
    - What's unclear: Whether any label-similarity candidates from Section A are confirmed (those would produce additional h_ columns)
-   - Recommendation: Plan conservatively for at least two new h_ columns; column count in the final `g.master_data_harmonized` will be (187 - 12 dropped) + new h_ columns
+   - Recommendation: final column count = 176 - 11 - (newly dropped aliases) - 1 (in_md3) + 11 + (new h_ columns); no `_src` columns remain. CPT1 may be deferred by the gate (m) screen, so plan for one to two new h_ columns.
 
 4. **Does DECISIONS.md have a slot for the HARM-07 rule (PCM-D-13 or next available)?**
    - What we know: D-11 and D-12 are the most recent; PCM-D-10 was closed 2026-09-14
    - What's unclear: Whether D-12 was assigned; D-12 appears in Phase 8 (abort cancel OS behavior)
-   - Recommendation: Assign the next available decision ID (likely PCM-D-13) for the HARM-07 rule and the SSDI/CPT1 confirmations
+   - Recommendation: PCM-D-13 = the HARM-04 confirmations and deferrals (Plan 15-01); PCM-D-14 = the HARM-07 rule (Plan 15-02). Two decisions, two IDs.
 
 ---
 
@@ -420,26 +461,25 @@ quit;
 | Framework | SAS 9.4 `%abort cancel` assertion pattern (no external test runner) |
 | Config file | `sas/00_config.sas` |
 | Quick run command | Submit `sas/10b_concept_harmonize.sas` in a fresh SAS 9.4 session |
-| Full suite command | Same — 10b is self-contained; all assertions are in-program |
+| Full suite command | Same — 10b is self-contained; all assertions are in-program. There is no separate Phase 15 program. |
 
 ### Phase Requirements → Test Map
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|--------------|
 | HARM-04 | concept_decisions.csv updated with EXT rows; program applies them; DECISIONS.md entry added | integration | Run `10b_concept_harmonize.sas`; check log for `NOTE: [10b] &n_con_yes concepts confirmed` matches expected count | `sas/10b_concept_harmonize.sas` — YES |
-| HARM-07 | 12 no-information columns absent from g.master_data_harmonized; rule stated in code | integration | HARM-07 assertion block in assert_all macro; `n_noinfo_present = 0` logged | Added in Phase 15 — Wave 0 gap |
-| SC-3 | g.master_data_merged unmodified: 176 cols, 41,150 rows | integration | Post-run column count assertion `n_merged_cols = 176` | Added in Phase 15 — Wave 0 gap |
+| HARM-07 | in_md3 + every h_*_src absent from g.master_data_harmonized; premise proven; rule stated in code | integration | `%assert_src_single` + `%assert_harm07`; both NOTE lines logged | Added in Phase 15 (Plan 15-02 Tasks 1-2) |
+| SC-3 | g.master_data_merged unmodified: 176 cols, 41,150 rows | integration | `%assert_merged_unchanged` re-queries both counts post-run | Added in Phase 15 (Plan 15-02 Task 2) |
 | SC-4 | Any newly dropped alias proven redundant (0 rows added, 0 disagreements) | integration | Existing SECTION 4b redundancy proof in 10b | YES — existing machinery |
 
 ### Wave 0 Gaps
 
-- [ ] HARM-07 DROP block in `sas/10b_concept_harmonize.sas` — covers HARM-07
-- [ ] HARM-07 assertion in `assert_all` macro — covers HARM-07
-- [ ] `src_changed` exclusion fix for `in_md3` — prerequisite for HARM-07 to not false-fire
-- [ ] Post-run `g.master_data_merged` column count assertion — covers success criterion 3
-- [ ] Human review of `label_similarity_candidates.csv` and EXT template — prerequisite for HARM-04 (cannot be automated)
-- [ ] `docs/concept_decisions.csv` extended with EXT rows — HARM-04 input
-- [ ] DECISIONS.md entry for new confirmations — HARM-04 attribution requirement
+- [ ] Phase 14 CSVs present on disk (15-01 Task 1 — the only true Wave 0 item)
+- [ ] Gate (m) screen + human review of EXT template and label candidates (15-01 Task 2)
+- [ ] `docs/concept_decisions.csv` extended; PCM-D-13 (15-01 Task 3)
+- [ ] HARM-07 drop= + work.src_check in `sas/10b_concept_harmonize.sas` (15-02 Task 1)
+- [ ] `%assert_src_single`, `%assert_harm07`, `src_changed` exclusion, `%assert_merged_unchanged` (15-02 Task 2)
+- [ ] PCM-D-14 (15-02 Task 3)
 
 ---
 

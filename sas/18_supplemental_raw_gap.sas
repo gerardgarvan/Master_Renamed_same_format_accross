@@ -560,36 +560,36 @@ run;
       if inb and inr;
     run;
 
-    /* Numeric NEW columns: recode -999 to missing, then PROC MEANS N */
+    /* Numeric NEW columns: count non-missing (and not -999) via array pass */
     %if &&_nn_num_&rid > 0 %then %do;
-      data work.raw_matched_num;
-        set work.raw_matched (keep=_k &&_new_num_list_&rid);
+      data work.raw_matched_num_&rid (keep=_col _n_pop);
+        length _col $32 _n_pop 8;
+        set work.raw_matched (keep=_k &&_new_num_list_&rid) end=_eof;
         array _nv {*} &&_new_num_list_&rid;
+        array _nc {&&_nn_num_&rid} _temporary_;
         do _i = 1 to dim(_nv);
-          if _nv{_i} = -999 then _nv{_i} = .;
+          if not missing(_nv{_i}) and _nv{_i} ne -999 then _nc{_i} + 1;
+        end;
+        if _eof then do;
+          do _i = 1 to dim(_nv);
+            _col   = vname(_nv{_i});
+            _n_pop = coalesce(_nc{_i}, 0);
+            output;
+          end;
         end;
         drop _i;
       run;
 
-      ods exclude all;
-      proc means data=work.raw_matched_num n noprint;
-        var &&_new_num_list_&rid;
-        ods output summary=work._means_&rid;
-      run;
-      ods select all;
-
-      /* Insert one row per numeric NEW column */
       data _null_;
-        set work._means_&rid;
-        length _col $32 stmt $2000;
-        /* ODS summary: variable column is named 'Variable' */
-        _col = strip(Variable);
-        _nm  = put(&&_nmatch_&rid, best32.);
-        _n   = strip(put(N, best32.));
+        set work.raw_matched_num_&rid;
+        length stmt $2000;
+        _nm    = put(&&_nmatch_&rid, best32.);
+        _col_q = strip(_col);
+        _n_q   = strip(put(_n_pop, best32.));
         stmt = 'proc sql noprint; insert into work.gap_results'
              || ' set rid="&rid",'
              || ' fname="&fname",'
-             || ' column="' || _col || '",'
+             || ' column="' || _col_q || '",'
              || ' bucket="NEW",'
              || ' raw_type="num",'
              || ' base_type="",'
@@ -598,8 +598,8 @@ run;
              || ' pct_fillable=.,'
              || ' n_equal=.,'
              || ' n_conflict=.,'
-             || ' n_raw_populated=' || _n || ','
-             || ' pct_raw_populated=(' || _n || '/' || _nm || '); quit;';
+             || ' n_raw_populated=' || _n_q || ','
+             || ' pct_raw_populated=(' || _n_q || '/' || _nm || '); quit;';
         call execute(stmt);
       run;
     %end;
@@ -796,12 +796,13 @@ data work.r2_family_rollup;
   where not missing(family);
   length family_name $20;
   family_name = strip(family);
-  rename N_N_raw_populated       = n_cols
-         Median_n_raw_populated  = median_n_raw_populated
-         Min_n_raw_populated     = min_n_raw_populated
-         Max_n_raw_populated     = max_n_raw_populated;
-  keep family family_name N_N_raw_populated Median_n_raw_populated
-       Min_n_raw_populated Max_n_raw_populated;
+  /* ODS SUMMARY with CLASS names stats as {var}_{stat}, not {stat}_{var} */
+  rename n_raw_populated_N      = n_cols
+         n_raw_populated_Median = median_n_raw_populated
+         n_raw_populated_Min    = min_n_raw_populated
+         n_raw_populated_Max    = max_n_raw_populated;
+  keep family family_name n_raw_populated_N n_raw_populated_Median
+       n_raw_populated_Min n_raw_populated_Max;
 run;
 
 /* B-4d: Build work.gap_report = gap_results minus divider rows minus family rows */

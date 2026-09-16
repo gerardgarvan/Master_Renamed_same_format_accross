@@ -777,33 +777,19 @@ data work.r2_new_nondiv;
   drop _col_u;
 run;
 
-/* B-4c: Family rollup -- four rows via PROC MEANS */
-data work.r2_family_input;
-  set work.r2_new_nondiv;
-  where family ne '';
-run;
-
-ods exclude all;
-proc means data=work.r2_family_input n median min max noprint;
-  class family;
-  var n_raw_populated;
-  ods output summary=work.r2_family_rollup_raw;
-run;
-ods select all;
-
-data work.r2_family_rollup;
-  set work.r2_family_rollup_raw;
-  where not missing(family);
-  length family_name $20;
-  family_name = strip(family);
-  /* ODS SUMMARY with CLASS names stats as {var}_{stat}, not {stat}_{var} */
-  rename n_raw_populated_N      = n_cols
-         n_raw_populated_Median = median_n_raw_populated
-         n_raw_populated_Min    = min_n_raw_populated
-         n_raw_populated_Max    = max_n_raw_populated;
-  keep family family_name n_raw_populated_N n_raw_populated_Median
-       n_raw_populated_Min n_raw_populated_Max;
-run;
+/* B-4c: Family rollup -- PROC SQL avoids ODS SUMMARY column-naming variance */
+proc sql noprint;
+  create table work.r2_family_rollup as
+    select family                        as family_name length=20,
+           count(*)                      as n_cols,
+           median(n_raw_populated)       as median_n_raw_populated,
+           min(n_raw_populated)          as min_n_raw_populated,
+           max(n_raw_populated)          as max_n_raw_populated
+    from work.r2_new_nondiv
+    where family ne ''
+    group by family
+    order by family;
+quit;
 
 /* B-4d: Build work.gap_report = gap_results minus divider rows minus family rows */
 /* Keep: all non-r2 rows, plus r2 IN_BASE rows, plus r2 individual NEW rows  */

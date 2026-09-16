@@ -199,6 +199,13 @@ options nodate nonumber ps=max ls=200 nofmterr;
   %end;
 %mend gate_stats;
 
+/* ---- PCM-D-15 gate macro -- blocks analysis_base_ext build until approved */
+%macro gate_d15;
+  %if &D15_APPROVED ne 1 %then %do;
+    %fail_out(msg=PCM-D-15 awaiting approval -- review 18_gap_candidates.txt then set D15_APPROVED=1 in 00_config.sas);
+  %end;
+%mend gate_d15;
+
 /* ---- Directory preconditions (logs first, before the log is routed) ---- */
 %macro check_dir(path=, label=);
   %if %sysfunc(fileexist(&path)) = 0 %then %do;
@@ -1045,6 +1052,9 @@ quit;
 /* ---- 6. Sort and left merge -------------------------------------------- */
 proc sort data=work.merged_ext_cols; by PRECEDE_STUDY_ID; run;
 proc sort data=work.base_keyed out=work.analysis_base_sorted; by PRECEDE_STUDY_ID; run;
+
+/* D15 gate: blocks analysis_base_ext until PCM-D-15 is approved */
+%gate_d15;
 
 data work.analysis_base_ext;
   merge work.analysis_base_sorted (in=inbase)

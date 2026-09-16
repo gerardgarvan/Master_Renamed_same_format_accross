@@ -185,10 +185,10 @@ Plans:
 **Goal:** Deliver the two Phase 16 follow-on items ("16b") as a single read-only diagnostic program: (1) a 2022 ID mismatch diagnostic explaining why r7/r8/r9 2022 IDs match 0 base rows (PCM-D-16, diagnosed not fixed), and (2) a per-column gap-fill candidate table on matched IDs for r1/r2/r3/r4/r5/r6/r9 (r7/r8 excluded), so Gerard can decide PCM-D-15. Ends with a %let D15_APPROVED=0 gate that blocks downstream gap-fill until approved. Nothing under raw\ is written; no g.* dataset is modified.
 **Requirements**: RAW-08, RAW-09, RAW-10, RAW-11, RAW-12
 **Depends on:** Phase 16 (reuses the raw-inventory import pattern; note 16_raw_inventory.sas is not in git, so import macros are reconstructed)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 18-01-PLAN.md -- Wave 1: add raw_path to 00_config.sas; scaffold 18_supplemental_raw_gap.sas (reconstructed %import_csv/%import_xlsx, libname g, %assert_base, log routing, %fail_out); Section A 2022 ID diagnostic to qc\18_id_diagnostic.txt, no abort (RAW-08, RAW-12)
+- [x] 18-01-PLAN.md -- Wave 1: add raw_path to 00_config.sas; scaffold 18_supplemental_raw_gap.sas (reconstructed %import_csv/%import_xlsx, libname g, %assert_base, log routing, %fail_out); Section A 2022 ID diagnostic to qc\18_id_diagnostic.txt, no abort (RAW-08, RAW-12)
 - [ ] 18-02-PLAN.md -- Wave 2: Section B per-column gap counts (n_fillable/n_equal/n_conflict for IN_BASE, n_raw_populated for NEW) for r1/r2/r3/r4/r5/r6/r9; r2 dCDT/LINUS family rollups + divider exclusion; qc\18_gap_candidates.txt; %let D15_APPROVED=0 gate (RAW-09, RAW-10, RAW-11)
 
 ---

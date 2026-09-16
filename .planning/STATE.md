@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: executing
-last_updated: "2026-09-16T18:15:37.632Z"
-last_activity: 2026-09-14 -- Phase 15 execution started
+last_updated: "2026-09-16T18:53:12.951Z"
+last_activity: 2026-09-16
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 16
-  completed_plans: 11
-  percent: 83
+  total_plans: 18
+  completed_plans: 12
+  percent: 67
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-16T18:15:37.628Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-16T18:53:12.946Z
 
 ---
 
@@ -23,16 +23,16 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 15 — extend-the-harmonized-dataset
+**Current Focus:** Phase 18 — supplemental-raw-inventory
 
 ---
 
 ## Current Position
 
-Phase: 15 (extend-the-harmonized-dataset) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 15
-Last activity: 2026-09-14 -- Phase 15 execution started
+Phase: 18 (supplemental-raw-inventory) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-16
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
   redundant), and summary statistics already cover every variable. What remains open is the
@@ -51,7 +51,7 @@ Plan: 2 of 3
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [████████░░] 83%
+**Progress:** [███████░░░] 67%
 
 **Phase status at a glance:**
 
@@ -111,6 +111,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 | Phase 17 P01 | 140 | 2 tasks | 1 files |
 | Phase 17 P02 | 420 | 2 tasks | 1 files |
 | Phase 17 P03 | 420 | 2 tasks | 1 files |
+| Phase 18 P01 | 15 | 4 tasks | 4 files |
 
 ## Accumulated Context
 

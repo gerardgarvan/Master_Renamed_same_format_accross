@@ -135,6 +135,7 @@ data work.r9_ids;
   set work.r9(keep=PRECEDE_Study_ID);
   length _k $32;
   _k = strip(cats(PRECEDE_Study_ID));
+  if substr(_k, 1, 7) ne 'Precede' then _k = 'Precede' || _k;  /* PCM-D-16: prepend prefix */
   id_length = length(_k);
   if _k ne '';
   keep _k id_length;
@@ -143,9 +144,9 @@ run;
 data work.r7_ids;
   set work.r7(keep=PRECEDE_Study_ID);
   length _k $32 id_best32 $32;
-  _k       = strip(cats(PRECEDE_Study_ID));
   id_best32 = strip(put(PRECEDE_Study_ID, best32.));   /* full precision rendering */
-  id_length = length(id_best32);
+  _k        = 'Precede' || id_best32;                  /* PCM-D-16: all r7 IDs are bare numeric */
+  id_length = length(_k);
   if _k ne '';
   keep _k id_best32 id_length;
 run;
@@ -341,7 +342,7 @@ data _null_;
   file "&qc_path.\18_id_diagnostic.txt" mod lrecl=200;
   put " ";
   put "==========================================================================";
-  put "PCM-D-16 remains open -- no cast or fix applied by this program";
+  put "PCM-D-16 resolved -- bare numeric IDs in r7/r8 prepended with Precede prefix";
   put "==========================================================================";
 run;
 
@@ -408,6 +409,7 @@ run;
     set &ds;
     length _k $32;
     _k = strip(cats(&key));
+    if substr(_k, 1, 7) ne 'Precede' then _k = 'Precede' || _k;  /* PCM-D-16: normalise prefix */
     drop &key;
   run;
 
@@ -698,7 +700,19 @@ run;
           ds=work.r9,
           key=PRECEDE_Study_ID)
 
-%put NOTE: ==== Section B Task 1 complete -- r1/r3/r4/r5/r6/r9 processed ====;
+/* r7: CSV, numeric key -- prefix normalised to Precede&id (PCM-D-16 resolved) */
+%gap_file(rid=r7,
+          fname=2022_Education_20240124.csv,
+          ds=work.r7,
+          key=PRECEDE_Study_ID)
+
+/* r8: CSV, numeric key -- prefix normalised to Precede&id (PCM-D-16 resolved) */
+%gap_file(rid=r8,
+          fname=2022_RES_20230927.csv,
+          ds=work.r8,
+          key=PRECEDE_Study_ID)
+
+%put NOTE: ==== Section B Task 1 complete -- r1/r3/r4/r5/r6/r7/r8/r9 processed ====;
 
 
 /* ---- B-4: r2 gap counts with family rollups and divider exclusion -------- */
@@ -863,8 +877,8 @@ run;
     put "treated as missing in every count. Standard SAS missing() alone is not";
     put "sufficient because -999 is the dCDT sentinel and NULL was the md8 sentinel.";
     put " ";
-    put "EXCLUDED from Section B: r7 (2022_Education) and r8 (2022_RES).";
-    put "Both have a numeric key with 0 matched IDs. See PCM-D-16 (open).";
+    put "PCM-D-16 resolved: bare numeric IDs in r7/r8 prepended with Precede prefix.";
+    put "r7 (2022_Education) and r8 (2022_RES) are now included in Section B.";
     put " ";
     put "==========================================================================";
     put "PER-FILE SUMMARY";

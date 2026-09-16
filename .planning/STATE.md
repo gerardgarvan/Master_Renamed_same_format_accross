@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: executing
-last_updated: "2026-09-14T18:28:11.410Z"
-last_activity: 2026-09-14
+last_updated: "2026-09-16T18:15:37.632Z"
+last_activity: 2026-09-14 -- Phase 15 execution started
 progress:
-  total_phases: 12
-  completed_phases: 8
-  total_plans: 29
-  completed_plans: 26
+  total_phases: 13
+  completed_phases: 3
+  total_plans: 16
+  completed_plans: 11
   percent: 83
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-14T18:22:07.964Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-16T18:15:37.628Z
 
 ---
 
@@ -23,16 +23,16 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 17 — summary-stats-by-domain-context
+**Current Focus:** Phase 15 — extend-the-harmonized-dataset
 
 ---
 
 ## Current Position
 
-Phase: 04
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-09-14
+Phase: 15 (extend-the-harmonized-dataset) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 15
+Last activity: 2026-09-14 -- Phase 15 execution started
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
   redundant), and summary statistics already cover every variable. What remains open is the
@@ -124,6 +124,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   QC-06 (Phase 5); plans 03-06 and 05-03
 
 - Phase 17 added: summary-stats-by-domain-CONTEXT
+- Phase 18 added: Supplemental Raw Inventory
 
 ### Established Decisions
 

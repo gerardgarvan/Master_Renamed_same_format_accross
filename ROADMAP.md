@@ -58,7 +58,7 @@ Plans:
 - [x] 03-03-PLAN.md -- md1/md2/md3 structural prep (md3 spine 41,150 asserted) (PREP-01, PREP-02, PREP-05, PREP-06)
 - [x] 03-04-PLAN.md -- md4/md5/md6 structural prep; prove-then-drop PRECEDE_Study_ID_1 from md6; Base_Procedure_Code_1 to CHAR (PREP-01, PREP-02, PREP-04, PREP-05, PREP-06, PREP-07)
 - [x] 03-05-PLAN.md -- md7 structural prep + 03_prep_all.sas driver and consolidated summary (PREP-01, PREP-02, PREP-05, PREP-06, PREP-07)
-- [x] 03-06-PLAN.md -- AMENDMENT-01: null negative operative intervals across all eight; report-only negative scan of every other `rt_*` (PREP-08, PREP-09)
+- [ ] 03-06-PLAN.md -- AMENDMENT-01: null negative operative intervals across all eight; report-only negative scan of every other `rt_*` (PREP-08, PREP-09)
 
 ### Phase 4: Merge
 **Goal**: Produce `g.master_data_merged` with exactly 41,150 rows and 41,150 distinct IDs by merging all eight normalized prep outputs on md3 as the spine, with provenance flags for each source and no silent last-wins overwrites
@@ -162,35 +162,6 @@ passes, logging 9 rows flagged. The merged file gains one column, `rt_envelope_f
 An earlier version predicted QC-06 failing at 9 -- correct under the null-or-block reading of
 PCM-D-08, superseded by the flag resolution.
 
-### Phase 17: Summary Statistics by Variable Domain
-
-**Goal:** Produce descriptive summary statistics for every PRECEDE-dictionary-documented
-variable, organized into five clinical domains (D1 Sociodemographics, D2 Preoperative
-assessment, D3 Cognitive assessments, D4 Intraoperative variables, D5 Outcomes), output as a
-single Excel workbook with pooled and per-year column blocks, sentinel recoding, and small-cell
-suppression (<=11). Descriptive only -- no inferential testing, no cohort restriction beyond
-g.analysis_base.
-**Requirements**: SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK
-**Depends on:** Phase 16 (numbering only). NOTE: Phase 17 is functionally DOWNSTREAM of Phase 18 (D-05): its work.analysis_base_ext takes the columns approved under PCM-D-15, which Phase 18 produces. The lower number is not a mistake.
-**Plans:** 6/6 plans complete
-
-Plans:
-- [x] 17-01-PLAN.md -- Wave 0 discovery: program scaffold (config, log routing, preconditions) + discover year variable, extension KEEP= list, per-year N (SUMM-DOMAIN-DISC)
-- [x] 17-02-PLAN.md -- Wave 1: build work.analysis_base_ext (D-01 CHAR $12 join), dictionary match, domain assignment with rationale, g.var_domain_map + Checkpoint 1 human review (SUMM-DOMAIN-MAP)
-- [x] 17-03-PLAN.md -- Wave 2: sentinel recode + log, PROC MEANS + PROC FREQ pooled and per-year, small-cell suppression (SUMM-DOMAIN-STATS)
-- [x] 17-04-PLAN.md -- Wave 3: ODS EXCEL workbook (KEY leftmost, D1-D5, Crosswalk, QC), UF colors, QC text artifact + Checkpoint 2 review (SUMM-DOMAIN-BOOK) -- Checkpoint 2 approved by Gerard 2026-09-10
-
-### Phase 18: Supplemental Raw Inventory
-
-**Goal:** Deliver the two Phase 16 follow-on items ("16b") as a single read-only diagnostic program: (1) a 2022 ID mismatch diagnostic explaining why r7/r8/r9 2022 IDs match 0 base rows (PCM-D-16, diagnosed not fixed), and (2) a per-column gap-fill candidate table on matched IDs for r1/r2/r3/r4/r5/r6/r9 (r7/r8 excluded), so Gerard can decide PCM-D-15. Ends with a %let D15_APPROVED=0 gate that blocks downstream gap-fill until approved. Nothing under raw\ is written; no g.* dataset is modified.
-**Requirements**: RAW-08, RAW-09, RAW-10, RAW-11, RAW-12
-**Depends on:** Phase 16 (reuses the raw-inventory import pattern; note 16_raw_inventory.sas is not in git, so import macros are reconstructed)
-**Plans:** 2/2 plans complete
-
-Plans:
-- [x] 18-01-PLAN.md -- Wave 1: add raw_path to 00_config.sas; scaffold 18_supplemental_raw_gap.sas (reconstructed %import_csv/%import_xlsx, libname g, %assert_base, log routing, %fail_out); Section A 2022 ID diagnostic to qc\18_id_diagnostic.txt, no abort (RAW-08, RAW-12)
-- [x] 18-02-PLAN.md -- Wave 2: Section B per-column gap counts (n_fillable/n_equal/n_conflict for IN_BASE, n_raw_populated for NEW) for r1/r2/r3/r4/r5/r6/r9; r2 dCDT/LINUS family rollups + divider exclusion; qc\18_gap_candidates.txt; %let D15_APPROVED=0 gate (RAW-09, RAW-10, RAW-11)
-
 ---
 
 ## Milestone v1.1 — Variable Harmonization
@@ -227,10 +198,7 @@ stale cohort file.
   3. Canonical names come from `docs/precede_dictionary.csv`, read programmatically. `VARIABLE_RECTIFICATION.xlsx` is NOT used as a crosswalk -- it is a register of open questions and holds no name mapping (HARM-02)
   4. The SSDI death family and the `CPT1_CLASS`/`CPT1_LABEL` pair are added to the concept list and profiled (HARM-09)
   5. A pair the sweep proposes is never harmonised without human confirmation -- the `concept_decisions.csv` pattern, where the program applies exactly what is confirmed and FAILS on any unmapped value
-**Plans**: 2 plans
-Plans:
-- [x] 14-01-PLAN.md -- Write sas/14_label_similarity.sas Section A: extract labels from g.master_data_harmonized, join precede_dictionary.csv for best-label enrichment, COMPGED pairwise sweep, exclude known pairs, write docs/label_similarity_candidates.csv and evidence workbook (HARM-02, HARM-03)
-- [x] 14-02-PLAN.md -- Implement Section B: SSDI death family and CPT1 concept group profiling, write docs/concept_decisions_EXT_TEMPLATE.csv and docs/CONCEPT_EVIDENCE_EXT.xlsx; human-verify SAS run (HARM-09)
+**Plans**: TBD
 
 ### Phase 15: Extend the Harmonized Dataset
 **Goal**: Concepts confirmed in Phase 14 are harmonised into `g.master_data_harmonized` by the existing `10b` machinery, and a stated rule governs the pipeline-derived columns
@@ -241,10 +209,7 @@ Plans:
   2. A written rule states which pipeline-derived columns are carried and which dropped, and the rule is enforced in code. It must address the twelve columns that carry no information: `in_md3` (constant -- md3 is the spine) and the eleven `h_*_src` companions (each a single repeated value, because the redundancy proof showed no secondary source ever fires) (HARM-07)
   3. `g.master_data_merged` is confirmed unmodified after the run -- 176 columns, 41,150 rows
   4. Any newly dropped alias is PROVEN redundant in the run, not assumed: zero rows added and zero disagreements where both are populated
-**Plans**: 2 plans
-Plans:
-- [ ] 15-01-PLAN.md -- HARM-04: human confirms SSDI/CPT1 (and any label-similarity) concepts, appends to concept_decisions.csv, records PCM-D-13 attribution in DECISIONS.md (HARM-04)
-- [ ] 15-02-PLAN.md -- HARM-07: add pipeline-column rule + drop_pipeline_noinfo DROP block + assertions to 10b_concept_harmonize.sas (in_md3 + eleven h_*_src), src_changed in_md3 fix, 176-column merged assertion; fresh-session re-run (HARM-07, HARM-04)
+**Plans**: TBD
 
 ### Phase 16: Rebuild the Analytic Cohort
 **Goal**: `g.analytic_cohort` is rebuilt from `g.master_data_harmonized` so all three datasets are in step, and the cohort decision itself is settled

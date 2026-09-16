@@ -21,6 +21,15 @@
 %let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
 %let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
 
+/* ---- Raw supplemental source path (P: -- NOT in git) ---- */
+%let raw_path = P:\PeCAN Master Data\Gerard\raw;
+
+/* ---- Phase 18 / PCM-D-15 approval gate ----
+   0 = awaiting Gerard review of qc\18_gap_candidates.txt
+   1 = approved -- lets 18_supplemental_raw_gap.sas complete and lets
+       17_summary_stats_by_domain.sas build work.analysis_base_ext */
+%let D15_APPROVED = 0;
+
 /* ---- Pipeline flag ----
    0 = running standalone; the program redirects the log to its own file.
    1 = running under 99_run_all.sas, which owns the master log.
@@ -49,3 +58,5 @@
 %put NOTE: [00_config] g_path      = &g_path;
 %put NOTE: [00_config] qc_path     = &qc_path;
 %put NOTE: [00_config] logs_path   = &logs_path;
+%put NOTE: [00_config] raw_path     = &raw_path;
+%put NOTE: [00_config] D15_APPROVED = &D15_APPROVED;

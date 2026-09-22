@@ -897,10 +897,10 @@ quit;
   data g.master_data_harmonized
     %if &drop_pipeline_noinfo = 1 %then %do;
       (drop=in_md3
-            %do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+            %do _pi = 1 %to &n_h; %scan(&hnames, &_pi)_src %end;)
     %end;
     %if &n_h > 0 %then %do;
-      work.src_check (keep=%do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+      work.src_check (keep=%do _pi = 1 %to &n_h; %scan(&hnames, &_pi)_src %end;)
     %end;
     ;
     set g.master_data_merged;
@@ -1024,7 +1024,7 @@ quit;
   %let n_bad = 0;
   %if &n_h > 0 %then %do;
     %do _pi = 1 %to &n_h;
-      %let _v = %scan(&hnames, &_pi)._src;
+      %let _v = %scan(&hnames, &_pi)_src;
       proc sql noprint;
         select count(distinct &_v) into :n_dist trimmed
         from work.src_check

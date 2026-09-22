@@ -1,0 +1,156 @@
+=================================================================
+Phase 17 Discovery Report
+Run: 10SEP2026:15:08:39
+Program: 17_summary_stats_by_domain.sas (Section 0b)
+=================================================================
+ 
+--- BASE ROW COUNT ---
+g.analysis_base rows: 41150
+ 
+--- KEY METADATA ---
+PRECEDE_STUDY_ID in g.analysis_base:      type=char  length=12
+PRECEDE_STUDY_ID in g.master_data_merged: type=char  length=12
+Observed key width: base=12  merged=12
+Normalised join key length: $12
+ 
+NOTE: a SAS variable has exactly one type per dataset. The CHAR vs
+NUM8 history describes the md1 to md8 SOURCE files, not the merged
+dataset, which now holds a single resolved type.
+ 
+Sampled key values from g.analysis_base (up to 10, pipe-separated):
+Precede00001|Precede00002|Precede00003|Precede00004|Precede00005|Precede00006|Precede00007|Precede00008|Precede00009|Precede00010
+Sampled key values from g.master_data_merged (up to 10, pipe-separated):
+Precede00001|Precede00002|Precede00003|Precede00004|Precede00005|Precede00006|Precede00007|Precede00008|Precede00009|Precede00010
+Inspect these for zero-padding before trusting the join format.
+Section 1 additionally tests the format empirically by match count.
+ 
+--- KEY UNIQUENESS ---
+Duplicate PRECEDE_STUDY_ID count in g.master_data_merged (missing excluded): 0
+Rows with a MISSING PRECEDE_STUDY_ID in g.master_data_merged: 0
+Duplicate PRECEDE_STUDY_ID count in g.analysis_base (missing excluded): 0
+Rows with a MISSING PRECEDE_STUDY_ID in g.analysis_base: 0
+REVIEW: duplicate base keys mean g.analysis_base is not one row per patient.
+ 
+--- VARNN DEFECT SCAN ---
+Columns with positional VAR+digits names in g.analysis_base: 0
+ 
+--- YEAR VARIABLE ---
+Resolved year variable: YEAR
+Year variable resolved to YEAR
+ 
+Candidate columns considered:
+  ENCRYPTED_ENCOUNTER   type=char   label=ENCRYPTED_ENCOUNTER
+  DEATH_DATE_Y_N   type=char   label=Death_Date Y/N
+  SSDI_DEATH_DATE_Y_N   type=char   label=SSDI Death Date Y/N
+  YEAR   type=num   label=YEAR
+  RT_ANCHOR_TO_SURGERY_DAYS   type=num   label=rt_ANCHOR_to_SURGERY_days
+  AGE_AT_ENCOUNTER   type=num   label=Age at Encounter
+  DEATH_DAYS_AFTER_SURGERY   type=num   label=Death_Days_After_Surgery
+ 
+Per-year row counts (missing included):
+  year=2018   n_rows=14229
+  year=2019   n_rows=549
+  year=2020   n_rows=7695
+  year=2021   n_rows=9462
+  year=2022   n_rows=9215
+ 
+--- EXTENSION COLUMN LIST (D-01 KEEP=) ---
+Columns in g.master_data_merged NOT in g.analysis_base, concept-filtered.
+PRECEDE_STUDY_ID_1 explicitly excluded (md6 duplicate).
+Count: 23
+REVIEW: the concept filter is a name heuristic. A frailty, cognitive
+or intraoperative variable named outside these fragments is missed.
+Confirm this list against the dictionary at Checkpoint 1.
+ 
+  FEELS_EXAUSTED   type=char
+  LOW_PHYSICAL_ACTIVITY   type=char
+  SLOW_WALKING_SPEED   type=char
+  UNINTENDED_WEIGHT_LOSS   type=char
+  WEEK_GRIP_STRENGTH   type=char
+  COGNITIVE_DISORDER   type=char
+  ISO_SEV_INTRAOP_MAC_AVERAGE   type=num
+  ISO_SEV_MAC_TOTAL_EXP   type=num
+  ABP_LESS_THAN_60_COUNT   type=num
+  ABP_LESS_THAN_70_COUNT   type=num
+  ABP_LESS_THAN_80_COUNT   type=num
+  BIS_INDEX_LESS_30_COUNT   type=num
+  BIS_INDEX_LESS_40_COUNT   type=num
+  NIBP_LESS_60_COUNT   type=num
+  NIBP_LESS_70_COUNT   type=num
+  NIBP_LESS_80_COUNT   type=num
+  SD_ABP_MEAN   type=num
+  SD_NIBP_MEAN   type=num
+  SD_BIS_INDEX   type=num
+  AVG_ABP_MEAN   type=num
+  AVG_NIBP_MEAN   type=num
+  AVG_BIS_INDEX   type=num
+  TOTAL_MIDAZOLAM_MG   type=num
+ 
+--- IDENTIFIER CANDIDATES (marked OUT_OF_SCOPE in Wave 1) ---
+Matched on the anchored pattern (^ or underscore) ID or MRN (underscore or end).
+  PRECEDE_STUDY_ID
+  ENCRYPTED_MRN
+  ENCRYPTED_ENCOUNTER
+ 
+--- HIGH-CARDINALITY CHARACTER VARIABLES (>200 levels) ---
+REVIEW FLAG ONLY -- these are NOT excluded. CPT codes, procedure
+names and ZIP codes legitimately exceed 200 levels.
+  PRECEDE_STUDY_ID   nlevels=41150
+  ENCRYPTED_MRN   nlevels=33031
+  ENCRYPTED_ENCOUNTER   nlevels=39788
+  BASE_PROCEDURE_1   nlevels=2459
+  BASE_PROCEDURE_CODE_1   nlevels=1971
+  CPT_1   nlevels=1619
+  CPT_1_DESCRIPTION   nlevels=1631
+  ICD10_PRINCIPAL_DIAGNOSIS_DESC   nlevels=4645
+  ICD10_PRINCIPAL_DIAGNOSIS   nlevels=2425
+ 
+--- SENTINEL APPLICABILITY (Wave 2 recodes ONLY these variables) ---
+Variables with at least one observed sentinel value: 0
+A variable here that nobody expected to carry a sentinel is a finding.
+ 
+  -999 sentinel (numeric):
+  literal NULL sentinel (character):
+ 
+--- EXTENSION COVERAGE (post-join, denominator = 41150 base rows) ---
+Columns flagged PARTIAL: 23
+  ISO_SEV_INTRAOP_MAC_AVERAGE   n_nonmiss=7695   pct_of_base=  18.7  PARTIAL
+  ISO_SEV_MAC_TOTAL_EXP   n_nonmiss=10788   pct_of_base=  26.2  PARTIAL
+  ABP_LESS_THAN_60_COUNT   n_nonmiss=3519   pct_of_base=   8.6  PARTIAL
+  ABP_LESS_THAN_70_COUNT   n_nonmiss=3919   pct_of_base=   9.5  PARTIAL
+  ABP_LESS_THAN_80_COUNT   n_nonmiss=4010   pct_of_base=   9.7  PARTIAL
+  BIS_INDEX_LESS_30_COUNT   n_nonmiss=3604   pct_of_base=   8.8  PARTIAL
+  BIS_INDEX_LESS_40_COUNT   n_nonmiss=5173   pct_of_base=  12.6  PARTIAL
+  NIBP_LESS_60_COUNT   n_nonmiss=7549   pct_of_base=  18.3  PARTIAL
+  NIBP_LESS_70_COUNT   n_nonmiss=13229   pct_of_base=  32.1  PARTIAL
+  NIBP_LESS_80_COUNT   n_nonmiss=16846   pct_of_base=  40.9  PARTIAL
+  SD_ABP_MEAN   n_nonmiss=4005   pct_of_base=   9.7  PARTIAL
+  SD_NIBP_MEAN   n_nonmiss=18054   pct_of_base=  43.9  PARTIAL
+  SD_BIS_INDEX   n_nonmiss=5601   pct_of_base=  13.6  PARTIAL
+  AVG_ABP_MEAN   n_nonmiss=4005   pct_of_base=   9.7  PARTIAL
+  AVG_NIBP_MEAN   n_nonmiss=18866   pct_of_base=  45.8  PARTIAL
+  AVG_BIS_INDEX   n_nonmiss=5609   pct_of_base=  13.6  PARTIAL
+  TOTAL_MIDAZOLAM_MG   n_nonmiss=22473   pct_of_base=  54.6  PARTIAL
+  FEELS_EXAUSTED   n_nonmiss=4852   pct_of_base=  11.8  PARTIAL
+  LOW_PHYSICAL_ACTIVITY   n_nonmiss=4783   pct_of_base=  11.6  PARTIAL
+  SLOW_WALKING_SPEED   n_nonmiss=4771   pct_of_base=  11.6  PARTIAL
+  UNINTENDED_WEIGHT_LOSS   n_nonmiss=4849   pct_of_base=  11.8  PARTIAL
+  WEEK_GRIP_STRENGTH   n_nonmiss=4701   pct_of_base=  11.4  PARTIAL
+  COGNITIVE_DISORDER   n_nonmiss=11   pct_of_base=   0.0  PARTIAL
+ 
+=================================================================
+End of Phase 17 Discovery Report
+=================================================================
+ 
+--- Y/BLANK CODED FLAGS (only non-missing level is Y) ---
+Count: 9
+Blank is reported as a level named (blank = absent) with percent on total N.
+  COGNITIVEDISORDER_YN
+  COGNITIVE_DISORDER
+  DIABETES_YN
+  HYPERLIPIDEMIA_YN
+  HYPERTENSION_YN
+  INTRAOP_KETAMINE
+  MOVEMENTDISORDER_YN
+  PREOP_BLOCK
+  SLEEP_APNEA_YN

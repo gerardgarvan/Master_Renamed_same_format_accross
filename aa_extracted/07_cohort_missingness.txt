@@ -1,0 +1,31 @@
+07_cohort_missingness -- Run:   28AUG2026:10:20:32
+Phase 7 Cohort and Missingness -- g.master_data_merged (41150 rows)
+Tables and distributions: see 07_cohort_tables.txt (written by ODS LISTING)
+=======================================================================
+ 
+=== md3-owns missingness trade-off (PCM-D-11) ===
+Admit_BMI: 28424 of 41150 missing in the merged file.
+  Verified unrecoverable from all 7 other sources (PCM-F-07, PCM-D-11).
+Cognitive_Score: missing values verified unrecoverable from md5, md6 (PCM-D-11).
+Frailty_Score: missing values verified unrecoverable from md5, md6 (PCM-D-11).
+SCOPE: verified for these three variables ONLY. md3-owns missingness is NOT
+  established as a global property -- do not state it as one.
+ 
+=== Summary (grep-able key=value lines) ===
+cohort_filter_status=OK
+merged_n=41150
+admitted_n=13890
+BMI_complete_case_n_merged=12726
+Cognitive_complete_case_n_merged=20540
+Frailty_complete_case_n_merged=23311
+all_three_complete_case_n_merged=6523
+BMI_complete_case_n_cohort=12726
+Cognitive_complete_case_n_cohort=7252
+Frailty_complete_case_n_cohort=8150
+all_three_complete_case_n_cohort=6523
+pct_admitted_HAVE_bmi=91.6
+pct_admitted_LACK_bmi=8.4
+ 
+NOTE: the four _merged values above were ASSERTED against established
+  expectations and passed. The _cohort values were MEASURED only -- no
+  expectation has ever been established for them.

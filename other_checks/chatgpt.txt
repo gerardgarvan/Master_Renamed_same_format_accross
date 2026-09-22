@@ -1,0 +1,256 @@
+I checked the uploaded `17_summary_stats_by_domain.sas`. There are **several important errors**. I would **not run this version unchanged**.
+
+1. **Definite macro/compile error — open-code `%DO` at line 1022.** This code is executable:
+
+```sas
+if varname in (%do _vi = 1 %to 1;
+               /* placeholder — will use WHERE join below */
+               %end; '') then
+```
+
+`%DO/%END` cannot be used this way outside a macro definition. This will produce a macro-processing error. The whole `if inmatched then ...` source-assignment block should simply be removed because lines 1036–1053 already perform the source assignment properly with a SQL join.
+
+2. **Major incompleteness — Sections 5–11 do not exist.** The file says Sections 5–11 will execute after `DOMAIN_MAP_APPROVED=1`, but the file actually ends at line **1361**, immediately after Section 4 and `%restore_log;`. There is no sentinel recoding, PROC MEANS, PROC FREQ, suppression, Excel workbook, QC sheet, or final output check. `gate_stats` is defined at lines 80–86 but is **never called**. So changing:
+
+```sas
+%let DOMAIN_MAP_APPROVED = 1;
+```
+
+will not cause statistics to run. The comments at lines 1352–1354 are therefore currently false.
+
+3. **High-priority logic error — every high-cardinality character variable is treated as an identifier.** Lines 1077–1086 contain:
+
+```sas
+or (vtype = 'char' and n_levels > 200)
+```
+
+This automatically marks the variable `OUT_OF_SCOPE`.
+
+That is unsafe. Legitimate analytic variables can have >200 levels, particularly:
+
+* CPT/procedure codes
+* procedure names
+* ZIP/geography
+* potentially other D4 variables
+
+In fact, your lookup explicitly includes `PROCEDURE_NAME`, `CPT_CODE`, and `ZIP_CODE` later. But once the high-cardinality rule marks them `OUT_OF_SCOPE`, the lookup is deliberately prevented from overriding them at lines 1214–1216.
+
+**Fix:** high cardinality should be a **review flag**, not an identifier criterion. Remove:
+
+```sas
+or (vtype = 'char' and n_levels > 200)
+```
+
+from the exclusion rule.
+
+4. **The domain lookup silently sends documented variables to `OUT_OF_SCOPE`.** Lines 1224–1229 say:
+
+```sas
+if domain = '' then do;
+    domain           = 'OUT_OF_SCOPE';
+    domain_rationale = 'not in domain lookup; review needed';
+    assign_rule      = 'unrecognised';
+end;
+```
+
+This masks an incomplete lookup.
+
+According to the Phase 17 design, variables not in the PRECEDE dictionary may be `OUT_OF_SCOPE`; dictionary-documented analytic variables are supposed to be assigned D1–D5. An undocumented lookup omission should therefore **fail the checkpoint**, not quietly become OUT_OF_SCOPE.
+
+I recommend creating an `n_unassigned_documented` guard and aborting if it is nonzero.
+
+5. **The hard-coded domain lookup looks far too small to satisfy "every documented variable."** It contains only a relatively short manually chosen set from lines 1140–1202. Unless the actual PRECEDE dictionary contains only those variables, many legitimate variables will end up:
+
+```text
+OUT_OF_SCOPE
+not in domain lookup; review needed
+```
+
+Because of issue #4, the current guards will still pass. That creates a dangerous false sense of completeness.
+
+This should be a **hard failure**, not an accepted classification.
+
+6. **Discovery does not actually determine the year variable.** Section 0b creates `work.year_candidates` and runs PROC FREQ on candidates, but it never establishes something such as:
+
+```sas
+%let year_variable = SURGERY_YEAR;
+```
+
+Nor does it place the actual per-year counts in `17_discovery.txt`; instead it says:
+
+```text
+See PROC FREQ output in SAS log/listing
+```
+
+The Phase 17 discovery requirement was stronger: determine the exact year variable and its distinct values/counts before downstream implementation. The current program only supplies candidates.
+
+This needs to be resolved before Sections 5–11 are written.
+
+7. **Remove the `PROC EXPORT` to `17_discovery.txt` at lines 479–484.**
+
+You already correctly acknowledge in the comment that appending is unsupported:
+
+```sas
+proc export data=work.year_candidates
+  outfile="&qc_path.\17_discovery.txt"
+  dbms=dlm;
+...
+/* appending is not supported by proc export; use data step below */
+```
+
+But the PROC EXPORT is still executed.
+
+It can overwrite/conflict with the text report that was just created, or fail because the destination exists. The following DATA step already writes the candidates correctly.
+
+**Delete lines 479–484 entirely.**
+
+8. **Avoid `MONOTONIC()` at lines 214 and 221.**
+
+```sas
+having monotonic() <= 10;
+```
+
+`MONOTONIC()` is undocumented PROC SQL behavior and is not reliable enough for production QC code. It is particularly unnecessary just to obtain ten sample IDs.
+
+Use a DATA step with `obs=10`, or another supported mechanism.
+
+9. **The key conversion is compile-safe now, but the actual conversion rule is not proven correct.** This is substantially improved from the plan because you correctly moved type selection to macro time:
+
+```sas
+%if &key_type_merged = num %then %do;
+    key_char = strip(put(PRECEDE_STUDY_ID, best12.));
+%end;
+```
+
+Good change.
+
+However, the comment itself acknowledges the unresolved issue:
+
+> `best12.` unless Wave 0 sampled keys show zero-padding.
+
+The program **never actually converts that discovery into a decision**. It always uses `BEST12.` for numeric keys.
+
+If canonical `analysis_base` keys are zero-padded, your join still fails.
+
+Better: empirically test both representations against the base IDs and select/fail based on match counts, rather than eyeballing ten sample values.
+
+10. **Missing keys need separate handling in the uniqueness test.** Currently:
+
+```sas
+group by PRECEDE_STUDY_ID
+having count(*) > 1
+```
+
+also treats repeated missing IDs as a duplicate BY group. That may trigger the uniqueness failure for the wrong reason.
+
+More importantly, a missing ID should not participate in the extension merge at all.
+
+I'd separately calculate:
+
+```sas
+where not missing(PRECEDE_STUDY_ID)
+```
+
+for duplicate-key detection, plus an explicit `n_missing_key` QC count. Ideally, exclude missing extension keys before the merge.
+
+11. **The extension-column discovery is still heuristic rather than authoritative.** `work.ext_candidates` relies on name fragments such as:
+
+```sas
+FRAIL
+COGNI
+ABP
+BIS_
+NIBP
+MIDAZOLAM
+ISO_SEV
+```
+
+This can easily omit a legitimate frailty/cognitive/intraoperative variable whose name doesn't contain one of those strings.
+
+The original discovery goal was to establish the **exact KEEP list**. I would compare against dictionary metadata/source provenance and produce an explicit reviewed list rather than treating this heuristic result as automatically complete.
+
+12. **`D3_DENOM_NOTE` is logically incorrect for frailty.** Lines 808-ish construct essentially:
+
+```sas
+D3 and the D2 frailty block are computed on the subcohort
+with a non-missing assessment (n=&n_cog_nonmiss)
+```
+
+Then lines 1237–1239 apply that same note both to D3 and D2 frailty variables.
+
+But `&n_cog_nonmiss` is the count for **one cognitive-score variable**. It is not necessarily the frailty denominator, and different extension variables can have different missingness.
+
+Don't claim a single N for both blocks. Prefer a generic statement such as:
+
+```text
+Statistics use the non-missing observations available for each variable;
+coverage varies by extension variable.
+```
+
+and show each variable's N in the results.
+
+13. **Frailty is being labeled `assign_rule='instrument'`, which muddies the locked assignment-rule definition.** For example:
+
+```sas
+FRAILTY_SCORE,D2,instrument,...
+```
+
+The Phase 17 framework defined the instrument override primarily for named cognitive instruments → D3. If the QC workbook later says "variables assigned by instrument rule," frailty gets mixed into that category.
+
+I'd use `timing` or `analytic_role` for the D2 frailty assignment unless the specification is deliberately expanded to define "instrument" for non-cognitive instruments too.
+
+14. **`dict_only` is computed incorrectly for squash matches.** Your actual matching permits:
+
+```sas
+ABC_DEF
+```
+
+to match dictionary:
+
+```text
+ABCDEF
+```
+
+through the squash rule.
+
+But `work.dict_only` later checks only:
+
+```sas
+where upcase(sas_name) not in
+      (select var_u from work.actual_ext);
+```
+
+So a dictionary entry successfully matched by SQUASH can simultaneously be reported as **dict-only**.
+
+The reconciliation should determine dictionary-only rows from the actual matched dictionary IDs/names, not just exact uppercase names.
+
+15. **Remove this no-op and potential nuisance at line 1250:**
+
+```sas
+rename sas_label = sas_label;
+```
+
+It accomplishes nothing and should simply be deleted.
+
+16. **`stat_route` based only on `n_levels <= 10` needs human review.**
+
+```sas
+if n_levels <= 10 then stat_route = 'FREQ';
+else stat_route = 'MEANS';
+```
+
+This is much better than numeric = continuous, but cardinality alone is still not enough. A numeric ordinal scale with 11 levels may be categorical, while a genuinely continuous measure could conceivably have ≤10 observed values in a small subset.
+
+Since the domain map is already human-reviewed, I strongly recommend making `stat_route` part of Checkpoint 1 rather than treating 10 as an unquestioned semantic boundary.
+
+### Bottom line
+
+The earlier key-type issue and merge-cardinality issue have been addressed **much better** in this version. The uniqueness guard and macro-time key typing are good improvements.
+
+But there are **three blockers before I would run it**:
+
+1. **Remove the open-code `%DO/%END` placeholder at line 1022 — it can break compilation.**
+2. **Fix the high-cardinality identifier rule — it can wrongly eliminate legitimate variables.**
+3. **Recognize that the program currently stops at Wave 1. Sections 5–11 are absent, and `DOMAIN_MAP_APPROVED=1` currently does nothing.**
+
+I would also fix the `PROC EXPORT` to `17_discovery.txt` and make unassigned documented variables a hard failure before using the generated crosswalk for Checkpoint 1.

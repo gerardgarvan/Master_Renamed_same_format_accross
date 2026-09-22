@@ -1,0 +1,29 @@
+16_summary_docx -- Run:   30AUG2026:21:03:03
+=======================================================================
+ 
+source=g.analysis_base
+records=41150
+documented_variables=84
+numeric_summaries=46
+frequency_tables=28
+high_cardinality=10
+frequency_level_ceiling=25
+ 
+ALIASES. Every table carries the DOCUMENTED name, so a reader holding the
+PRECEDE dictionary finds the variable under the name they know.
+aliases_differing_from_stored_name=2   (derived this run, not assumed)
+squash_matches=2   (matched only after removing underscores -- review)
+match_ties=0
+ 
+The ISO/SEV mapping is a PRIOR FINDING, not measured here: the dictionary
+documents ISO_SEV_IntraOp_MAC_Average, a master_data_4 column, and Phase 10
+found it identical to this file column on all 7,695 overlapping records.
+That figure is dated evidence from Phase 10 and is not recomputed by this
+program -- re-verify it if the extracts are ever refreshed.
+ 
+SCOPE BOUNDARY. This covers the documented subset only. Cognitive_Score,
+Frailty_Score, the frailty components and the hemodynamic block are NOT in
+g.analysis_base -- none appears in the dictionary sheets that matched. An
+analysis needing them must use g.master_data_merged, where Cognitive_Score
+carries 8,412 more values than master_data_3 holds alone. Both files look
+complete in isolation, which is why this is stated in the document itself.

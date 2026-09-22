@@ -1,0 +1,39 @@
+Cross-source recoverability sweep -- Run:   27AUG2026:14:39:17
+=========================================================================
+ 
+WHAT THIS MEASURES
+  recoverable  = rows where the OWNER is missing and a DONOR has a value.
+                 These are values the KEEP= ownership merge DISCARDS.
+  disagree     = rows where both have a value and the values DIFFER.
+                 Non-zero means coalescing is a DECISION, not a gap-fill.
+                 CHARACTER variables use exact inequality. NUMERIC variables
+                 use abs(a-b) > 1e-8, so floating-point representation noise
+                 between two exports is not reported as a conflict.
+  both_present = rows where both have a value (the disagreement denominator).
+ 
+WHY THIS EXISTS
+  PCM-D-11 was closed as 'md3-owns costs nothing' on a spot check that
+  omitted md8. It was wrong -- Cognitive_Score and Frailty_Score were each
+  losing 8-9k values, and three more variables were found only by sweeping
+  all of md3/md8 rather than guessing which to test.
+ 
+SCOPE NOTE
+  4 variable-pairs were SKIPPED because the types differ between
+  sources. They cannot be compared until harmonised -- see the type
+  mismatch section below. A skipped pair is NOT a clean result.
+ 
+=== OWNERSHIP LOSSES (act on these) ===
+variables affected=0   owner/donor rows=0   total disagreements=0
+ 
+Variable                           Owner   Donor       Recoverable   Disagree
+-----------------------------------------------------------------------------
+ 
+=== TYPE MISMATCHES (not tested -- 1 variables) ===
+These could not be compared because the type differs between sources.
+This is the same blind spot that hid md8 from the original BMI check:
+md8's Admit_BMI was character then, so the coalesce silently skipped it.
+ 
+ISO_SEV_EXP_INTRAOP_MAC_AVERAGE    PREP_MD1    PREP_MD2    type c vs n
+ISO_SEV_EXP_INTRAOP_MAC_AVERAGE    PREP_MD1    PREP_MD3    type c vs n
+ISO_SEV_EXP_INTRAOP_MAC_AVERAGE    PREP_MD2    PREP_MD1    type n vs c
+ISO_SEV_EXP_INTRAOP_MAC_AVERAGE    PREP_MD3    PREP_MD1    type n vs c

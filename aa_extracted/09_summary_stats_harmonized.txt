@@ -1,0 +1,20 @@
+09_summary_stats -- Run:   28AUG2026:15:29:50
+=======================================================================
+ 
+merged_rows=41150
+n_variables=187
+n_numeric=120
+n_character=67
+n_summary_rows=187
+n_identifier_like=7
+n_missing_distinct_count=0
+precede_study_id_distinct=41150
+ 
+SUM-05: PRECEDE_STUDY_ID distinct equals the row count, so the key is
+  still unique in the merged file. This re-confirms PCM-F-01 downstream
+  of the merge rather than only at source.
+ 
+SUM-04 value suppression: no example VALUES are written for variables
+  flagged identifier-like. Distinct counts and coverage are reported for
+  every variable, which is what makes an ID column interpretable without
+  exposing it.

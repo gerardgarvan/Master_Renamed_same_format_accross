@@ -1,0 +1,26 @@
+                        Phase 16 RAW-03 -- key columns, uniqueness, coverage vs g.analysis_base (N=41150)                       77
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+                                       s                                                                                      n
+                                       o                                                            n                    n    _
+                                       u                                                      n     _                    _    b
+                                       r                                       k              _     d                    r    a
+                                       c                                       e              n     i              n     a    s
+                                       e                                       y        n     o     s              _     w    e
+               s                       _                                       _        _     n     t      g       m     _    _
+               h                       n                   n           t       r        r     m     i      r       a     o    o
+r              e                       a                   a           y       o        o     i     n      a       t     n    n
+i              e                       m                   m           p       l        w     s     c      i       c     l    l
+d              t                       e                   e           e       e        s     s     t      n       h     y    y
+
+r1 (csv)                      PRECEDE_Study_ID    PRECEDE_Study_ID    char PRECEDE_ID 22476 22476 22476 UNIQUE   22472    4 18678
+r2 2018_2019_PRECEDE_DATABASE studyid             studyid             char PRECEDE_ID 14807 14807 14807 UNIQUE   14778   29 26372
+r2 2018_2019_PRECEDE_DATABASE ENCRYPTED_MRN       ENCRYPTED_MRN       char MRN        14807 14778 13044 REPEATED     .    .     .
+r2 2018_2019_PRECEDE_DATABASE ENCRYPTED_ENCOUNTER ENCRYPTED_ENCOUNTER char ENCOUNTER  14807 14560 14348 REPEATED     .    .     .
+r3 SHEET1                     PRECEDE Study ID    PRECEDE_Study_ID    char PRECEDE_ID  3456  3456  3456 UNIQUE    2688  768 38462
+r4 2020_PRECEDE_DATABASE_EDU  studyid             studyid             char PRECEDE_ID  7696  7696  7696 UNIQUE    7695    1 33455
+r5 (csv)                      PRECEDE_Study_ID    PRECEDE_Study_ID    char PRECEDE_ID  9462  9462  9462 UNIQUE    9462    0 31688
+r6 (csv)                      PRECEDE_Study_ID    PRECEDE_Study_ID    char PRECEDE_ID  9462  9462  9462 UNIQUE    9462    0 31688
+r7 (csv)                      PRECEDE_Study_ID    PRECEDE_Study_ID    num  PRECEDE_ID  9215  9215  9215 UNIQUE       0 9215 41150
+r8 (csv)                      PRECEDE_Study_ID    PRECEDE_Study_ID    num  PRECEDE_ID  9485  9485  9484 REPEATED     0 9484 41150
+r9 (csv)                      PRECEDE_Study_ID    PRECEDE_Study_ID    char PRECEDE_ID 41150 41150 41150 UNIQUE   31935 9215  9215

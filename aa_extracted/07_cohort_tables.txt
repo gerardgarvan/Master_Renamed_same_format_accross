@@ -1,0 +1,51 @@
+                                                          Patient_Type distribution in g.master_data_merged (pre-filter) -- PCM-D-05 evidence
+
+                                                                                           The FREQ Procedure
+
+                                                                                             Patient Type
+ 
+                                                                                                               Cumulative    Cumulative
+                                                                Patient_Type          Frequency     Percent     Frequency      Percent
+                                                                -----------------------------------------------------------------------
+                                                                                          2395        5.82          2395         5.82  
+                                                                ?                          118        0.29          2513         6.11  
+                                                                AMBULATORY SURGERY       24571       59.71         27084        65.82  
+                                                                CM PENDING                   2        0.00         27086        65.82  
+                                                                INPATIENT                13223       32.13         40309        97.96  
+                                                                OBSERVATION                667        1.62         40976        99.58  
+                                                                OUTPATIENT                 174        0.42         41150       100.00  
+                                                                       Missingness profile: g.master_data_merged (all 41150 rows)
+
+                                                                                          The MEANS Procedure
+
+                                                                                                                              N
+                                                                         Variable            Label                   N     Miss
+                                                                         ------------------------------------------------------
+                                                                         Admit_BMI           Admit BMI           12726    28424
+                                                                         Cognitive_Score     Cognitive_Score     20540    20610
+                                                                         Frailty_Score       Frailty_Score       23311    17839
+                                                                         Age_at_Encounter    Age at Encounter    38755     2395
+                                                                         ------------------------------------------------------
+                                                                  Missingness profile: cohort candidate (admitted rows only, N=13890)
+
+                                                                                          The MEANS Procedure
+
+                                                                                                                              N
+                                                                         Variable            Label                   N     Miss
+                                                                         ------------------------------------------------------
+                                                                         Admit_BMI           Admit BMI           12726     1164
+                                                                         Cognitive_Score     Cognitive_Score      7252     6638
+                                                                         Frailty_Score       Frailty_Score        8150     5740
+                                                                         Age_at_Encounter    Age at Encounter    13890        0
+                                                                         ------------------------------------------------------
+                                                   Patient_Type in the cohort candidate (post-filter) -- only INPATIENT and OBSERVATION should appear
+
+                                                                                           The FREQ Procedure
+
+                                                                                             Patient Type
+ 
+                                                                                                               Cumulative    Cumulative
+                                                                Patient_Type          Frequency     Percent     Frequency      Percent
+                                                                -----------------------------------------------------------------------
+                                                                INPATIENT                13223       95.20         13223        95.20  
+                                                                OBSERVATION                667        4.80         13890       100.00  

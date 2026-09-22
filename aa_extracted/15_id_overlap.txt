@@ -1,0 +1,29 @@
+15_id_overlap -- Run:   30AUG2026:17:27:24
+=======================================================================
+ 
+distinct_patients=41150
+rows_if_stacked=127246
+patients_in_more_than_one_source=41150
+max_sources_per_patient=4
+patients_not_in_md3=0
+patients_in_md3=41150
+ 
+WHAT THIS DECIDES
+  If patients_not_in_md3 = 0, md3 is a complete superset: the 1:1 merge
+  onto md3 as spine loses no patient, and stacking the masters for summary
+  statistics WOULD double-count every patient appearing in more than one
+  source.
+ 
+  If patients_not_in_md3 > 0, md3 is NOT a superset. The merge silently
+  drops those patients, and the row-count assertions that have been passing
+  were checking the wrong thing.
+ 
+STACKING IS SAFE HERE, AND ONLY HERE
+  SECTION 1 stacks ID-ONLY extracts. IDs repeat there by design and are
+  consolidated to one row per patient. No ANALYTIC MEASUREMENT is carried,
+  so none can be double-counted. That is precisely the difference between
+  this program and stacking the masters to summarise their variables.
+ 
+  PCM-T-03 records the alternative: a stack-then-dedup that yielded exactly
+  41,150 rows and looked correct while discarding md8 entirely. Row count
+  alone does not validate a combine.

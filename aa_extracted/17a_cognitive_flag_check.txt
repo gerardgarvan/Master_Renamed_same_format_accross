@@ -1,0 +1,14 @@
+17a cognitive flag check
+Run:   10SEP2026:14:41:28
+==========================================================
+Rows in g.analysis_base:            41150
+Both flags populated:               11
+  agree (after upcase/strip):       11
+  percent agreement:                100
+COGNITIVEDISORDER_YN only:          133
+COGNITIVE_DISORDER only:            0
+Neither populated:                  41006
+ 
+VERDICT: SAME VALUES WHERE BOTH PRESENT but missingness differs -- likely the same source at different coverage. Keep the better-covered one and document the other as a duplicate.
+ 
+See the crosstab in the log or listing for the level-by-level view.

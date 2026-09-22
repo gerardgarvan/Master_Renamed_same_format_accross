@@ -1,0 +1,29 @@
+11_dictionary_reconcile -- Run:   30AUG2026:17:36:16
+=======================================================================
+ 
+merged_columns=176
+documented_variables=200
+matched=85
+  match_exact=78
+  match_case=5
+  match_squash=2
+documented_but_absent=115
+present_but_undocumented=91
+renames_proposed=7
+type_mismatches=3
+ambiguous_matches_forward=0
+ambiguous_matches_reverse=0
+dictionary_rows_with_no_sas_name=4
+rules_contradicted=2
+ 
+NOTHING WAS RENAMED OR CHANGED. A rename touches every downstream
+reference, so this program supplies the proposal and the evidence;
+a human applies it.
+ 
+match_squash entries need review individually. That pass ignores
+underscores, which is right for Death_Date_Y_N but can also pair a bare
+comorbidity name with its _YN variant when both exist as columns.
+ 
+A CONTRADICTED rule means the extract and the 2020 dictionary disagree.
+That is information about the data, not a pipeline defect -- but it does
+mean one of the two is stale and the analysis should say which it trusts.

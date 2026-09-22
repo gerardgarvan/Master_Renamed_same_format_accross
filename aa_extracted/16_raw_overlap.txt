@@ -1,0 +1,360 @@
+                                        Phase 16 RAW-05 -- raw columns vs g.analysis_base                                       78
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+                                                        The FREQ Procedure
+
+                                                      Table of rid by bucket
+
+                                               rid       bucket
+
+                                               Frequency|IN_BASE |NEW     |  Total
+                                               ---------+--------+--------+
+                                               r1       |      3 |      0 |      3
+                                               ---------+--------+--------+
+                                               r2       |    102 |   3885 |   3987
+                                               ---------+--------+--------+
+                                               r3       |      8 |      0 |      8
+                                               ---------+--------+--------+
+                                               r4       |      0 |      3 |      3
+                                               ---------+--------+--------+
+                                               r5       |      2 |      0 |      2
+                                               ---------+--------+--------+
+                                               r6       |      1 |      5 |      6
+                                               ---------+--------+--------+
+                                               r7       |      2 |      0 |      2
+                                               ---------+--------+--------+
+                                               r8       |      4 |      0 |      4
+                                               ---------+--------+--------+
+                                               r9       |      4 |      0 |      4
+                                               ---------+--------+--------+
+                                               Total         126     3893     4019
+                                    Phase 16 RAW-05 -- IN_BASE columns (already exist in base)                                  79
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+ 
+            rid    sheet                         source_name                         name
+
+            r1     (csv)                         PRECEDE_Study_ID                    PRECEDE_Study_ID                
+            r1     (csv)                         rt_RM_START_to_INDUCTION_mins       rt_RM_START_to_INDUCTION_mins   
+            r1     (csv)                         rt_RM_START_to_EMERGENCE_mins       rt_RM_START_to_EMERGENCE_mins   
+            r2     2018_2019_PRECEDE_DATABASE    sex                                 sex                             
+            r2     2018_2019_PRECEDE_DATABASE    Frailty_Score                       Frailty_Score                   
+            r2     2018_2019_PRECEDE_DATABASE    ENCRYPTED_MRN                       ENCRYPTED_MRN                   
+            r2     2018_2019_PRECEDE_DATABASE    ENCRYPTED_ENCOUNTER                 ENCRYPTED_ENCOUNTER             
+            r2     2018_2019_PRECEDE_DATABASE    Weekend_Indicator                   Weekend_Indicator               
+            r2     2018_2019_PRECEDE_DATABASE    Age_at_Encounter                    Age_at_Encounter                
+            r2     2018_2019_PRECEDE_DATABASE    Race                                Race                            
+            r2     2018_2019_PRECEDE_DATABASE    Ethnicity                           Ethnicity                       
+            r2     2018_2019_PRECEDE_DATABASE    Marital_Status                      Marital_Status                  
+            r2     2018_2019_PRECEDE_DATABASE    Admit_BMI                           Admit_BMI                       
+            r2     2018_2019_PRECEDE_DATABASE    Service                             Service                         
+            r2     2018_2019_PRECEDE_DATABASE    Room_Type                           Room_Type                       
+            r2     2018_2019_PRECEDE_DATABASE    Base_Procedure_1                    Base_Procedure_1                
+            r2     2018_2019_PRECEDE_DATABASE    Base_Procedure_Code_1               Base_Procedure_Code_1           
+            r2     2018_2019_PRECEDE_DATABASE    CPT_1                               CPT_1                           
+            r2     2018_2019_PRECEDE_DATABASE    CPT_1_Description                   CPT_1_Description               
+            r2     2018_2019_PRECEDE_DATABASE    Patient_Type                        Patient_Type                    
+            r2     2018_2019_PRECEDE_DATABASE    LOS                                 LOS                             
+            r2     2018_2019_PRECEDE_DATABASE    LOS_in_Hours                        LOS_in_Hours                    
+            r2     2018_2019_PRECEDE_DATABASE    Payer                               Payer                           
+            r2     2018_2019_PRECEDE_DATABASE    Charges                             Charges                         
+            r2     2018_2019_PRECEDE_DATABASE    ICD10_Principal_Diagnosis_Desc      ICD10_Principal_Diagnosis_Desc  
+            r2     2018_2019_PRECEDE_DATABASE    ICD10_Principal_Diagnosis           ICD10_Principal_Diagnosis       
+            r2     2018_2019_PRECEDE_DATABASE    Charlson_Comorbidity_Index          Charlson_Comorbidity_Index      
+
+                      pct_
+            type    missing    base_match
+
+            char     0.0000    PRECEDE_STUDY_ID                
+            num     40.6923    rt_RM_START_to_INDUCTION_mins   
+            num     42.5254    rt_RM_START_to_EMERGENCE_mins   
+            char     0.5741    Sex                             
+            num     21.5844    Frailty_Score                   
+            char     0.1959    ENCRYPTED_MRN                   
+            char     1.6681    ENCRYPTED_ENCOUNTER             
+            char     8.0975    Weekend_Indicator               
+            num      8.1043    Age_at_Encounter                
+            char     8.0975    Race                            
+            char     8.0975    Ethnicity                       
+            char     8.1043    Marital_Status                  
+            num     64.0575    Admit_BMI                       
+            char     8.0975    Service                         
+            char     8.1448    Room_Type                       
+            char     8.1043    Base_Procedure_1                
+            char     8.1043    Base_Procedure_Code_1           
+            char     8.1043    CPT_1                           
+            char     8.1043    CPT_1_Description               
+            char     8.1043    Patient_Type                    
+            num      8.9552    LOS                             
+            num     62.4502    LOS_in_Hours                    
+            char     8.9552    Payer                           
+            num      8.9890    Charges                         
+            char     9.6846    ICD10_Principal_Diagnosis_Desc  
+            char     9.6846    ICD10_Principal_Diagnosis       
+            num      9.6846    Charlson_Comorbidity_Index      
+                                    Phase 16 RAW-05 -- IN_BASE columns (already exist in base)                                  80
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+ 
+          rid              sheet               source_name                             name
+
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T80                              COMP10_T80                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T81                              COMP10_T81                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T82                              COMP10_T82                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T83                              COMP10_T83                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T84                              COMP10_T84                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T85                              COMP10_T85                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T86                              COMP10_T86                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T87                              COMP10_T87                      
+          r2     2018_2019_PRECEDE_DATABASE    COMP10_T88                              COMP10_T88                      
+          r2     2018_2019_PRECEDE_DATABASE    complication_sum                        complication_sum                
+          r2     2018_2019_PRECEDE_DATABASE    Intraop_Ketamine                        Intraop_Ketamine                
+          r2     2018_2019_PRECEDE_DATABASE    Preop_block                             Preop_block                     
+          r2     2018_2019_PRECEDE_DATABASE    EmployeeStatus                          EmployeeStatus                  
+          r2     2018_2019_PRECEDE_DATABASE    rt_ANCHOR_to_ADMIT_days                 rt_ANCHOR_to_ADMIT_days         
+          r2     2018_2019_PRECEDE_DATABASE    rt_ANCHOR_to_SURGERY_days               rt_ANCHOR_to_SURGERY_days       
+          r2     2018_2019_PRECEDE_DATABASE    rt_ANCHOR_to_DISCHG_days                rt_ANCHOR_to_DISCHG_days        
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_AN_START_mins               rt_ADMIT_to_AN_START_mins       
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_AN_END_mins                 rt_ADMIT_to_AN_END_mins         
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_BLOCK_START_mins            rt_ADMIT_to_BLOCK_START_mins    
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_BLOCK_END_mins              rt_ADMIT_to_BLOCK_END_mins      
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_RM_START_mins               rt_ADMIT_to_RM_START_mins       
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_RM_END_mins                 rt_ADMIT_to_RM_END_mins         
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_INCISION_mins               rt_ADMIT_to_INCISION_mins       
+          r2     2018_2019_PRECEDE_DATABASE    rt_ADMIT_to_DRESS_mins                  rt_ADMIT_to_DRESS_mins          
+          r2     2018_2019_PRECEDE_DATABASE    rt_INCISE_to_DRESS_mins                 rt_INCISE_to_DRESS_mins         
+          r2     2018_2019_PRECEDE_DATABASE    rt_RM_START_to_RM_END_mins              rt_RM_START_to_RM_END_mins      
+          r2     2018_2019_PRECEDE_DATABASE    rt_AN_START_to_AN_END_mins              rt_AN_START_to_AN_END_mins      
+
+                    pct_
+          type    missing    base_match
+
+          num      0.1959    COMP10_T80                      
+          num      0.1959    COMP10_T81                      
+          num      0.1959    COMP10_T82                      
+          num      0.1959    COMP10_T83                      
+          num      0.1959    COMP10_T84                      
+          num      0.1959    COMP10_T85                      
+          num      0.1959    COMP10_T86                      
+          num      0.1959    COMP10_T87                      
+          num      0.1959    COMP10_T88                      
+          num      0.1959    complication_sum                
+          char    92.4900    Intraop_Ketamine                
+          char    81.4682    Preop_block                     
+          char     0.1959    EmployeeStatus                  
+          num      8.9552    rt_ANCHOR_to_ADMIT_days         
+          num      8.0975    rt_ANCHOR_to_SURGERY_days       
+          num      8.9755    rt_ANCHOR_to_DISCHG_days        
+          num     11.8660    rt_ADMIT_to_AN_START_mins       
+          num     11.8795    rt_ADMIT_to_AN_END_mins         
+          num     81.4952    rt_ADMIT_to_BLOCK_START_mins    
+          num     81.4952    rt_ADMIT_to_BLOCK_END_mins      
+          num     10.8867    rt_ADMIT_to_RM_START_mins       
+          num     11.0083    rt_ADMIT_to_RM_END_mins         
+          num     13.0817    rt_ADMIT_to_INCISION_mins       
+          num     28.4460    rt_ADMIT_to_DRESS_mins          
+          num     30.1614    rt_INCISE_to_DRESS_mins         
+          num     10.5018    rt_RM_START_to_RM_END_mins      
+          num     11.4405    rt_AN_START_to_AN_END_mins      
+                                    Phase 16 RAW-05 -- IN_BASE columns (already exist in base)                                  81
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+ 
+         rid    sheet                         source_name                                name
+
+         r2     2018_2019_PRECEDE_DATABASE    rt_BLOCK_START_TO_BLOCK_END_mins           rt_BLOCK_START_TO_BLOCK_END_mins
+         r2     2018_2019_PRECEDE_DATABASE    rt_RM_START_to_DRESS_mins                  rt_RM_START_to_DRESS_mins       
+         r2     2018_2019_PRECEDE_DATABASE    rt_RM_START_to_AN_START_mins               rt_RM_START_to_AN_START_mins    
+         r2     2018_2019_PRECEDE_DATABASE    rt_RM_START_to_INCISION_mins               rt_RM_START_to_INCISION_mins    
+         r2     2018_2019_PRECEDE_DATABASE    Education                                  Education                       
+         r2     2018_2019_PRECEDE_DATABASE    Admit_Source                               Admit_Source                    
+         r2     2018_2019_PRECEDE_DATABASE    30_DAY_MORTALITY                           _30_DAY_MORTALITY               
+         r2     2018_2019_PRECEDE_DATABASE    Death_Date Y/N                             Death_Date_Y_N                  
+         r2     2018_2019_PRECEDE_DATABASE    SSDI Death Date Y/N                        SSDI_Death_Date_Y_N             
+         r2     2018_2019_PRECEDE_DATABASE    Anesthesia_Type                            Anesthesia_Type                 
+         r2     2018_2019_PRECEDE_DATABASE    Sleep_Apnea_YN                             Sleep_Apnea_YN                  
+         r2     2018_2019_PRECEDE_DATABASE    Diabetes_YN                                Diabetes_YN                     
+         r2     2018_2019_PRECEDE_DATABASE    Hyperlipidemia_YN                          Hyperlipidemia_YN               
+         r2     2018_2019_PRECEDE_DATABASE    Hypertension_YN                            Hypertension_YN                 
+         r2     2018_2019_PRECEDE_DATABASE    MovementDisorder_YN                        MovementDisorder_YN             
+         r2     2018_2019_PRECEDE_DATABASE    CognitiveDisorder_YN                       CognitiveDisorder_YN            
+         r2     2018_2019_PRECEDE_DATABASE    Latitude                                   Latitude                        
+         r2     2018_2019_PRECEDE_DATABASE    Longitude                                  Longitude                       
+         r2     2018_2019_PRECEDE_DATABASE    Dischg_Disposition                         Dischg_Disposition              
+         r2     2018_2019_PRECEDE_DATABASE    Propofol_mg_IntraOp_Total                  Propofol_mg_IntraOp_Total       
+         r2     2018_2019_PRECEDE_DATABASE    Ketamine_mg_IntraOp_Total                  Ketamine_mg_IntraOp_Total       
+         r2     2018_2019_PRECEDE_DATABASE    fentaNYL_SUBLIMAZE_mg_IntraOp_Total        fentaNYL_SUBLIMAZE_mg_IntraOp_To
+         r2     2018_2019_PRECEDE_DATABASE    Sufentanil_mg_IntraOp_Total                Sufentanil_mg_IntraOp_Total     
+         r2     2018_2019_PRECEDE_DATABASE    Hydromorphone_mg_IntraOp_Total             Hydromorphone_mg_IntraOp_Total  
+         r2     2018_2019_PRECEDE_DATABASE    Lidocaine_mg_IntraOp_Total                 Lidocaine_mg_IntraOp_Total      
+         r2     2018_2019_PRECEDE_DATABASE    Oral_Morphine_Equiv_IntraOp_Total_mg       Oral_Morphine_Equiv_IntraOp_Tota
+         r2     2018_2019_PRECEDE_DATABASE    ISO_Exp_IntraOp_Total                      ISO_Exp_IntraOp_Total           
+
+                   pct_
+         type    missing    base_match
+
+         num     81.4682    rt_BLOCK_START_TO_BLOCK_END_mins
+         num     28.1624    rt_RM_START_to_DRESS_mins       
+         num     11.4878    rt_RM_START_to_AN_START_mins    
+         num     12.6967    rt_RM_START_to_INCISION_mins    
+         char    98.0010    Education                       
+         char     8.9620    Admit_Source                    
+         char     8.9147    _30_DAY_MORTALITY               
+         char    95.1509    Death_Date_Y_N                  
+         char     8.9147    SSDI_Death_Date_Y_N             
+         char     8.0435    Anesthesia_Type                 
+         char    85.7432    Sleep_Apnea_YN                  
+         char    72.7764    Diabetes_YN                     
+         char    50.9556    Hyperlipidemia_YN               
+         char    50.7598    Hypertension_YN                 
+         char    94.3675    MovementDisorder_YN             
+         char    99.1018    CognitiveDisorder_YN            
+         num      8.0435    Latitude                        
+         num      8.0435    Longitude                       
+         char     8.9620    Dischg_Disposition              
+         num      0.1959    Propofol_mg_IntraOp_Total       
+         num      0.1959    Ketamine_mg_IntraOp_Total       
+         num      0.1959    fentaNYL_SUBLIMAZE_mg_IntraOp_To
+         num      0.1959    Sufentanil_mg_IntraOp_Total     
+         num      0.1959    Hydromorphone_mg_IntraOp_Total  
+         num      0.1959    Lidocaine_mg_IntraOp_Total      
+         num      0.1959    Oral_Morphine_Equiv_IntraOp_Tota
+         num      0.1959    ISO_Exp_IntraOp_Total           
+                                    Phase 16 RAW-05 -- IN_BASE columns (already exist in base)                                  82
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+ 
+         rid    sheet                         source_name                                name
+
+         r2     2018_2019_PRECEDE_DATABASE    ISO_Exp_IntraOp_MAC_Average                ISO_Exp_IntraOp_MAC_Average     
+         r2     2018_2019_PRECEDE_DATABASE    ISO_Exp_IntraOp_MAC_Minutes_Total          ISO_Exp_IntraOp_MAC_Minutes_Tota
+         r2     2018_2019_PRECEDE_DATABASE    ISO_Exp_IntraOp_MAC_Total                  ISO_Exp_IntraOp_MAC_Total       
+         r2     2018_2019_PRECEDE_DATABASE    SEV_Exp_IntraOp_Total                      SEV_Exp_IntraOp_Total           
+         r2     2018_2019_PRECEDE_DATABASE    SEV_Exp_IntraOp_MAC_Average                SEV_Exp_IntraOp_MAC_Average     
+         r2     2018_2019_PRECEDE_DATABASE    SEV_Exp_IntraOp_MAC_Minutes_Total          SEV_Exp_IntraOp_MAC_Minutes_Tota
+         r2     2018_2019_PRECEDE_DATABASE    SEV_Exp_IntraOp_MAC_Total                  SEV_Exp_IntraOp_MAC_Total       
+         r2     2018_2019_PRECEDE_DATABASE    ISO_SEV_Exp_IntraOp_MAC_Average            ISO_SEV_Exp_IntraOp_MAC_Average 
+         r2     2018_2019_PRECEDE_DATABASE    Propofol_mg_1_7_Total                      Propofol_mg_1_7_Total           
+         r2     2018_2019_PRECEDE_DATABASE    Ketamine_mg_1_7_Total                      Ketamine_mg_1_7_Total           
+         r2     2018_2019_PRECEDE_DATABASE    fentaNYL_SUBLIMAZE_mg__1_7_Total           fentaNYL_SUBLIMAZE_mg__1_7_Total
+         r2     2018_2019_PRECEDE_DATABASE    Sufentanil_mg__1_7_Total                   Sufentanil_mg__1_7_Total        
+         r2     2018_2019_PRECEDE_DATABASE    Hydromorphone_mg__1_7_Total                Hydromorphone_mg__1_7_Total     
+         r2     2018_2019_PRECEDE_DATABASE    Lidocaine_mg_1_7_Total                     Lidocaine_mg_1_7_Total          
+         r2     2018_2019_PRECEDE_DATABASE    Oral_Morphine_Equiv_Given__1_7_Total_mg    Oral_Morphine_Equiv_Given__1_7_T
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY1            ORAL_MORPHINE_EQUIV_mg_POD_DAY1 
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY2            ORAL_MORPHINE_EQUIV_mg_POD_DAY2 
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY3            ORAL_MORPHINE_EQUIV_mg_POD_DAY3 
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY4            ORAL_MORPHINE_EQUIV_mg_POD_DAY4 
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY5            ORAL_MORPHINE_EQUIV_mg_POD_DAY5 
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY6            ORAL_MORPHINE_EQUIV_mg_POD_DAY6 
+         r2     2018_2019_PRECEDE_DATABASE    ORAL_MORPHINE_EQUIV_mg_POD_DAY7            ORAL_MORPHINE_EQUIV_mg_POD_DAY7 
+         r2     2018_2019_PRECEDE_DATABASE    ICU_LOS_TOTAL_TIME_HOURS                   ICU_LOS_TOTAL_TIME_HOURS        
+         r2     2018_2019_PRECEDE_DATABASE    Death_Days_After_Surgery                   Death_Days_After_Surgery        
+         r3     SHEET1                        PRECEDE Study ID                           PRECEDE_Study_ID                
+         r3     SHEET1                        Base Procedure 1                           Base_Procedure_1                
+         r3     SHEET1                        Base Procedure Code 1                      Base_Procedure_Code_1           
+
+                   pct_
+         type    missing    base_match
+
+         num      0.1959    ISO_Exp_IntraOp_MAC_Average     
+         num      0.1959    ISO_Exp_IntraOp_MAC_Minutes_Tota
+         num      0.1959    ISO_Exp_IntraOp_MAC_Total       
+         num      0.1959    SEV_Exp_IntraOp_Total           
+         num      0.1959    SEV_Exp_IntraOp_MAC_Average     
+         num      0.1959    SEV_Exp_IntraOp_MAC_Minutes_Tota
+         num      0.1959    SEV_Exp_IntraOp_MAC_Total       
+         num      0.1959    ISO_SEV_Exp_IntraOp_MAC_Average 
+         num      0.1959    Propofol_mg_1_7_Total           
+         num      0.1959    Ketamine_mg_1_7_Total           
+         num      0.1959    fentaNYL_SUBLIMAZE_mg__1_7_Total
+         num      0.1959    Sufentanil_mg__1_7_Total        
+         num      0.1959    Hydromorphone_mg__1_7_Total     
+         num      0.1959    Lidocaine_mg_1_7_Total          
+         num      0.1959    Oral_Morphine_Equiv_Given__1_7_T
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY1 
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY2 
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY3 
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY4 
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY5 
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY6 
+         num      0.1959    ORAL_MORPHINE_EQUIV_mg_POD_DAY7 
+         num      0.1959    ICU_LOS_TOTAL_TIME_HOURS        
+         num     95.1577    Death_Days_After_Surgery        
+         char     0.0000    PRECEDE_STUDY_ID                
+         char     0.0000    Base_Procedure_1                
+         char     0.0000    Base_Procedure_Code_1           
+                                    Phase 16 RAW-05 -- IN_BASE columns (already exist in base)                                  83
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+                                                                                      pct_
+                 rid    sheet     source_name          name                 type    missing    base_match
+
+                 r3     SHEET1    CPT 1                CPT_1                char     0.0000    CPT_1            
+                 r3     SHEET1    CPT 1 Description    CPT_1_Description    char     0.0000    CPT_1_Description
+                 r3     SHEET1    CPT1 Class           CPT1_Class           char     0.0579    CPT1_Class       
+                 r3     SHEET1    CPT1 Label           CPT1_Label           char     0.0579    CPT1_Label       
+                 r3     SHEET1    YEAR                 YEAR                 char     0.0000    YEAR             
+                 r5     (csv)     PRECEDE_Study_ID     PRECEDE_Study_ID     char     0.0000    PRECEDE_STUDY_ID 
+                 r5     (csv)     Education            Education            char    98.0237    Education        
+                 r6     (csv)     PRECEDE_Study_ID     PRECEDE_Study_ID     char     0.0000    PRECEDE_STUDY_ID 
+                 r7     (csv)     PRECEDE_Study_ID     PRECEDE_Study_ID     num      0.0000    PRECEDE_STUDY_ID 
+                 r7     (csv)     Education            Education            char    99.4900    Education        
+                 r8     (csv)     PRECEDE_Study_ID     PRECEDE_Study_ID     num      0.0000    PRECEDE_STUDY_ID 
+                 r8     (csv)     Race                 Race                 char     1.6552    Race             
+                 r8     (csv)     Ethnicity            Ethnicity            char     1.6552    Ethnicity        
+                 r8     (csv)     Sex                  Sex                  char     1.6552    Sex              
+                 r9     (csv)     PRECEDE_Study_ID     PRECEDE_Study_ID     char     0.0000    PRECEDE_STUDY_ID 
+                 r9     (csv)     Latitude             Latitude             num      5.8202    Latitude         
+                 r9     (csv)     Longitude            Longitude            num      5.8202    Longitude        
+                 r9     (csv)     YEAR                 YEAR                 char     0.0000    YEAR             
+                      Phase 16 RAW-05 -- NEW columns, r2 excluded (r2 families are in 16_raw_inventory.txt)                     84
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+                                                                                                               pct_
+             rid    sheet                        source_name               name                      type    missing
+
+             r4     2020_PRECEDE_DATABASE_EDU    studyid                   studyid                   char     0.0000
+             r4     2020_PRECEDE_DATABASE_EDU    Edu_Years                 Edu_Years                 num     33.5499
+             r4     2020_PRECEDE_DATABASE_EDU    edu_categorical           edu_categorical           num     83.8228
+             r6     (csv)                        Feels_Exausted            Feels_Exausted            char    45.5084
+             r6     (csv)                        Low_Physical_Activity     Low_Physical_Activity     char    46.0791
+             r6     (csv)                        Slow_Walking_Speed        Slow_Walking_Speed        char    46.1742
+             r6     (csv)                        Unintended_Weight_Loss    Unintended_Weight_Loss    char    45.6246
+             r6     (csv)                        Week_Grip_Strength        Week_Grip_Strength        char    47.5692
+                                           Phase 16 RAW-06 -- r8 (RES) non-key columns                                          85
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+                                                        The FREQ Procedure
+
+                                                                           Cumulative    Cumulative
+                               Race               Frequency     Percent     Frequency      Percent
+                               --------------------------------------------------------------------
+                                                       157        1.66           157         1.66  
+                               WHITE                  7872       82.99          8029        84.65  
+                               BLACK                   807        8.51          8836        93.16  
+                               OTHER                   340        3.58          9176        96.74  
+                               PATIENT REFUSED         102        1.08          9278        97.82  
+                               ASIAN                    94        0.99          9372        98.81  
+                               MULTIRACIAL              48        0.51          9420        99.31  
+                               UNKNOWN                  47        0.50          9467        99.81  
+                               AMERICAN INDIAN          18        0.19          9485       100.00  
+
+
+                                                                           Cumulative    Cumulative
+                               Ethnicity          Frequency     Percent     Frequency      Percent
+                               --------------------------------------------------------------------
+                                                       157        1.66           157         1.66  
+                               NOT HISPANIC           8817       92.96          8974        94.61  
+                               HISPANIC                333        3.51          9307        98.12  
+                               PATIENT REFUSED         130        1.37          9437        99.49  
+                               UNKNOWN                  46        0.48          9483        99.98  
+                               ?                         2        0.02          9485       100.00  
+
+
+                                                                      Cumulative    Cumulative
+                                   Sex       Frequency     Percent     Frequency      Percent
+                                   -----------------------------------------------------------
+                                                  157        1.66           157         1.66  
+                                   MALE          4729       49.86          4886        51.51  
+                                   FEMALE        4599       48.49          9485       100.00  

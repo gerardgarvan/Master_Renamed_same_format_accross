@@ -1,0 +1,16 @@
+10_concept_profile -- Run:   28AUG2026:11:31:00
+=======================================================================
+ 
+merged_rows=41150
+columns_named=31
+columns_absent=0
+pairs_crosstabbed=17
+pairs_with_no_overlap=1
+template_value_rows=58
+ 
+This program decides nothing. It writes evidence and a decision template.
+Complete docs/concept_decisions_TEMPLATE.csv, save it as
+docs/concept_decisions.csv, then run 10b_concept_harmonize.sas.
+ 
+A pair with no overlap cannot be compared on values at all. Under md3-owns
+ownership that is a real possibility and it is a finding, not a null result.

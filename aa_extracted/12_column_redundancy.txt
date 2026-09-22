@@ -1,0 +1,35 @@
+12_column_redundancy -- Run:   28AUG2026:16:12:37
+=======================================================================
+ 
+source_dataset=g.master_data_harmonized
+rows=41150
+columns=187
+candidate_pairs=2939
+  candidates_exact_path=68
+  candidates_subset_path=2871
+identical_pairs=4
+subset_pairs=3
+tested_neither=2932
+constant_columns=30
+empty_columns=0
+ 
+NOTHING WAS DROPPED. A duplicate column is evidence for a decision, not a
+decision. Before removing one, check which name the PRECEDE data dictionary
+documents -- Phase 11 answers that -- and keep the documented name.
+ 
+A_SUBSET_B or B_SUBSET_A is the strict-subset relationship Phase 10 proved
+eleven times: the narrower column adds no rows AND disagrees nowhere, so it
+carries no information the wider one lacks. Both conditions are required --
+n_disagree_both = 0 is what makes it a subset rather than merely narrower.
+ 
+Constant columns are excluded from pairing on purpose: every all-Y flag
+pairs with every other all-Y flag, which is true and tells you nothing. The
+Constant Columns sheet lists them with the single value each one holds.
+ 
+Two entirely-missing columns are equal on every row but are NOT reported as
+an identical pair -- IDENTICAL here requires at least one populated value.
+They appear on the Empty Columns sheet instead.
+ 
+For numeric columns, two DIFFERENT special missing values (.A against .B)
+count as a difference. Both satisfy missing(), so without that test a pair
+storing different special missing codes would be reported IDENTICAL.

@@ -1,0 +1,47 @@
+13_value_profile_long -- Run:   28AUG2026:20:22:54
+=======================================================================
+ 
+datasets_named=3
+datasets_profiled=3
+value_rows=8138
+variables_profiled=132
+skipped_column_dataset_pairs=198
+distinct_variables_skipped=66
+cardinality_ceiling=200
+distribution_shifts_over_0.5_points=887
+absent_value_dataset_combinations=161
+ 
+HOW TO USE g.value_profile_long
+  Frequencies are PRE-COMPUTED, so PROC FREQ needs a WEIGHT statement:
+ 
+    proc freq data=g.value_profile_long;
+      where varname = 'RACE';
+      tables ds_name * value_txt;
+      weight n_rows;
+    run;
+ 
+  Without WEIGHT, PROC FREQ counts one row per VALUE rather than per
+  patient, and every cell reads 1.
+ 
+COMPANION TABLES
+  g.value_profile_delta  -- values whose SHARE differs by more than
+                            0.5 percentage points between two datasets.
+                            Compared on percent, not count: the datasets have
+                            different row counts by design, so a count
+                            comparison flags nearly everything.
+  g.value_profile_skipped -- every column NOT profiled, with the reason and
+                            its distinct count. A variable absent from the
+                            profile is distinguishable from one never
+                            considered. Query it ascending by n_distinct:
+                            anything just above the ceiling is a categorical
+                            that nearly made it.
+  g.value_profile_absent -- a value seen for a variable in one dataset and
+                            NOT present in another that carries that same
+                            variable. This is the did-it-disappear question.
+ 
+SKIPPED COLUMNS
+  Identifier-named columns are skipped before any value is read, and any
+  column above the cardinality ceiling is skipped by count. This dataset
+  holds VALUES, so that guard is load-bearing rather than cosmetic. Every
+  skip is recorded in work.skipped with its reason, so a variable absent
+  from the output is distinguishable from one never considered.

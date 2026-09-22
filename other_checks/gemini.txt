@@ -1,0 +1,222 @@
+Several syntax errors, macro resolution pitfalls, and operational issues in the program will cause SAS execution errors or runtime failures.
+
+---
+
+### Critical Syntax & Logic Errors
+
+**1. Invalid SQL `HAVING` / Non-Standard `MONOTONIC()` Usage (Section 0b, Step 2)**
+
+* **Issue:**
+```sas
+select PRECEDE_STUDY_ID into :key_sample_base separated by '|'
+from (
+  select PRECEDE_STUDY_ID from g.analysis_base
+  where not missing(PRECEDE_STUDY_ID)
+)
+having monotonic() <= 10;
+
+```
+
+
+In PROC SQL, `HAVING` without a `GROUP BY` acts across the entire summary grouping, and `monotonic()` is an undocumented internal function. In SAS 9.4 SQL queries, using `monotonic()` inside a `HAVING` clause without an explicit aggregation often yields syntax errors (`ERROR 22-322: Syntax error, expecting one of the following...`) or fetches zero rows.
+* **Correction:** Use the standard SAS SQL row-limiting option `(obs=10)`:
+```sas
+select strip(put(PRECEDE_STUDY_ID, $12.)) into :key_sample_base separated by '|'
+from g.analysis_base(obs=10)
+where not missing(PRECEDE_STUDY_ID);
+
+```
+
+
+
+**2. Invalid Overwrite / Open File Collision with `PROC EXPORT` (Section 0b, Step 10)**
+
+* **Issue:**
+```sas
+data _null_;
+  file "&qc_path.\17_discovery.txt" lrecl=200;
+  ...
+run;
+/* Append year candidates */
+data _null_;
+  file "&qc_path.\17_discovery.txt" lrecl=200 mod;
+  put "--- YEAR VARIABLE CANDIDATES ---";
+run;
+proc export data=work.year_candidates
+  outfile="&qc_path.\17_discovery.txt"
+  dbms=dlm;
+  delimiter='|';
+run;
+
+```
+
+
+`PROC EXPORT` does not support appending to an existing delimited file without `REPLACE`, and if `REPLACE` is provided, it clobbers the previous blocks written by `data _null_;`. The subsequent `data _null_; ... mod;` step also writes the exact same candidate list right after it.
+* **Correction:** Remove the `proc export` step entirely. Let the DATA step directly under it output the pipe-delimited candidates.
+
+**3. Macro Loop Syntax Inside Open-Code DATA Step (Section 3c)**
+
+* **Issue:**
+```sas
+if inmatched then do;
+  /* Check if varname is one of the extension columns */
+  if varname in (%do _vi = 1 %to 1; /* placeholder */ %end; '') then
+    source_dataset = 'master_data_merged';
+  else source_dataset = 'analysis_base';
+end;
+
+```
+
+
+`%do` loops cannot be used in open code (outside of a `%macro ... %mend` container). This will throw:
+`ERROR: A DO loop is not valid in open code.`
+* **Correction:** You already handle this cleanly two steps down via `work.domain_staging2` using a SQL join against `work.ext_candidates`. Simplify this block to avoid open-code macro loops:
+```sas
+if inmatched then source_dataset = 'analysis_base';
+if indataonly then source_dataset = 'analysis_base_ext';
+
+```
+
+
+
+**4. Datalines Comma Delimiter Collision (Section 4)**
+
+* **Issue:**
+```sas
+data work.domain_lookup;
+  length varname_u $32 domain $16 domain_rationale $200 assign_rule $20;
+  infile datalines dsd;
+  input varname_u $ domain $ assign_rule $ domain_rationale $;
+datalines;
+...
+INSURANCE_TYPE,D1,analytic_role,'payer type known preoperatively; sociodemographic proxy'
+FRAILTY_SCORE,D2,instrument,'named frailty instrument score; preoperative assessment per D-02'
+FEELS_EXHAUSTED,D2,instrument,'frailty component (Fried criteria); preoperative assessment'
+...
+;
+
+```
+
+
+Because you specified `dsd` without an explicit `dlm=','`, SAS assumes comma delimitation and strips enclosing quotes. However, several descriptions contain semicolons or parenthetical phrases. More critically, standard formatted list input `input varname_u $ domain $ assign_rule $ domain_rationale $;` truncates any character variable at 8 characters unless read with `:$` (e.g., `input varname_u :$32. domain :$16. assign_rule :$20. domain_rationale :$200.;`). Without the colon modifier, `domain_rationale` can bleed across tokens or truncate prematurely.
+* **Correction:** Explicitly define delimiter and use colon modifiers:
+```sas
+infile datalines dsd dlm=',' truncover;
+input varname_u :$32. domain :$16. assign_rule :$20. domain_rationale :$200.;
+
+```
+
+
+
+---
+
+### Operational & Macro Pitfalls
+
+**5. Single Ampersand Macro Trigger in Text Comments**
+
+* **Line 479:**
+```sas
+/* Wave 3 prints this on KEY sheet and affected domain sheets; without it D3 reads as ~95% missing. */
+
+```
+
+
+In SAS, `%` followed by characters inside SAS code or comments can trigger macro resolution warnings (`WARNING: Apparent invocation of macro MISSING not resolved.`).
+* **Correction:** Mask or change the wording (e.g., `reads as approximately 95 percent missing`).
+
+**6. Double Resolution of Unquoted `&D3_DENOM_NOTE**`
+
+* **Section 4 (Setting `denominator_note`):**
+```sas
+if domain = 'D3' then denominator_note = "&D3_DENOM_NOTE";
+
+```
+
+
+When `&n_partial_cov > 0`, `&D3_DENOM_NOTE` resolves to:
+`D3 and the D2 frailty block are computed on the subcohort with a non-missing assessment (n=...), not on the 41150 base`
+Because this text string contains parentheses and commas, resolving it inside double quotes in a DATA step assignment is valid, but if `D3_DENOM_NOTE` is empty (`%let D3_DENOM_NOTE = ;`), it resolves to:
+```sas
+if domain = 'D3' then denominator_note = "";
+
+```
+
+
+Ensure `D3_DENOM_NOTE` is guaranteed to be declared global prior to this DATA step even if `compute_ext_coverage` encounters an early return. (You have `%global D3_DENOM_NOTE;` inside the macro `%if`, but if `work.ext_candidates` has 0 observations, `&n_partial_cov` query might fail or leave `&D3_DENOM_NOTE` undefined in open code).
+* **Correction:** Add `%global D3_DENOM_NOTE; %let D3_DENOM_NOTE=;` at the very top of Section 1.
+
+**7. Self-Redundant RENAME Statement (Section 4)**
+
+* **End of Section 4:**
+```sas
+data g.var_domain_map;
+  ...
+  rename sas_label = sas_label;
+
+```
+
+
+Renaming a variable to its own name is redundant and produces a note in the SAS log:
+`NOTE: Renaming variable sas_label to sas_label.`
+* **Correction:** Remove `rename sas_label = sas_label;`.
+
+---
+
+### Cleaned Code Snippets
+
+#### 1. Section 0b (Sample Key fix & Proc Export removal)
+
+```sas
+/* Sample non-missing key values */
+proc sql noprint;
+  select strip(put(PRECEDE_STUDY_ID, $12.)) into :key_sample_base separated by '|'
+  from g.analysis_base(obs=10)
+  where not missing(PRECEDE_STUDY_ID);
+
+  select strip(put(PRECEDE_STUDY_ID, $12.)) into :key_sample_merged separated by '|'
+  from g.master_data_merged(obs=10)
+  where not missing(PRECEDE_STUDY_ID);
+quit;
+
+```
+
+#### 2. Section 3c (Clean Staging Table Union)
+
+```sas
+/* Combine matched + data-only into one staging table */
+data work.domain_staging;
+  length varname $32 vtype $4 vlen 8 sas_label $256
+         dict_name $60 dict_type $20 description $300 match_how $8
+         domain $16 domain_rationale $200 assign_rule $20
+         source_dataset $32 stat_route $8 n_levels 8 denominator_note $300;
+
+  set work.var_domain_raw (in=inmatched)
+      work.data_only_oos  (in=indataonly);
+
+  if inmatched then do;
+    source_dataset   = 'analysis_base';
+    domain           = '';
+    domain_rationale = '';
+    assign_rule      = '';
+  end;
+  if indataonly then do;
+    source_dataset   = 'analysis_base_ext';
+  end;
+run;
+
+```
+
+#### 3. Section 4 (Datalines Parser)
+
+```sas
+data work.domain_lookup;
+  length varname_u $32 domain $16 assign_rule $20 domain_rationale $200;
+  infile datalines dsd dlm=',' truncover;
+  input varname_u :$32. domain :$16. assign_rule :$20. domain_rationale :$200.;
+datalines;
+AGE_AT_SURGERY,D1,timing,'captured at surgery registration; sociodemographic descriptor'
+...
+;
+run;
+
+```

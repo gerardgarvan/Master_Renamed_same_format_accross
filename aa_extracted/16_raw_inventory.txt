@@ -1,0 +1,47 @@
+                           Phase 16 RAW-01/02 -- dataset inventory (base spine N=41150, base cols=125)                           1
+                                                                                         Wednesday, September 16, 2026 01:06:00 PM
+
+                                                                                                                      ceiling_
+    rid    fname                                            sheet                         memname     nobs    nvar      flag
+
+    r1     2018_2019_2020_Induction_Emergent20231121.csv    (csv)                          R1        22476       3            
+    r2     2018_2019_Precede_Database.xlsx                  2018_2019_PRECEDE_DATABASE     R2_S1     14807    3987            
+    r3     2018_2022_COLONOSCOPY_20240118.xlsx              SHEET1                         R3_S1      3456       8            
+    r4     2020_Precede_Database_Edu.xlsx                   2020_PRECEDE_DATABASE_EDU      R4_S1      7696       3            
+    r5     2021_Education_20240124.csv                      (csv)                          R5         9462       2            
+    r6     2021_Frailty_20240123.csv                        (csv)                          R6         9462       6            
+    r7     2022_Education_20240124.csv                      (csv)                          R7         9215       2            
+    r8     2022_RES_20230927.csv                            (csv)                          R8         9485       4            
+    r9     All_YEARS_LAT_LONG_20231127.csv                  (csv)                          R9        41150       4            
+                                               Phase 16 RAW-04 -- grain by dataset   Wednesday, September 16, 2026 01:06:00 PM   2
+
+                                       pid_                 enc_
+                           memname    unique    has_pid    unique    has_enc    has_mrn    grain_class
+
+                            R1           1         1          0         0          0       PATIENT     
+                            R2_S1        1         1          0         1          1       PATIENT     
+                            R3_S1        1         1          0         0          0       PATIENT     
+                            R4_S1        1         1          0         0          0       PATIENT     
+                            R5           1         1          0         0          0       PATIENT     
+                            R6           1         1          0         0          0       PATIENT     
+                            R7           1         1          0         0          0       PATIENT     
+                            R8           0         1          0         0          0       MULTI_PER_PT
+                            R9           1         1          0         0          0       PATIENT     
+                                                  Phase 16 -- r2 column families     Wednesday, September 16, 2026 01:06:00 PM   3
+
+                                                                  n_all_    min_pct_    med_pct_
+                                  family               n_cols    missing      miss        miss
+
+                                  COM_dCDT              2082        12       22.5299     22.5299
+                                  COPY_dCDT             1259         2       22.5299     22.5299
+                                  LINUS                  251         1       22.3003     22.9419
+                                  paper_neuropsych       153         0       18.5453     90.1195
+                                  idr_other              108        30        0.0000     22.4927
+                                  anesthetic_opioid       30         0        0.1959      0.1959
+                                  precede_admin           27         8        0.0000     95.3806
+                                  rt_times                18         0        8.0975     11.8728
+                                  blood_labs              17         0       35.6250     49.5306
+                                  billing_dx              15         3       99.3652     99.9257
+                                  ron                     11         1        8.0975      8.0975
+                                  COMP10                  10         0        0.1959      0.1959
+                                  garvan                   6         1        0.1148     62.4164

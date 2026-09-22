@@ -1,0 +1,235 @@
+==========================================================================
+Phase 18 -- Gap-Fill Candidate Report
+Run date: 16SEP2026:15:12:39
+==========================================================================
+ 
+Missing-value rule: -999 (numeric) and the string NULL (character) are
+treated as missing in every count. Standard SAS missing() alone is not
+sufficient because -999 is the dCDT sentinel and NULL was the md8 sentinel.
+ 
+EXCLUDED from Section B: r7 (2022_Education) and r8 (2022_RES).
+Both have a numeric key with 0 matched IDs. See PCM-D-16 (open).
+ 
+==========================================================================
+PER-FILE SUMMARY
+rid   n_matched   n_IN_BASE   n_NEW   n_rolled_up
+==========================================================================
+r1    22472        2           0       0
+r2    14778        102         273     201
+r3    2688         7           0       0
+r5    9462         1           0       0
+r9    31935        3           0       0
+ 
+==========================================================================
+IN_BASE COLUMN DETAIL (sorted by pct_fillable DESC then n_fillable DESC)
+FLAG: TYPE_DIFF = raw_type ne base_type (conflict counts may be type artefacts)
+rid   column   raw_type   base_type   n_matched   n_fillable   pct_fillable
+      n_equal  n_conflict   TYPE_DIFF
+==========================================================================
+r1    rt_RM_START_to_EMERGENCE_mins    num        num        22472       0             0.0000  0          0            
+r1    rt_RM_START_to_INDUCTION_mins    num        num        22472       0             0.0000  0          0            
+r3    Base_Procedure_1                 char       char       2688        0             0.0000  0          0            
+r3    Base_Procedure_Code_1            char       char       2688        0             0.0000  0          0            
+r3    CPT1_Class                       char       num        2688        0             0.0000  0          0           TYPE_DIFF
+r3    CPT1_Label                       char       char       2688        0             0.0000  0          0            
+r3    CPT_1                            char       char       2688        0             0.0000  0          0            
+r3    CPT_1_Description                char       char       2688        0             0.0000  0          0            
+r3    YEAR                             char       num        2688        0             0.0000  0          0           TYPE_DIFF
+r5    Education                        char       char       9462        0             0.0000  0          0            
+r9    Latitude                         num        num        31935       0             0.0000  0          0            
+r9    Longitude                        num        num        31935       0             0.0000  0          0            
+r9    YEAR                             char       num        31935       0             0.0000  0          0           TYPE_DIFF
+r2    Admit_BMI                        num        num        14778       0             0.0000  0          0            
+r2    Admit_Source                     char       char       14778       0             0.0000  0          0            
+r2    Age_at_Encounter                 num        num        14778       0             0.0000  0          0            
+r2    Anesthesia_Type                  char       char       14778       0             0.0000  0          0            
+r2    Base_Procedure_1                 char       char       14778       0             0.0000  0          0            
+r2    Base_Procedure_Code_1            char       char       14778       0             0.0000  0          0            
+r2    Charges                          num        num        14778       0             0.0000  0          0            
+r2    Charlson_Comorbidity_Index       num        num        14778       0             0.0000  0          0            
+r2    CognitiveDisorder_YN             char       char       14778       0             0.0000  0          0            
+r2    COMP10_T80                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T81                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T82                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T83                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T84                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T85                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T86                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T87                       num        num        14778       0             0.0000  0          0            
+r2    COMP10_T88                       num        num        14778       0             0.0000  0          0            
+r2    complication_sum                 num        num        14778       0             0.0000  0          0            
+r2    CPT_1                            char       char       14778       0             0.0000  0          0            
+r2    CPT_1_Description                char       char       14778       0             0.0000  0          0            
+r2    Death_Date_Y_N                   char       char       14778       0             0.0000  0          0            
+r2    Death_Days_After_Surgery         num        num        14778       0             0.0000  0          0            
+r2    Diabetes_YN                      char       char       14778       0             0.0000  0          0            
+r2    Dischg_Disposition               char       char       14778       0             0.0000  0          0            
+r2    Education                        char       char       14778       0             0.0000  0          0            
+r2    EmployeeStatus                   char       char       14778       0             0.0000  0          0            
+r2    ENCRYPTED_ENCOUNTER              char       char       14778       0             0.0000  0          0            
+r2    ENCRYPTED_MRN                    char       char       14778       0             0.0000  0          0            
+r2    Ethnicity                        char       char       14778       0             0.0000  0          0            
+r2    fentaNYL_SUBLIMAZE_mg_IntraOp_To num        num        14778       0             0.0000  0          0            
+r2    fentaNYL_SUBLIMAZE_mg__1_7_Total num        num        14778       0             0.0000  0          0            
+r2    Frailty_Score                    num        num        14778       0             0.0000  0          0            
+r2    Hydromorphone_mg_IntraOp_Total   num        num        14778       0             0.0000  0          0            
+r2    Hydromorphone_mg__1_7_Total      num        num        14778       0             0.0000  0          0            
+r2    Hyperlipidemia_YN                char       char       14778       0             0.0000  0          0            
+r2    Hypertension_YN                  char       char       14778       0             0.0000  0          0            
+r2    ICD10_Principal_Diagnosis        char       char       14778       0             0.0000  0          0            
+r2    ICD10_Principal_Diagnosis_Desc   char       char       14778       0             0.0000  0          0            
+r2    ICU_LOS_TOTAL_TIME_HOURS         num        num        14778       0             0.0000  0          0            
+r2    Intraop_Ketamine                 char       char       14778       0             0.0000  0          0            
+r2    ISO_Exp_IntraOp_MAC_Average      num        num        14778       0             0.0000  0          0            
+r2    ISO_Exp_IntraOp_MAC_Minutes_Tota num        num        14778       0             0.0000  0          0            
+r2    ISO_Exp_IntraOp_MAC_Total        num        num        14778       0             0.0000  0          0            
+r2    ISO_Exp_IntraOp_Total            num        num        14778       0             0.0000  0          0            
+r2    ISO_SEV_Exp_IntraOp_MAC_Average  num        num        14778       0             0.0000  0          0            
+r2    Ketamine_mg_1_7_Total            num        num        14778       0             0.0000  0          0            
+r2    Ketamine_mg_IntraOp_Total        num        num        14778       0             0.0000  0          0            
+r2    Latitude                         num        num        14778       0             0.0000  0          0            
+r2    Lidocaine_mg_1_7_Total           num        num        14778       0             0.0000  0          0            
+r2    Lidocaine_mg_IntraOp_Total       num        num        14778       0             0.0000  0          0            
+r2    Longitude                        num        num        14778       0             0.0000  0          0            
+r2    LOS                              num        num        14778       0             0.0000  0          0            
+r2    LOS_in_Hours                     num        num        14778       0             0.0000  0          0            
+r2    Marital_Status                   char       char       14778       0             0.0000  0          0            
+r2    MovementDisorder_YN              char       char       14778       0             0.0000  0          0            
+r2    Oral_Morphine_Equiv_Given__1_7_T num        num        14778       0             0.0000  0          0            
+r2    Oral_Morphine_Equiv_IntraOp_Tota num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY1  num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY2  num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY3  num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY4  num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY5  num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY6  num        num        14778       0             0.0000  0          0            
+r2    ORAL_MORPHINE_EQUIV_mg_POD_DAY7  num        num        14778       0             0.0000  0          0            
+r2    Patient_Type                     char       char       14778       0             0.0000  0          0            
+r2    Payer                            char       char       14778       0             0.0000  0          0            
+r2    Preop_block                      char       char       14778       0             0.0000  0          0            
+r2    Propofol_mg_1_7_Total            num        num        14778       0             0.0000  0          0            
+r2    Propofol_mg_IntraOp_Total        num        num        14778       0             0.0000  0          0            
+r2    Race                             char       char       14778       0             0.0000  0          0            
+r2    Room_Type                        char       char       14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_AN_END_mins          num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_AN_START_mins        num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_BLOCK_END_mins       num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_BLOCK_START_mins     num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_DRESS_mins           num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_INCISION_mins        num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_RM_END_mins          num        num        14778       0             0.0000  0          0            
+r2    rt_ADMIT_to_RM_START_mins        num        num        14778       0             0.0000  0          0            
+r2    rt_ANCHOR_to_ADMIT_days          num        num        14778       0             0.0000  0          0            
+r2    rt_ANCHOR_to_DISCHG_days         num        num        14778       0             0.0000  0          0            
+r2    rt_ANCHOR_to_SURGERY_days        num        num        14778       0             0.0000  0          0            
+r2    rt_AN_START_to_AN_END_mins       num        num        14778       0             0.0000  0          0            
+r2    rt_BLOCK_START_TO_BLOCK_END_mins num        num        14778       0             0.0000  0          0            
+r2    rt_INCISE_to_DRESS_mins          num        num        14778       0             0.0000  0          0            
+r2    rt_RM_START_to_AN_START_mins     num        num        14778       0             0.0000  0          0            
+r2    rt_RM_START_to_DRESS_mins        num        num        14778       0             0.0000  0          0            
+r2    rt_RM_START_to_INCISION_mins     num        num        14778       0             0.0000  0          0            
+r2    rt_RM_START_to_RM_END_mins       num        num        14778       0             0.0000  0          0            
+r2    Service                          char       char       14778       0             0.0000  0          0            
+r2    SEV_Exp_IntraOp_MAC_Average      num        num        14778       0             0.0000  0          0            
+r2    SEV_Exp_IntraOp_MAC_Minutes_Tota num        num        14778       0             0.0000  0          0            
+r2    SEV_Exp_IntraOp_MAC_Total        num        num        14778       0             0.0000  0          0            
+r2    SEV_Exp_IntraOp_Total            num        num        14778       0             0.0000  0          0            
+r2    sex                              char       char       14778       0             0.0000  0          0            
+r2    Sleep_Apnea_YN                   char       char       14778       0             0.0000  0          0            
+r2    SSDI_Death_Date_Y_N              char       char       14778       0             0.0000  0          0            
+r2    Sufentanil_mg_IntraOp_Total      num        num        14778       0             0.0000  0          0            
+r2    Sufentanil_mg__1_7_Total         num        num        14778       0             0.0000  0          0            
+r2    Weekend_Indicator                char       char       14778       0             0.0000  0          0            
+r2    _30_DAY_MORTALITY                char       char       14778       0             0.0000  0          0            
+ 
+==========================================================================
+NEW COLUMN DETAIL -- individual rows
+(sorted by pct_raw_populated DESC then n_raw_populated DESC)
+rid   column   raw_type   n_matched   n_raw_populated   pct_raw_populated
+==========================================================================
+r2    preop_date                       char       14778      14777         0.9999
+r2    sex_cat                          char       14778      14718         0.9959
+r2    DigitalClockDataExpected         char       14778      14688         0.9939
+r2    precede_aim1_2_location          char       14778      13970         0.9453
+r2    ron_Base_Procedure_Code_1        char       14778      13608         0.9208
+r2    ron_BPC_4_DIGIT                  char       14778      13608         0.9208
+r2    ron_BPC_5_DIGIT                  char       14778      13608         0.9208
+r2    ron_BPC_6_DIGIT                  char       14778      13608         0.9208
+r2    ron_BPC_7_DIGIT                  char       14778      13608         0.9208
+r2    ron_CPT_1                        char       14778      13608         0.9208
+r2    ron_CPT_1_DIGIT                  char       14778      13608         0.9208
+r2    ron_CPT_2_DIGIT                  char       14778      13608         0.9208
+r2    ron_CPT_3_DIGIT                  char       14778      13608         0.9208
+r2    ron_CPT_4_DIGIT                  char       14778      13608         0.9208
+r2    Sex_1                            char       14778      13608         0.9208
+r2    Day_of_Week                      char       14778      13607         0.9208
+r2    Emergent_Anest_Record            char       14778      13607         0.9208
+r2    Service_PT                       char       14778      13607         0.9208
+r2    Holiday                          char       14778      13273         0.8982
+r2    handedness                       char       14778      10774         0.7291
+r2    handedness_cat                   char       14778      10774         0.7291
+r2    repeated_clock_instructions      char       14778      9740          0.6591
+r2    Death_Indicator                  char       14778      9718          0.6576
+r2    DigitalClockDataInfo             char       14778      7134          0.4827
+r2    Primary_Payer                    char       14778      7109          0.4811
+r2    Insurance                        char       14778      6569          0.4445
+r2    blood_PROTIME_INR_LAB_RESULT_VAL char       14778      3683          0.2492
+r2    blood_APTT_LAB_RESULT_VALUE      char       14778      3094          0.2094
+r2    Edu_Clock_notes                  char       14778      720           0.0487
+r2    SSDI_Death_Y_N                   char       14778      717           0.0485
+r2    precede_aim1_2_clock_file_notes  char       14778      680           0.0460
+r2    precede_aim1_2_nurse_notes       char       14778      260           0.0176
+r2    precede_aim1_2_physical_limitati char       14778      146           0.0099
+r2    aim3_enroll_id                   char       14778      122           0.0083
+r2    billing_code                     char       14778      94            0.0064
+r2    billing_neurocog_primary_diag_co char       14778      83            0.0056
+r2    Presence_of_Preop_Pyscotic_Disor char       14778      55            0.0037
+r2    billing_neurocog_primary_desc    char       14778      51            0.0035
+r2    precede_aim1_2_notes             char       14778      40            0.0027
+r2    billing_psych_code               char       14778      17            0.0012
+r2    billing_neurocog_secondary_diag_ char       14778      16            0.0011
+r2    billing_psych_desc               char       14778      11            0.0007
+r2    precede_aim1_2_scoring_issues    char       14778      10            0.0007
+r2    billing_neurocog_secondary_desc  char       14778      5             0.0003
+r2    billing_neurodevelp_code         char       14778      4             0.0003
+r2    billing_neurodevelp_desc         char       14778      4             0.0003
+r2    nacc_lbd_first_symp              char       14778      1             0.0001
+r2    Aim_3_1Year_Redcap_Comp          char       14778      0             0.0000
+r2    Aim_3_3Month_Redcap_Comp         char       14778      0             0.0000
+r2    Aim_3_6Week_Redcap_Comp          char       14778      0             0.0000
+r2    Aim_3_Baseline_Redcap_Comp       char       14778      0             0.0000
+r2    CorrectionNotes                  char       14778      0             0.0000
+r2    Delirium                         char       14778      0             0.0000
+r2    dukes_activity_scale             char       14778      0             0.0000
+r2    edu_categorical_other            char       14778      0             0.0000
+r2    group                            char       14778      0             0.0000
+r2    nacc_lbd_first_symp_age          char       14778      0             0.0000
+r2    nacc_lbd_sleepdis_age            char       14778      0             0.0000
+r2    nacc_lbd_smellimpair_age         char       14778      0             0.0000
+r2    pecan_psychometrist              char       14778      0             0.0000
+r2    precede_aim1_2_clock_administrat char       14778      0             0.0000
+r2    Redcap                           char       14778      0             0.0000
+r2    time_point                       char       14778      0             0.0000
+r2    trltid                           char       14778      0             0.0000
+ 
+==========================================================================
+r2 FAMILY ROLLUP (COM_dCDT / COPY_dCDT / LINUS / paper_neuropsych)
+family   n_cols   median_n_raw_populated   min   max
+==========================================================================
+ 
+==========================================================================
+APPENDIX: r2 SECTION DIVIDER COLUMNS
+column   n_raw_populated   note
+==========================================================================
+Bloods                                 0                 section divider -- excluded
+DigitalClockData                       0                 section divider -- excluded
+garvan_added_variables                 0                 section divider -- excluded
+IDR_Variables_Only                     0                 section divider -- excluded
+LINUS                                  0                 section divider -- excluded
+Other_Variables                        3                 on divider list but populated -- REVIEW
+PeCANers                               0                 section divider -- excluded
+ron_extra_for_sabya                    0                 section divider -- excluded
+ 
+==========================================================================
+End of Phase 18 Gap-Fill Candidate Report
+==========================================================================

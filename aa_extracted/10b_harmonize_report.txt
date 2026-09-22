@@ -1,0 +1,36 @@
+10b_concept_harmonize -- Run:   28AUG2026:14:25:49
+=======================================================================
+ 
+merged_rows=41150
+harmonized_rows=41150
+harmonized_columns=11
+confirmed_value_mappings=34
+concepts_confirmed=11
+rules_applied=34
+ 
+Secondary sources proven redundant : 11
+Source columns actually DROPPED     : 11  (drop_redundant=1)
+  A column is dropped ONLY when this run proved it adds no rows the
+  primary lacks AND disagrees with it nowhere. g.master_data_merged is
+  untouched, so re-running restores anything dropped.
+Every other source column is RETAINED, unchanged in type and length.
+Harmonized values are additive, in new h_ prefixed columns, each with an
+h_*_src companion naming which source supplied the value on that row.
+ 
+Column                              N Populated    Pct
+---------------------------------------------------------
+H_DEATH_YN                          22917           55.7
+H_DIABETES                          5983            14.5
+H_FRAILTY_ACTIVITY                  14025           34.1
+H_FRAILTY_EXHAUST                   14181           34.5
+H_FRAILTY_GRIP                      13699           33.3
+H_FRAILTY_WALKING                   13989           34.0
+H_FRAILTY_WEIGHT                    14156           34.4
+H_HYPERLIPIDEMIA                    11207           27.2
+H_HYPERTENSION                      12546           30.5
+H_MOVEMENT_DISORDER                 1357             3.3
+H_SLEEP_APNEA                       3812             9.3
+ 
+A harmonized column populated on fewer rows than the union of its sources
+would mean some rows had no mapped value -- but the coverage gate in
+SECTION 3 fails the run before it gets here, so that should be impossible.

@@ -13,3 +13,9 @@ raw/
 # OS
 .DS_Store
 Thumbs.db
+
+logs/
+qc/*.txt
+qc/*.sas7bdat
+qc/*.xlsx
+*.zip

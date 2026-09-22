@@ -1,0 +1,44 @@
+14_label_similarity Section A -- Run:   29AUG2026:15:24:15
+=======================================================================
+ 
+harmonized_vars=186
+precede_dict_rows=310
+vars_with_dict_label=82
+vars_with_sas_label=73
+vars_using_varname_fallback=31
+total_pairs_scored=16740
+threshold=0.20
+jaccard_threshold=0.34
+similarity_measure_edit=COMPLEV_normalized_by_max_label_length
+similarity_measure_jaccard=word_overlap_over_word_union
+pairs_above_threshold=3607
+known_or_pipeline_derived_pairs_excluded=633
+candidate_pairs_written=2974
+ 
+CALIBRATION (Death_Date_Y_N vs IsDead_Y_N):
+  score_edit=NA
+  score_jaccard=NA
+  (Phase 10 proved this pair identical on all 8730 overlapping rows)
+ 
+Candidate file: docs/label_similarity_candidates.csv
+Evidence workbook: docs/LABEL_SIMILARITY_EVIDENCE.xlsx (not committed)
+ 
+HUMAN ACTION REQUIRED
+1. Open docs/label_similarity_candidates.csv
+2. For each row, set CONFIRMED=YES if the pair is the same concept
+3. Add confirmed pairs to docs/concept_decisions.csv
+4. Run Phase 15 (10b machinery applies confirmed decisions)
+ 
+Section B (SSDI/CPT1 profiling) output follows below after Plan 02 run.
+ 
+=== Section B: SSDI and CPT1 Concept Profiling (HARM-09) ===
+ssdi_present=YES
+cpt1_present=YES
+ssdi_xtab_rows=13
+cpt1_xtab_full_rows=159
+cpt1_xtab_displayed_rows=159
+ext_template_rows=323
+decisions_template=docs/concept_decisions_EXT_TEMPLATE.csv
+evidence_workbook=docs/CONCEPT_EVIDENCE_EXT.xlsx (not committed)
+ 
+Section B complete.

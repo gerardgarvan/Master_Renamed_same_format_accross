@@ -1,0 +1,46 @@
+17_summary_stats_by_domain -- QC Artifact
+Run:   10SEP2026:15:10:15
+=======================================================================
+ 
+source=work.analysis_base_ext (g.analysis_base + extension columns)
+source_rows=41150
+year_variable=YEAR
+years_available=2018 2019 2020 2021 2022
+ 
+DOMAIN VARIABLE COUNTS
+D1_variables=8
+D2_variables=17
+D3_variables=0
+D4_variables=59
+D5_variables=17
+OUT_OF_SCOPE_total=47
+OUT_OF_SCOPE_identifier_or_key=5
+OUT_OF_SCOPE_not_in_dictionary=41
+OUT_OF_SCOPE_not_in_domain_lookup=0
+yn_blank_coded_flags=9
+ 
+ASSIGNMENT RULE COUNTS
+assign_rule_timing=82
+assign_rule_analytic_role=19
+assign_rule_instrument=0
+ 
+SENTINEL RECODES
+total_sentinel_recodes=0
+ 
+SUPPRESSION SUMMARY
+total_suppressed_rows=74403
+suppressed_level_count=74264
+suppressed_n_missing=6
+suppressed_complementary=52
+suppressed_continuous_small_n=81
+ 
+D3_FRAILTY_DENOMINATOR_NOTE=Coverage varies by variable in this block. Statistics use the non-missing observations available for each variable rather than the 41150 row base. See the per-variable N column and the QC sheet coverage table.
+ 
+SUPPRESSION RULE
+Cells representing 11 or fewer patients are shown as --
+Continuous blocks at or below that count have ALL statistics suppressed
+ 
+DENOMINATOR RULE (D-02)
+Percents computed on non-missing denominator
+N-missing is reported separately and suppressed on the same rule
+Y/blank flags: blank reported as (blank = absent) with percent on total N

@@ -428,8 +428,8 @@ run;
   %local hvars i hvar hn;
   %let hvars = H_DEATH_YN H_DIABETES H_FRAILTY_ACTIVITY H_FRAILTY_EXHAUST H_FRAILTY_GRIP
                H_FRAILTY_WALKING H_FRAILTY_WEIGHT H_HYPERLIPIDEMIA H_HYPERTENSION
-               H_MOVEMENT_DISORDER H_SLEEP_APNEA H_SSDI_DEATH;
-  %do i = 1 %to 12;
+               H_MOVEMENT_DISORDER H_SLEEP_APNEA;
+  %do i = 1 %to 11;
     %let hvar = %scan(&hvars, &i);
     proc sql noprint;
       select count(*) into :hn trimmed

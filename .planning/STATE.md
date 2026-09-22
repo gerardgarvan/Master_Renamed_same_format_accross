@@ -183,6 +183,12 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   check that tested md3<-md5 and md3<-md6 and OMITTED md8, the largest non-spine source.
   md5 and md6 hold only duplicates, so the zeros were real but irrelevant. See PCM-F-18.
 
+- **PCM-D-05 RESOLVED 2026-09-21** — Analytic cohort restricted to INPATIENT + OBSERVATION
+  (N = 13,890). Rationale: Admit_BMI forces the restriction -- all 12,726 BMI values are
+  inside the admitted cohort, zero ambulatory. Old rationale PCM-F-12 is VOID after MRG-06.
+  g.analytic_cohort rebuilt from g.master_data_harmonized by sas/16b_cohort_rebuild.sas
+  (HARM-10 satisfied). Decided by Gerard. See docs/DECISIONS.md for full entry.
+
 - **PCM-F-18** — md3-owns DID discard data, from md8 only. A sweep of all 578 owner/donor/
   variable combinations found exactly five variables losing values, all donated by md8,
   all with ZERO disagreements where both sources hold a value:
@@ -216,20 +222,15 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
   MRG-06: `04_merge.sas` builds `work.md8_donors` and fills md3's blanks from md8 for the
   five affected variables. One-way only — an md3 value is never overwritten.
 
-**Still open:**
-
-- **PCM-D-05** — Analytic cohort INPATIENT/OBSERVATION restriction: **pending, and its
-  original rationale no longer holds.** The justification was PCM-F-12: only admitted
-  patients had the geriatric assessments, so ambulatory patients were never eligible. After
-  MRG-06 that is false — 13,288 of 20,540 cognitive scores and 15,161 of 23,311 frailty
-  scores belong to patients OUTSIDE the admitted cohort (md8 covers the ambulatory
-  population). Within the cohort those two are now the WEAKER variables (52% and 59%).
-  **`Admit_BMI` is what actually forces the restriction**: all 12,726 values are inside the
-  admitted cohort, 91.6% coverage there and zero outside. So a cognitive/frailty analysis
-  may not want the admitted restriction at all, while anything using BMI has no choice.
-  This is a question for Price, not a settled default.
+**Still open:** None -- all numbered decisions resolved as of Phase 16.
 
 - **PCM-D-10** — CLOSED 2026-09-14: PREP-09 scan showed only rt_ANCHOR_to_*_days negatives (expected offsets). No other rt_*_mins variable had negatives. Retain-with-doc, no further action. See docs/DECISIONS.md.
+
+**Follow-up item (PCM-D-05):**
+
+- Inform Price of PCM-D-05 resolution (decided by Gerard, 2026-09-21; admitted-only cohort,
+  BMI-forces-it rationale). Update DECISIONS.md attribution line from "Price: informed" to
+  reflect Price's response once received.
 
 **Phase 6 is no longer blocked on Price.** D-01 and D-02 were its entry conditions and both are
 resolved as keep-separate, which is a valid resolution. Phase 6 is now largely a documentation
@@ -281,4 +282,4 @@ then `03-06-PLAN.md`.
 session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-08-27 — 8 phases; AMENDMENT-01 registered; metrics populated; D-01/02/03/04/07/08/09/11 resolved; Phase 6 unblocked*
+*Last updated: 2026-09-22 — Phase 16 complete; PCM-D-05 resolved (Gerard, 2026-09-21); g.analytic_cohort rebuilt (13,890 rows, 174 cols) from g.master_data_harmonized by sas/16b_cohort_rebuild.sas; HARM-10 satisfied; all-three within-cohort baseline 6,523 (47.0% of cohort) recorded; Price follow-up item added*

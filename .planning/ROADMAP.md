@@ -172,7 +172,7 @@ suppression (<=11). Descriptive only -- no inferential testing, no cohort restri
 g.analysis_base.
 **Requirements**: SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK
 **Depends on:** Phase 16 (numbering only). NOTE: Phase 17 is functionally DOWNSTREAM of Phase 18 (D-05): its work.analysis_base_ext takes the columns approved under PCM-D-15, which Phase 18 produces. The lower number is not a mistake.
-**Plans:** 6/6 plans complete
+**Plans:** 4/4 plans complete
 
 Plans:
 - [x] 17-01-PLAN.md -- Wave 0 discovery: program scaffold (config, log routing, preconditions) + discover year variable, extension KEEP= list, per-year N (SUMM-DOMAIN-DISC)

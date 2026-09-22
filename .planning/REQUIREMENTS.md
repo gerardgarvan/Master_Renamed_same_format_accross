@@ -97,6 +97,20 @@ should show they were considered, not that they were never raised.
       min/P25/median/mean/P75/max/std for numerics; observed lengths for characters.
       Delivered by `09_summary_stats.sas`
 - [x] **SUMM-02** — Written to `docs/SUMMARY_STATS_HARMONIZED.xlsx`, not the log
+- [x] **SUMM-DOMAIN-DISC** — Wave 0 discovery run that enumerates candidate extension
+      columns, key type/length, sentinel applicability, and duplicate key count, written to
+      `qc/17_discovery.txt`. Delivered by `sas/17_summary_stats_by_domain.sas` §0–1
+- [x] **SUMM-DOMAIN-MAP** — Three-tier dictionary-to-dataset variable matching that assigns
+      every analysis column to a clinical domain (D1–D5) with a stat_route and rationale;
+      produces `g.var_domain_map` with four guards (missing rationale, VARnn, blank route,
+      id_leak). Delivered by `sas/17_summary_stats_by_domain.sas` §2–4
+- [x] **SUMM-DOMAIN-STATS** — Full descriptive statistics routed by stat_route (not vtype),
+      using CLASS/TYPES for pooled + per-year blocks, sentinel recoding on Wave 0 applicability
+      list, and small-cell suppression (≤11). Delivered by `sas/17_summary_stats_by_domain.sas` §5–9
+- [x] **SUMM-DOMAIN-BOOK** — Single Excel workbook `qc/17_summary_stats_by_domain.xlsx`
+      with KEY sheet leftmost, UF blue (#0021A5) headers, one sheet per domain (D1, D2, D4,
+      D5) plus Crosswalk and QC; accompanied by QC text artifact
+      `qc/17_summary_stats_by_domain.txt`. Delivered by `sas/17_summary_stats_by_domain.sas` §10–11
 
 ### Open — the work this milestone actually adds
 
@@ -202,3 +216,7 @@ should show they were considered, not that they were never raised.
 | HARM-08 | Phase 10 — Harmonized Dataset | Pending |
 | SUMM-01 | Phase 11 — Summary Statistics | Pending |
 | SUMM-02 | Phase 11 — Summary Statistics | Pending |
+| SUMM-DOMAIN-DISC | Phase 17 — Summary Stats by Domain | Complete |
+| SUMM-DOMAIN-MAP | Phase 17 — Summary Stats by Domain | Complete |
+| SUMM-DOMAIN-STATS | Phase 17 — Summary Stats by Domain | Complete |
+| SUMM-DOMAIN-BOOK | Phase 17 — Summary Stats by Domain | Complete |

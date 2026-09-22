@@ -1,26 +1,17 @@
 ---
 phase: 17-summary-stats-by-domain-context
 verified: 2026-09-14T00:00:00Z
-status: gaps_found
-score: 6/8 must-haves verified
-gaps:
-  - truth: "A single Excel workbook exists with KEY (leftmost), D1, D2, D4, D5, Crosswalk, and QC sheets — runtime-produced artifact confirmed present on the P: drive"
-    status: partial
-    reason: "qc/17_summary_stats_by_domain.xlsx is confirmed present on P: drive (git ls shows it excluded per .gitignore as expected). However qc/17_summary_stats_by_domain.txt (QC text artifact) is NOT present in the accessible path C:\\Master_Renamed_same_format_accross\\qc\\. The xlsx is on the P: drive path (unreachable here) while the txt was expected to co-exist there. Cannot confirm the txt independently."
-    artifacts:
-      - path: "qc/17_summary_stats_by_domain.txt"
-        issue: "File not found at C:\\Master_Renamed_same_format_accross\\qc\\17_summary_stats_by_domain.txt — either it was never written, or it lives only on P: drive which is not accessible from this repo checkout"
-    missing:
-      - "Confirm qc/17_summary_stats_by_domain.txt was written to the P: drive qc folder and is non-empty (>= 12 lines per plan acceptance criteria)"
-
-  - truth: "SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK requirement IDs are registered in REQUIREMENTS.md"
-    status: failed
-    reason: "All four SUMM-DOMAIN-* IDs appear only in ROADMAP.md and plan frontmatter. REQUIREMENTS.md contains no entry for any of them. The CONTEXT.md specifically flagged this: 'The requirement IDs used by the plans (SUMM-DOMAIN-DISC / -MAP / -STATS / -BOOK) are not yet in .planning/REQUIREMENTS.md -- Register them there before execution or they dangle.' They were never registered."
-    artifacts:
-      - path: "REQUIREMENTS.md"
-        issue: "No SUMM-DOMAIN-* entries exist in the traceability table or requirement sections"
-    missing:
-      - "Add SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS, SUMM-DOMAIN-BOOK to REQUIREMENTS.md with descriptions and Phase 17 traceability"
+status: passed
+score: 8/8 must-haves verified
+gaps_resolved: 2026-09-22
+resolution_notes: >
+  Gap 1 (QC txt artifact): User confirmed qc/17_summary_stats_by_domain.txt exists on P:
+  drive. Content verified: Run 10SEP2026:15:10:15, source_rows=41150, all domain counts
+  present (D1=8, D2=17, D3=0, D4=59, D5=17), suppression summary complete,
+  sentinel_recodes=0. File meets >= 12 lines acceptance criterion.
+  Gap 2 (REQUIREMENTS.md): SUMM-DOMAIN-DISC, SUMM-DOMAIN-MAP, SUMM-DOMAIN-STATS,
+  SUMM-DOMAIN-BOOK registered in REQUIREMENTS.md with descriptions and Phase 17
+  traceability on 2026-09-22.
 
 human_verification:
   - test: "Open qc/17_summary_stats_by_domain.xlsx on P: drive and confirm tab count and order"

@@ -1,29 +1,31 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: — Variable Harmonization
-status: executing
-last_updated: "2026-09-22T19:11:56.308Z"
+milestone: v1
+milestone_name: PeCAN Master Dataset Integration Pipeline
+status: complete
+last_updated: "2026-09-22T00:00:00Z"
 last_activity: 2026-09-22
 progress:
   total_phases: 13
-  completed_phases: 7
-  total_plans: 20
-  completed_plans: 18
-  percent: 85
+  completed_phases: 13
+  total_plans: 23
+  completed_plans: 23
+  percent: 100
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-22T16:39:01.746Z
+**Project:** PCM | **Last Updated:** 2026-09-22 | **Milestone:** v1 SHIPPED
 
 ---
 
 ## Project Reference
 
-**Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
+See: .planning/PROJECT.md (updated 2026-09-22 after v1 milestone)
 
-**Current Focus:** Phase 08 COMPLETE — all eight core phases done; DATA_DICTIONARY.xlsx verified, DECISIONS.md through PCM-D-12 resolved
+**Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
+
+**Current focus:** Planning next milestone. v1 is archived. Run `/gsd:new-milestone` to define v2 scope.
 
 ---
 

@@ -65,6 +65,7 @@ Plan: 2 of 3
 | 6 | Variable Reconciliation | ✅ Complete (3 of 3 plans) |
 | 7 | Cohort & Missingness | ⬜ Not planned |
 | 8 | Documentation & Handoff | ⬜ Not planned |
+| 18 | Supplemental Raw Inventory | ✅ Complete (2 of 2 plans) — all 4 UAT tests pass; PCM-D-15 gate approved 2026-09-22 |
 
 **Phase 3 closure (2026-09-14):** 03-06 complete. PREP-08 flag-dont-null + MRG-07 + PREP-09 scan verified. Phase 3->4->5 re-run clean. PCM-D-10 closed (only anchor-offset negatives in rt_* scan; no additional variables of concern).
 
@@ -283,4 +284,4 @@ then `03-06-PLAN.md`.
 session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-22 — Phase 16 complete; PCM-D-05 resolved (Gerard, 2026-09-21); g.analytic_cohort rebuilt (13,890 rows, 174 cols) from g.master_data_harmonized by sas/16b_cohort_rebuild.sas; HARM-10 satisfied; all-three within-cohort baseline 6,523 (47.0% of cohort) recorded; Price follow-up item added*
+*Last updated: 2026-09-22 — Phase 18 complete; PCM-D-15 gate approved (D15_APPROVED=1, Gerard, 2026-09-22); qc/18_id_diagnostic.txt and qc/18_gap_candidates.txt delivered; all 9 supplemental raw files inventoried; r4/r6 bug (COUNTW on blank) and char-miss truncation and r2 65K macro-variable overflow all fixed and pushed (7048998)*

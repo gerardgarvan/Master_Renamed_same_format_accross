@@ -58,17 +58,17 @@
 
 ### Cohort & Missingness
 
-- [ ] **COH-01** — User can run `07_cohort.sas` to produce a documented analytic cohort with inclusion/exclusion criteria stated
-- [ ] **COH-02** — User can see a missingness profile for all key variables (BMI, Cognitive_Score, Frailty_Score, core covariates)
-- [ ] **COH-03** — User can see complete-case Ns (BMI 12,726; Cognitive 20,540; Frailty 23,311; all-three 6,523) re-asserted as code assertions
-- [ ] **COH-04** — User can see the INPATIENT/OBSERVATION restriction decision documented with rationale (PCM-D-05)
+- [x] **COH-01** — User can run `07_cohort.sas` to produce a documented analytic cohort with inclusion/exclusion criteria stated
+- [x] **COH-02** — User can see a missingness profile for all key variables (BMI, Cognitive_Score, Frailty_Score, core covariates)
+- [x] **COH-03** — User can see complete-case Ns (BMI 12,726; Cognitive 20,540; Frailty 23,311; all-three 6,523) re-asserted as code assertions
+- [x] **COH-04** — User can see the INPATIENT/OBSERVATION restriction decision documented with rationale (PCM-D-05)
 
 ### Documentation & Handoff
 
 - [x] **DOC-01** — User can run `08_dictionary.sas` to produce `docs/DATA_DICTIONARY.xlsx` with every variable: source, type, length, coverage, derivation rule
-- [ ] **DOC-02** — User can open `docs/DECISIONS.md` and see PCM-D-01 through D-07 resolved and attributed
-- [ ] **DOC-03** — User can run `99_run_all.sas` in a clean SAS session against read-only sources and have all programs complete without manual steps
-- [ ] **DOC-04** — User can verify git history shows each phase as a reviewable commit
+- [x] **DOC-02** — User can open `docs/DECISIONS.md` and see PCM-D-01 through D-12 resolved and attributed
+- [x] **DOC-03** — User can run `99_run_all.sas` in a clean SAS session against read-only sources and have all programs complete without manual steps
+- [x] **DOC-04** — User can verify git history shows each phase as a reviewable commit
 
 ---
 
@@ -127,10 +127,10 @@ should show they were considered, not that they were never raised.
       milestone.** Every sweep to date has matched on names, so a pair with unrelated names
       and near-identical labels is structurally invisible -- the class that hid
       `Cognitive_Category` until a full sweep ran
-- [ ] **HARM-04** — Every canonical-name decision recorded in a committed artifact,
+- [x] **HARM-04** — Every canonical-name decision recorded in a committed artifact,
       attributed and dated. `concept_decisions.csv` is the existing pattern: a human
       confirms, the program applies exactly that and fails on anything unmapped
-- [ ] **HARM-07** — A stated rule governs pipeline-derived columns (`in_md1`..`in_md8`,
+- [x] **HARM-07** — A stated rule governs pipeline-derived columns (`in_md1`..`in_md8`,
       `n_sources`, `rt_envelope_flag`, `rt_*_neg`, `h_*_src`), enforced in code.
       Note `in_md3` is constant (md3 is the spine) and the eleven `h_*_src` columns each
       hold a single repeated value -- all twelve carry no information, and the rule should
@@ -139,7 +139,7 @@ should show they were considered, not that they were never raised.
       the SSDI death family (`SSDI_DEATH_DATE_Y_N`, `SSDI_DEATH_Y_N`, `SSDI_DEATH` --
       the same three-variant shape as the death flags already harmonised), and
       `CPT1_CLASS` / `CPT1_LABEL` (a code/label pair, both 159 distinct)
-- [x] **HARM-10** — `g.analytic_cohort` is rebuilt from `g.master_data_harmonized`.
+- [x] **HARM-10** — `g.analytic_cohort` is rebuilt from `g.master_data_harmonized`. <!-- verified Phase 16 -->
       It is currently 176 columns, built in Phase 7 before harmonisation existed, so it
       carries the eleven dropped aliases and none of the `h_` columns. Any analysis using
       it gets pre-harmonisation encodings
@@ -198,24 +198,24 @@ should show they were considered, not that they were never raised.
 | REC-04 | Phase 6 — Variable Reconciliation | Complete |
 | REC-05 | Phase 6 — Variable Reconciliation | Pending |
 | REC-06 | Phase 6 — Variable Reconciliation | Complete |
-| COH-01 | Phase 7 — Cohort & Missingness | Pending |
-| COH-02 | Phase 7 — Cohort & Missingness | Pending |
-| COH-03 | Phase 7 — Cohort & Missingness | Pending |
-| COH-04 | Phase 7 — Cohort & Missingness | Pending |
+| COH-01 | Phase 7 — Cohort & Missingness | Complete |
+| COH-02 | Phase 7 — Cohort & Missingness | Complete |
+| COH-03 | Phase 7 — Cohort & Missingness | Complete |
+| COH-04 | Phase 7 — Cohort & Missingness | Complete |
 | DOC-01 | Phase 8 — Documentation & Handoff | Complete |
-| DOC-02 | Phase 8 — Documentation & Handoff | Pending |
-| DOC-03 | Phase 8 — Documentation & Handoff | Pending |
-| DOC-04 | Phase 8 — Documentation & Handoff | Pending |
-| HARM-01 | Phase 9 — Variable Harmonization | Pending |
-| HARM-02 | Phase 9 — Variable Harmonization | Complete |
-| HARM-03 | Phase 9 — Variable Harmonization | Complete |
-| HARM-04 | Phase 9 — Variable Harmonization | Pending |
-| HARM-05 | Phase 10 — Harmonized Dataset | Pending |
-| HARM-06 | Phase 10 — Harmonized Dataset | Pending |
-| HARM-07 | Phase 10 — Harmonized Dataset | Pending |
-| HARM-08 | Phase 10 — Harmonized Dataset | Pending |
-| SUMM-01 | Phase 11 — Summary Statistics | Pending |
-| SUMM-02 | Phase 11 — Summary Statistics | Pending |
+| DOC-02 | Phase 8 — Documentation & Handoff | Complete |
+| DOC-03 | Phase 8 — Documentation & Handoff | Complete |
+| DOC-04 | Phase 8 — Documentation & Handoff | Complete |
+| HARM-01 | Phase 2 — Ownership Map | Complete |
+| HARM-02 | Phase 14 — Label Similarity Sweep | Complete |
+| HARM-03 | Phase 14 — Label Similarity Sweep | Complete |
+| HARM-04 | Phase 15 — Extend Harmonized Dataset | Complete |
+| HARM-05 | Phase 10 — Harmonized Dataset | Complete |
+| HARM-06 | Phase 10 — Harmonized Dataset | Complete |
+| HARM-07 | Phase 15 — Extend Harmonized Dataset | Complete |
+| HARM-08 | Phase 10 — Harmonized Dataset | Complete |
+| SUMM-01 | Phase 9 — Summary Statistics | Complete |
+| SUMM-02 | Phase 9 — Summary Statistics | Complete |
 | SUMM-DOMAIN-DISC | Phase 17 — Summary Stats by Domain | Complete |
 | SUMM-DOMAIN-MAP | Phase 17 — Summary Stats by Domain | Complete |
 | SUMM-DOMAIN-STATS | Phase 17 — Summary Stats by Domain | Complete |

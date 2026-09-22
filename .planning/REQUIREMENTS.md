@@ -125,7 +125,7 @@ should show they were considered, not that they were never raised.
       the SSDI death family (`SSDI_DEATH_DATE_Y_N`, `SSDI_DEATH_Y_N`, `SSDI_DEATH` --
       the same three-variant shape as the death flags already harmonised), and
       `CPT1_CLASS` / `CPT1_LABEL` (a code/label pair, both 159 distinct)
-- [ ] **HARM-10** — `g.analytic_cohort` is rebuilt from `g.master_data_harmonized`.
+- [x] **HARM-10** — `g.analytic_cohort` is rebuilt from `g.master_data_harmonized`.
       It is currently 176 columns, built in Phase 7 before harmonisation existed, so it
       carries the eleven dropped aliases and none of the `h_` columns. Any analysis using
       it gets pre-harmonisation encodings

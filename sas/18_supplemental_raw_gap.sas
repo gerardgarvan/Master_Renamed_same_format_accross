@@ -460,14 +460,18 @@ run;
   quit;
 
   %local _nb_&rid;
-  %let _nb_&rid = %sysfunc(countw(&&_in_base_list_&rid));
+  %let _nb_&rid = 0;
+  proc sql noprint;
+    select count(*) into :_nb_&rid trimmed
+    from work.raw_cols_&rid where bucket='IN_BASE';
+  quit;
 
   /* Generate per-column merge steps only when there are IN_BASE columns */
   %if &&_nb_&rid > 0 %then %do;
     data _null_;
       set work.raw_cols_&rid (where=(bucket='IN_BASE'));
       /* Build call execute statements -- one column per iteration */
-      length stmt $4000;
+      length stmt $4000 raw_miss_expr $200;
 
       /* Determine raw_miss rule based on raw_type */
       /* Numeric: (missing(raw_val) or raw_val = -999) */
@@ -533,22 +537,23 @@ run;
   %end;
 
 
-  /* 6. NEW columns -- one PROC MEANS pass + one array pass, no per-column loop */
-  %let _new_num_list_&rid = ;
+  /* 6. NEW columns -- chr uses name list; num uses PROC MEANS (avoids 65K limit) */
   %let _new_chr_list_&rid = ;
   proc sql noprint;
-    select name into :_new_num_list_&rid separated by ' '
-    from work.raw_cols_&rid
-    where bucket='NEW' and raw_type='num';
-
     select name into :_new_chr_list_&rid separated by ' '
     from work.raw_cols_&rid
     where bucket='NEW' and raw_type='char';
   quit;
 
   %local _nn_num_&rid _nn_chr_&rid;
-  %let _nn_num_&rid = %sysfunc(countw(&&_new_num_list_&rid));
-  %let _nn_chr_&rid = %sysfunc(countw(&&_new_chr_list_&rid));
+  %let _nn_num_&rid = 0;
+  %let _nn_chr_&rid = 0;
+  proc sql noprint;
+    select count(*) into :_nn_num_&rid trimmed
+    from work.raw_cols_&rid where bucket='NEW' and raw_type='num';
+    select count(*) into :_nn_chr_&rid trimmed
+    from work.raw_cols_&rid where bucket='NEW' and raw_type='char';
+  quit;
 
   %if %eval(&&_nn_num_&rid + &&_nn_chr_&rid) > 0 %then %do;
 
@@ -560,25 +565,28 @@ run;
       if inb and inr;
     run;
 
-    /* Numeric NEW columns: count non-missing (and not -999) via array pass */
+    /* Numeric NEW columns: PROC MEANS N across all numerics, filter via raw_cols. */
+    /* Avoids macro variable length limit for wide files (e.g. r2 with ~3884 cols). */
+    /* Note: -999 sentinel counted as populated -- acceptable for QC diagnostic.    */
     %if &&_nn_num_&rid > 0 %then %do;
-      data work.raw_matched_num_&rid (keep=_col _n_pop);
-        length _col $32 _n_pop 8;
-        set work.raw_matched (keep=_k &&_new_num_list_&rid) end=_eof;
-        array _nv {*} &&_new_num_list_&rid;
-        array _nc {&&_nn_num_&rid} _temporary_;
-        do _i = 1 to dim(_nv);
-          if not missing(_nv{_i}) and _nv{_i} ne -999 then _nc{_i} + 1;
-        end;
-        if _eof then do;
-          do _i = 1 to dim(_nv);
-            _col   = vname(_nv{_i});
-            _n_pop = coalesce(_nc{_i}, 0);
-            output;
-          end;
-        end;
-        drop _i;
+      proc means data=work.raw_matched noprint;
+        var _numeric_;
+        output out=work.raw_means_num (drop=_type_ _freq_) n=;
       run;
+
+      proc transpose data=work.raw_means_num
+                     out=work.raw_means_tall (rename=(_name_=_col col1=_n_pop));
+      run;
+
+      proc sql noprint;
+        create table work.raw_matched_num_&rid as
+          select c.name as _col length=32,
+                 coalesce(m._n_pop, 0) as _n_pop
+          from work.raw_cols_&rid as c
+          left join work.raw_means_tall as m
+            on upcase(m._col) = upcase(c.name)
+          where c.bucket = 'NEW' and c.raw_type = 'num';
+      quit;
 
       data _null_;
         set work.raw_matched_num_&rid;

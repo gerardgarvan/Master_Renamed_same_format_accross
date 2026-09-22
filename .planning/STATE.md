@@ -23,7 +23,7 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 07 — cohort-missingness
+**Current Focus:** Phase 08 COMPLETE — all eight core phases done; DATA_DICTIONARY.xlsx verified, DECISIONS.md through PCM-D-12 resolved
 
 ---
 
@@ -63,8 +63,8 @@ Plan: 2 of 3
 | 4 | Merge | ✅ Complete — re-run after 03-06 verified clean (41,150 rows, MRG-07 counts confirmed) |
 | 5 | Merge QC | ✅ Complete (3 of 3 plans) — QC-01 through QC-07 all pass |
 | 6 | Variable Reconciliation | ✅ Complete (3 of 3 plans) |
-| 7 | Cohort & Missingness | ⬜ Not planned |
-| 8 | Documentation & Handoff | ⬜ Not planned |
+| 7 | Cohort & Missingness | ✅ Complete (2 of 2 plans) — PCM-D-05 resolved; g.analytic_cohort 13,890 rows; all 4 assertions pass |
+| 8 | Documentation & Handoff | ✅ Complete (3 of 3 plans) — 176-var DATA_DICTIONARY.xlsx verified, PCM-D-12 recorded (exit code = 3), all four DOC requirements satisfied 2026-09-22 |
 | 15 | Extend the Harmonized Dataset | ✅ Complete (2 of 2 plans) — PCM-D-13 resolved; h_ssdi_death added (29,316 / 71.2%); HARM-07 assertions pass 2026-09-22 |
 | 18 | Supplemental Raw Inventory | ✅ Complete (2 of 2 plans) — all 4 UAT tests pass; PCM-D-15 gate approved 2026-09-22 |
 
@@ -285,4 +285,4 @@ then `03-06-PLAN.md`.
 session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-22 — Phase 15 complete; PCM-D-13 fully resolved (CPT1 keep-separate, no label-similarity aliases); h_ssdi_death added to g.master_data_harmonized (29,316/41,150 rows, 71.2%); all HARM-07 assertions pass; 10b re-run clean*
+*Last updated: 2026-09-22 — Phase 8 complete; PCM-D-12 recorded (exit code = 3, -sasuser WORK required in headless batch); DATA_DICTIONARY.xlsx verified 176 vars, KEY sheet leftmost; all eight phases have reviewable git commits; git status clean*

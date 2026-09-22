@@ -21,7 +21,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-10 | Negatives in other rt_* variables | **Resolved 2026-08-27 -- see entry below** | Gerard |
 | PCM-D-11 | md3-owns missingness trade-off | **Closed 2026-08-27 -- costs nothing** | Gerard |
 | PCM-D-12 | (reserved for Phase 8) | Pending | TBD |
-| PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-21 -- see entry below** | Gerard |
+| PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-22 -- see entry below** | Gerard |
 | PCM-D-14 | Pipeline-derived column rule (HARM-07) | **Resolved 2026-09-14 -- see entry below** | Gerard |
 
 ---
@@ -467,9 +467,12 @@ concept_decisions.csv, and applied by 10b_concept_harmonize.sas (not by hand):
 
   Label-similarity candidates: none confirmed
 
-Deferred (gate (m) screen -- VALUE_TXT contains ampersand, which the current
-10b cannot map without breaking SECTION 3 coverage):
-  CPT1_CODE_LABEL -- 1 row affected, e.g. "Diagnostic dilatation and curettage (D&C)"
+CPT1_CODE_LABEL: keep separate -- resolved 2026-09-22 by Gerard.
+  CPT1_CLASS (numeric procedure code) and CPT1_LABEL (text description) are
+  complementary variables, not encoding aliases. The same pattern as
+  ICD10_PRINCIPAL_DIAGNOSIS + ICD10_PRINCIPAL_DIAGNOSIS_DESC, which are already
+  kept separate in the merged file. No rows added to concept_decisions.csv;
+  no harmonization step runs for this pair.
 
 Rationale: SSDI_DEATH_FLAG is the same three-variant death-flag shape as the
 PCM-D-01 family already harmonized. All five observed values (Y and N across

@@ -20,6 +20,8 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-09 | QC-05 operative-interval ceilings never fire | **Resolved 2026-08-27 -- drop them** | Gerard |
 | PCM-D-10 | Negatives in other rt_* variables | **Resolved 2026-08-27 -- see entry below** | Gerard |
 | PCM-D-11 | md3-owns missingness trade-off | **Closed 2026-08-27 -- costs nothing** | Gerard |
+| PCM-D-12 | (reserved for Phase 8) | Pending | TBD |
+| PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-21 -- see entry below** | Gerard |
 
 ---
 
@@ -402,3 +404,30 @@ Anyone consuming the merged file needs to know these are deliberate.
 | WEEK_GRIP_STRENGTH | md6|md7 | TBD | Pending |
 | WEEK_GRIP_STRENGTH_VALUE | md3|md5 | TBD | Pending |
 | _30_DAY_MORTALITY | md1|md2 | TBD | Pending |
+
+---
+
+### PCM-D-13 -- SSDI/CPT1/label-sweep concept harmonization (HARM-04)
+
+Confirmed 2026-09-21 by Gerard. The following concepts from the Phase 14 label
+sweep (14_label_similarity.sas) were screened for gate (m) characters, reviewed
+against label_similarity_candidates.csv, marked CONFIRMED=YES in
+concept_decisions.csv, and applied by 10b_concept_harmonize.sas (not by hand):
+
+  SSDI_DEATH_FLAG -> h_ssdi_death
+    Sources: SSDI_DEATH_DATE_Y_N (priority 1), SSDI_DEATH_Y_N (priority 2),
+             SSDI_DEATH (priority 3)
+    Values: Y/N pass-through (TARGET_VALUE = VALUE_TXT; no remapping needed)
+
+  Label-similarity candidates: none confirmed
+
+Deferred (gate (m) screen -- VALUE_TXT contains ampersand, which the current
+10b cannot map without breaking SECTION 3 coverage):
+  CPT1_CODE_LABEL -- 1 row affected, e.g. "Diagnostic dilatation and curettage (D&C)"
+
+Rationale: SSDI_DEATH_FLAG is the same three-variant death-flag shape as the
+PCM-D-01 family already harmonized. All five observed values (Y and N across
+three source columns) are clean alphanumeric strings. No label-similarity
+candidate pairs were judged to be the same underlying concept by the reviewer.
+Attribution: the CSV records the decision; this entry records who confirmed it
+and when (HARM-04 requires attributed and dated).

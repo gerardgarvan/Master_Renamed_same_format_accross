@@ -13,7 +13,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-02 | Frailty component encoding (char Y/N vs numeric _Value) | **Resolved 2026-08-27 -- keep separate** | Gerard |
 | PCM-D-03 | ISO_SEV naming (md4/md8 vs others) | **Resolved 2026-08-27 -- keep separate** | Gerard |
 | PCM-D-04 | Emergent usability (7 and 21 positives) | **Resolved 2026-08-27 -- retain despite rarity** | Gerard |
-| PCM-D-05 | Analytic cohort INPATIENT/OBSERVATION restriction | Pending -- Phase 7 | TBD |
+| PCM-D-05 | Analytic cohort INPATIENT/OBSERVATION restriction | Resolved -- Phase 16, 2026-09-21, Gerard | Gerard |
 | PCM-D-06 | PRECEDE_Study_ID_1 drop vs retain | Resolved -- drop (PREP-04), proven identical first | Gerard |
 | PCM-D-07 | Age floor (minimum 64) | **Deferred 2026-08-27 -- not pursuing** | Gerard |
 | PCM-D-08 | The 9 envelope-violating rows | **Resolved 2026-08-27 -- flag, don't null** | Gerard |
@@ -23,6 +23,51 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-12 | (reserved for Phase 8) | Pending | TBD |
 | PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-21 -- see entry below** | Gerard |
 | PCM-D-14 | Pipeline-derived column rule (HARM-07) | **Resolved 2026-09-14 -- see entry below** | Gerard |
+
+---
+
+## PCM-D-05 -- Analytic cohort INPATIENT/OBSERVATION restriction: RESOLVED
+
+**Decision:** The analytic cohort is restricted to patients with Patient_Type IN
+('INPATIENT', 'OBSERVATION'). Cohort N = 13,890 (INPATIENT 13,223 + OBSERVATION 667).
+Dataset: g.analytic_cohort. Rebuilt by sas/16b_cohort_rebuild.sas (Phase 16); supersedes
+the Phase 7 cohort built from g.master_data_merged.
+
+**True rationale (new -- replaces PCM-F-12):** Admit_BMI forces the restriction. All 12,726
+non-missing BMI values are inside the admitted cohort; zero ambulatory patients have a
+non-missing Admit_BMI. Any analysis that uses BMI has no choice but to restrict to the
+admitted cohort.
+
+The OLD rationale (PCM-F-12: ambulatory patients were never eligible for geriatric
+assessments, so restricting to INPATIENT/OBSERVATION is a patient-eligibility filter) is
+VOID after MRG-06 / PCM-F-19. After the md8 coalesce, most cognitive and frailty scores
+belong to ambulatory rows: 13,288 of 20,540 Cognitive_Score values and 15,161 of 23,311
+Frailty_Score values sit OUTSIDE the admitted cohort. A cognitive/frailty-only analysis
+may not want the admitted restriction at all; anything using BMI has no choice.
+
+**What the restriction does -- population shift (Phase 13 figures):**
+The restriction selects a clinically different population, not a convenience missingness
+filter. Key shifts from the full 41,150-row file to the 13,890-row cohort:
+
+  Charlson Comorbidity Index = 0:   60.8% (full) -> 34.5% (cohort)
+  General anaesthesia:              57.6% -> 84.2%
+  GI service:                       18.4% -> 1.7%
+  Colonoscopy:                       8.5% -> 0.4%
+  RACE = WHITE:                     79.8% -> 87.1%  (7.3-point shift -- required in any
+                                                      methods section for generalisability)
+
+**BMI availability within the 13,890 admitted cohort (from sas/16b_cohort_rebuild.sas run,
+2026-09-22):**
+  HAVE Admit_BMI: 12,726 of 13,890 = 91.6%
+  LACK Admit_BMI:  1,164 of 13,890 =  8.4%
+  (Denominator is the 13,890 admitted cohort, NOT the 41,150 full harmonized file.)
+
+**Cross-reference:** sas/16b_cohort_rebuild.sas (Phase 16); HARM-10 satisfied.
+QC output: qc/16b_cohort_missingness.txt.
+
+**Attribution:** Decided by Gerard, 2026-09-21. Price: informed.
+
+**Resolved:** 2026-09-21 | Owner: Gerard | Phase 16 Plan 02
 
 ---
 

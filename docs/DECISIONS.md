@@ -22,6 +22,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-11 | md3-owns missingness trade-off | **Closed 2026-08-27 -- costs nothing** | Gerard |
 | PCM-D-12 | (reserved for Phase 8) | Pending | TBD |
 | PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-21 -- see entry below** | Gerard |
+| PCM-D-14 | Pipeline-derived column rule (HARM-07) | **Resolved 2026-09-14 -- see entry below** | Gerard |
 
 ---
 
@@ -431,3 +432,20 @@ three source columns) are clean alphanumeric strings. No label-similarity
 candidate pairs were judged to be the same underlying concept by the reviewer.
 Attribution: the CSV records the decision; this entry records who confirmed it
 and when (HARM-04 requires attributed and dated).
+
+---
+
+### PCM-D-14 -- Pipeline-derived column rule (HARM-07)
+
+Decided 2026-09-14 by Gerard. g.master_data_harmonized CARRIES in_md1, in_md2,
+in_md4..in_md8, n_sources, rt_envelope_flag, and rt_* (source membership, row count,
+clinical timing). It DROPS in_md3 (constant: md3 is the spine) and every h_*_src
+companion. Companions are dropped only because each is single-valued -- no secondary
+source fires -- and that premise is asserted in every run (assert_src_single), not
+assumed; a companion that ever becomes multi-valued fails the run and forces the
+concept back to review.
+
+Enforcement: drop= dataset option in the SECTION 5 DATA step of 10b_concept_harmonize.sas,
+gated by drop_pipeline_noinfo=1; SECTION 6 assertions assert_src_single (premise) and
+assert_harm07 (absence); assert_merged_unchanged re-queries g.master_data_merged post-run.
+g.master_data_merged is never written by 10b.

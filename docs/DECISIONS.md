@@ -20,7 +20,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-09 | QC-05 operative-interval ceilings never fire | **Resolved 2026-08-27 -- drop them** | Gerard |
 | PCM-D-10 | Negatives in other rt_* variables | **Resolved 2026-08-27 -- see entry below** | Gerard |
 | PCM-D-11 | md3-owns missingness trade-off | **Closed 2026-08-27 -- costs nothing** | Gerard |
-| PCM-D-12 | (reserved for Phase 8) | Pending | TBD |
+| PCM-D-12 | %abort cancel return code on Windows batch | **Resolved 2026-09-22 -- return code = 3** | Gerard |
 | PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-22 -- see entry below** | Gerard |
 | PCM-D-14 | Pipeline-derived column rule (HARM-07) | **Resolved 2026-09-14 -- see entry below** | Gerard |
 
@@ -497,3 +497,24 @@ Enforcement: drop= dataset option in the SECTION 5 DATA step of 10b_concept_harm
 gated by drop_pipeline_noinfo=1; SECTION 6 assertions assert_src_single (premise) and
 assert_harm07 (absence); assert_merged_unchanged re-queries g.master_data_merged post-run.
 g.master_data_merged is never written by 10b.
+
+---
+
+## PCM-D-12 -- %abort cancel return code on Windows batch
+
+**Question:** When 99_run_all.sas is submitted via "sas -sysin ...", what OS return
+code does Windows receive when a %abort cancel fires?
+
+**Answer:** Return code = 3 (observed on this machine, SAS 9.4M8, Windows 10 Home
+10.0.19045, 2026-09-22).
+
+**Test method:** sas -sysin test_abort.sas -sasuser WORK where test_abort.sas contains
+only "%abort cancel;". Return code captured via %ERRORLEVEL% in CMD immediately after
+SAS exits. The -sasuser WORK flag was required because the default SASUSER library path
+is invalid in headless batch mode on this machine.
+
+**Consequence for scheduling:** Any Windows Task Scheduler job or CI step running
+99_run_all.sas must treat return code 3 as a pipeline failure. A return code of 0
+from the SAS process means all phases completed without an abort.
+
+**Resolved:** 2026-09-22 | Owner: Gerard | Phase 8 Plan 02

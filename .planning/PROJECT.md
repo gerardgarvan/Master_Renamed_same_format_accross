@@ -177,4 +177,4 @@ are met and are marked Complete in REQUIREMENTS.md against the program that met 
   percentage points
 
 ---
-*Last updated: 2026-08-29 — v1.1 milestone rescoped after review*
+*Last updated: 2026-09-22 — Phase 17 complete: domain-stratified summary statistics workbook delivered*

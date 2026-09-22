@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: verifying
-last_updated: "2026-09-22T16:39:01.752Z"
+last_updated: "2026-09-22T16:43:27.750Z"
 last_activity: 2026-09-22
 progress:
   total_phases: 13
@@ -29,8 +29,8 @@ progress:
 
 ## Current Position
 
-Phase: 16 (rebuild-the-analytic-cohort) — EXECUTING
-Plan: 2 of 2 (16-01 COMPLETE; 16-02 ready to execute)
+Phase: 17
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-09-22
   As first written it re-specified delivered work: g.master_data_harmonized already exists

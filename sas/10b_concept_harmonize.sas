@@ -19,6 +19,19 @@
     CON-09  Row count unchanged; key still unique; source columns unchanged in
             type and length (asserted, not merely claimed)
 
+  Pipeline-derived column rule (HARM-07):
+    CARRY: in_md1, in_md2, in_md4..in_md8, n_sources, rt_envelope_flag, rt_*
+           (these carry information: source membership, row count, clinical timing)
+    DROP:  in_md3 (constant -- md3 is the spine; value is 1 for every row)
+           every h_*_src companion (each must hold a single repeated value because no
+           secondary source fires; this is ASSERTED in-run for every companion, not
+           assumed -- see assert_src_single)
+    ENFORCEMENT: drop= dataset option on the SECTION 5 DATA statement; a work.src_check
+           side output keeps the companions so SECTION 6 can prove each is single-valued;
+           a SECTION 6 assertion that in_md3 and every h_*_src are absent from
+           g.master_data_harmonized. Set drop_pipeline_noinfo=0 to retain them for
+           diagnostic purposes (the premise assertion still runs).
+
   Reads   : g.master_data_merged        (read-only)
             docs/concept_decisions.csv  (human-completed)
   Writes  : g.master_data_harmonized
@@ -844,6 +857,11 @@ quit;
    the companion column to exist unconditionally.                            */
 %let force_src = 1;   /* keep the _src companions -- see the note above */
 
+/* HARM-07: pipeline-derived column rule. See header. in_md3 is constant (md3 is the
+   spine). Every h_*_src companion is asserted single-valued in SECTION 6 and dropped
+   here. g.master_data_merged is untouched. Set to 0 to retain for diagnostics. */
+%let drop_pipeline_noinfo = 1;
+
 proc sql noprint;
   create table work.src_needed as
   select r.harmonized_name,
@@ -875,8 +893,16 @@ quit;
 %default_srclist;
 
 %macro build_harmonized;
-  %local i k h emit_src;
-  data g.master_data_harmonized;
+  %local i k h emit_src _pi;
+  data g.master_data_harmonized
+    %if &drop_pipeline_noinfo = 1 %then %do;
+      (drop=in_md3
+            %do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+    %end;
+    %if &n_h > 0 %then %do;
+      work.src_check (keep=%do _pi = 1 %to &n_h; %scan(&hnames, &_pi)._src %end;)
+    %end;
+    ;
     set g.master_data_merged;
     /* Proven-redundant sources dropped here, AFTER the rules below have read
        them -- the DROP statement removes them from the OUTPUT, not the PDV, so

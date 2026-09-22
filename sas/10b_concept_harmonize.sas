@@ -981,6 +981,10 @@ proc sql noprint;
        an exclusion based on the verdict would have let a stray drop through.
        STRIP guards against trailing blanks in the char(32) varname column.   */
     and a.name not in (select strip(upcase(varname)) from work.drop_ok)
+    /* HARM-07 exclusion -- in_md3 is dropped by rule, not by redundancy proof */
+    %if &drop_pipeline_noinfo = 1 %then %do;
+    and a.name ne 'IN_MD3'
+    %end;
   ;
   select count(*) into :n_changed trimmed from work.src_changed;
 
@@ -1014,6 +1018,75 @@ quit;
   %put NOTE- &n_redundant proven redundant%str(,) &n_dropped actually dropped%str(,) every other original intact.;
 %mend assert_all;
 %assert_all;
+
+%macro assert_src_single;
+  %local _pi _v n_dist n_bad;
+  %let n_bad = 0;
+  %if &n_h > 0 %then %do;
+    %do _pi = 1 %to &n_h;
+      %let _v = %scan(&hnames, &_pi)._src;
+      proc sql noprint;
+        select count(distinct &_v) into :n_dist trimmed
+        from work.src_check
+        where not missing(&_v);
+      quit;
+      %if &n_dist > 1 %then %do;
+        %put ERROR: [10b] &_v holds &n_dist distinct values -- a secondary source fires -- cannot be dropped by rule.;
+        %let n_bad = %eval(&n_bad + 1);
+      %end;
+    %end;
+  %end;
+  %if &n_bad > 0 %then %do;
+    %fail_out(msg=HARM-07 premise violated -- &n_bad h_*_src companion(s) not single-valued);
+  %end;
+  %put NOTE: [10b] HARM-07 premise OK -- every h_*_src companion is single-valued.;
+%mend assert_src_single;
+%assert_src_single;
+
+%macro assert_harm07;
+  %local _pi n_noinfo_present;
+  %if &drop_pipeline_noinfo = 1 %then %do;
+    proc sql noprint;
+      create table work.noinfo_present as
+      select name from dictionary.columns
+      where libname='G' and memname='MASTER_DATA_HARMONIZED'
+        and ( upcase(name) = 'IN_MD3'
+              %do _pi = 1 %to &n_h;
+              or upcase(name) = upcase("%scan(&hnames,&_pi)_SRC")
+              %end; );
+      select count(*) into :n_noinfo_present trimmed from work.noinfo_present;
+    quit;
+    %if &n_noinfo_present > 0 %then %do;
+      %put ERROR: [10b] &n_noinfo_present no-information pipeline column(s) still present.;
+      %fail_out(msg=HARM-07 violation -- in_md3 or h_*_src columns not dropped);
+    %end;
+    %put NOTE: [10b] HARM-07 OK -- in_md3 and every h_*_src companion dropped.;
+  %end;
+  %else %do;
+    %put NOTE: [10b] HARM-07 gate is 0 -- no-information columns RETAINED for diagnostics.;
+  %end;
+%mend assert_harm07;
+%assert_harm07;
+
+%macro assert_merged_unchanged;
+  %local n_merged_cols n_merged_rows;
+  proc sql noprint;
+    select count(*) into :n_merged_cols trimmed
+    from dictionary.columns
+    where libname='G' and memname='MASTER_DATA_MERGED';
+    select nobs into :n_merged_rows trimmed
+    from dictionary.tables
+    where libname='G' and memname='MASTER_DATA_MERGED';
+  quit;
+  %if &n_merged_cols ne 176 %then %do;
+    %fail_out(msg=g.master_data_merged has &n_merged_cols columns post-run -- expected 176 -- it was modified);
+  %end;
+  %if &n_merged_rows ne &n_rows %then %do;
+    %fail_out(msg=g.master_data_merged has &n_merged_rows rows post-run -- expected &n_rows -- it was modified);
+  %end;
+  %put NOTE: [10b] g.master_data_merged confirmed post-run -- 176 columns and &n_merged_rows rows -- unmodified.;
+%mend assert_merged_unchanged;
+%assert_merged_unchanged;
 
 
 /* =========================================================================

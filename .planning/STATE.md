@@ -65,6 +65,7 @@ Plan: 2 of 3
 | 6 | Variable Reconciliation | ✅ Complete (3 of 3 plans) |
 | 7 | Cohort & Missingness | ⬜ Not planned |
 | 8 | Documentation & Handoff | ⬜ Not planned |
+| 15 | Extend the Harmonized Dataset | ✅ Complete (2 of 2 plans) — PCM-D-13 resolved; h_ssdi_death added (29,316 / 71.2%); HARM-07 assertions pass 2026-09-22 |
 | 18 | Supplemental Raw Inventory | ✅ Complete (2 of 2 plans) — all 4 UAT tests pass; PCM-D-15 gate approved 2026-09-22 |
 
 **Phase 3 closure (2026-09-14):** 03-06 complete. PREP-08 flag-dont-null + MRG-07 + PREP-09 scan verified. Phase 3->4->5 re-run clean. PCM-D-10 closed (only anchor-offset negatives in rt_* scan; no additional variables of concern).
@@ -284,4 +285,4 @@ then `03-06-PLAN.md`.
 session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-22 — Phase 18 complete; PCM-D-15 gate approved (D15_APPROVED=1, Gerard, 2026-09-22); qc/18_id_diagnostic.txt and qc/18_gap_candidates.txt delivered; all 9 supplemental raw files inventoried; r4/r6 bug (COUNTW on blank) and char-miss truncation and r2 65K macro-variable overflow all fixed and pushed (7048998)*
+*Last updated: 2026-09-22 — Phase 15 complete; PCM-D-13 fully resolved (CPT1 keep-separate, no label-similarity aliases); h_ssdi_death added to g.master_data_harmonized (29,316/41,150 rows, 71.2%); all HARM-07 assertions pass; 10b re-run clean*

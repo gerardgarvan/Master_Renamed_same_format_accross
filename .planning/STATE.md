@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
-status: executing
-last_updated: "2026-09-22T15:11:51.398Z"
+status: verifying
+last_updated: "2026-09-22T16:26:42.676Z"
 last_activity: 2026-09-22
 progress:
   total_phases: 13
@@ -15,7 +15,7 @@ progress:
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-22T15:11:51.392Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-22T16:26:42.671Z
 
 ---
 
@@ -30,8 +30,8 @@ progress:
 ## Current Position
 
 Phase: 16 (rebuild-the-analytic-cohort) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
+Plan: 2 of 2 (16-01 COMPLETE; 16-02 ready to execute)
+Status: Executing
 Last activity: 2026-09-22
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
@@ -91,11 +91,12 @@ Plan: 2 of 3
 | Complete-case N (BMI), merged | — | **12,726** | unchanged by MRG-06 — md8 recovers 0 BMI |
 | Complete-case N (Cognitive), merged | — | 12,128 → **20,540** ✓ | +8,412 from md8 (MRG-06) |
 | Complete-case N (Frailty), merged | — | 14,043 → **23,311** ✓ | +9,268 from md8 (MRG-06) |
-| Complete-case N (all three), merged | — | **RE-MEASURE** | the 6,523 figure was pre-coalesce and is stale |
-| Admitted cohort N | — | **13,890** | INPATIENT 13,223 + OBSERVATION 667 |
-| Within-cohort BMI | — | **12,726** (91.6%) | ALL BMI values are inside the admitted cohort |
-| Within-cohort Cognitive | — | **7,252** (52.2%) | 13,288 of 20,540 sit OUTSIDE the cohort |
-| Within-cohort Frailty | — | **8,150** (58.7%) | 15,161 of 23,311 sit OUTSIDE the cohort |
+| Complete-case N (all three), merged | — | **6,523** | Measured 2026-09-22 via 16b_cohort_rebuild.sas within-cohort (47.0% of 13,890); 6,523 within cohort |
+| Admitted cohort N | — | **13,890** | INPATIENT 13,223 + OBSERVATION 667; verified 16-01 |
+| Within-cohort BMI | — | **12,726** (91.6%) | ALL BMI values are inside the admitted cohort; PCM-D-05 rationale PASSED |
+| Within-cohort Cognitive | — | **7,252** (52.2%) | 13,288 of 20,540 sit OUTSIDE the cohort (prior merged reference) |
+| Within-cohort Frailty | — | **8,150** (58.7%) | 15,161 of 23,311 sit OUTSIDE the cohort (prior merged reference) |
+| g.analytic_cohort (harmonized) | — | **13,890 rows, 174 cols** | Rebuilt 2026-09-22 from g.master_data_harmonized; includes all h_* columns |
 
 **md8-only block population** — the old "22,473 for the whole block" target was wrong and has
 been removed. Within-md8 population varies by design: `Total_Midazolam_mg` 22,473 (100%),
@@ -114,6 +115,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 | Phase 18 P01 | 15 | 4 tasks | 4 files |
 | Phase 18 P02 | 45 | 3 tasks | 2 files |
 | Phase 16 P01 | 25 | 2 tasks | 1 files |
+| Phase 16 P01 | 25 | 3 tasks | 1 files |
 
 ## Accumulated Context
 

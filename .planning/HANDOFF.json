@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-22T18:56:13.644Z",
+  "phase": "between phases",
+  "phase_name": "Phases 15 and 18 both complete this session",
+  "phase_dir": ".planning",
+  "plan": null,
+  "task": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Phase 18 bug fixes (r4/r6 countw, char-miss, r2 65K overflow)", "status": "done", "commit": "7048998"},
+    {"id": 2, "name": "Phase 18 UAT complete + D15_APPROVED=1", "status": "done", "commit": "04dbc1e"},
+    {"id": 3, "name": "Phase 15-01: PCM-D-13 resolved (CPT1 keep-separate, label sweep no aliases)", "status": "done", "commit": "0f1f3a9"},
+    {"id": 4, "name": "Phase 15-02: 10b re-run clean, h_ssdi_death added (29316/41150, 71.2%)", "status": "done", "commit": "ac6765d"}
+  ],
+  "remaining_tasks": [
+    {"id": 5, "name": "Phase 7 Plan 07-02: update DECISIONS.md with PCM-D-05 resolution (doc-only)", "status": "not_started"},
+    {"id": 6, "name": "Phase 8 Plan 08-02: add Phase 8 block to 99_run_all.sas + PCM-D-12", "status": "not_started"},
+    {"id": 7, "name": "Phase 8 Plan 08-03: full clean-session pipeline run + verify DATA_DICTIONARY.xlsx", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Run 99_run_all.sas in a clean SAS session (Phase 8-03)", "context": "Final end-to-end pipeline verification", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "CPT1_CLASS + CPT1_LABEL: keep separate (not aliases)", "rationale": "Code and label are complementary, not encoding duplicates", "phase": "15"},
+    {"decision": "Label similarity sweep: no true aliases found", "rationale": "All high-scoring pairs are same-template different-measurement (POD days, timing milestones, anesthetic agents)", "phase": "15"},
+    {"decision": "D15_APPROVED=1: gap-fill candidate report accepted", "rationale": "All 9 supplemental files inventoried; r4/r6 bugs fixed; output verified", "phase": "18"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Start Phase 7 Plan 07-02 -- update docs/DECISIONS.md with PCM-D-05 attribution block (low effort, doc-only). Then proceed to Phase 8.",
+  "context_notes": "g.master_data_harmonized now has 12 h_ columns (added h_ssdi_death this session). All HARM-07 assertions pass. g.master_data_merged confirmed at 176 cols / 41150 rows unmodified. Working tree clean, all pushed to origin/master."
+}

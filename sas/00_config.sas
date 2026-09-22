@@ -28,7 +28,7 @@
    0 = awaiting Gerard review of qc\18_gap_candidates.txt
    1 = approved -- lets 18_supplemental_raw_gap.sas complete and lets
        17_summary_stats_by_domain.sas build work.analysis_base_ext */
-%let D15_APPROVED = 0;
+%let D15_APPROVED = 1;
 
 /* ---- Pipeline flag ----
    0 = running standalone; the program redirects the log to its own file.

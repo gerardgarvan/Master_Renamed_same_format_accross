@@ -258,4 +258,4 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 16-01-PLAN.md -- Write sas/16b_cohort_rebuild.sas: read g.master_data_harmonized, INPATIENT+OBSERVATION filter, promote g.analytic_cohort (174 cols, ~13,890 rows), full-file complete-case assertions, assert source unmodified (HARM-10)
-- [ ] 16-02-PLAN.md -- Resolve PCM-D-05 in docs/DECISIONS.md (BMI-forces-restriction rationale, five population-shift figures, attribution); record measured baselines in STATE.md (PCM-D-05, HARM-10)
+- [x] 16-02-PLAN.md -- Resolve PCM-D-05 in docs/DECISIONS.md (BMI-forces-restriction rationale, five population-shift figures, attribution); record measured baselines in STATE.md (PCM-D-05, HARM-10)

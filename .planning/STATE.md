@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: verifying
-last_updated: "2026-09-22T16:26:42.676Z"
+last_updated: "2026-09-22T16:39:01.752Z"
 last_activity: 2026-09-22
 progress:
   total_phases: 13
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 20
-  completed_plans: 16
-  percent: 80
+  completed_plans: 17
+  percent: 85
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-22T16:26:42.671Z
+**Project:** PCM | **Last Updated:** 2026-08-27 | **Last Session:** 2026-09-22T16:39:01.746Z
 
 ---
 
@@ -31,7 +31,7 @@ progress:
 
 Phase: 16 (rebuild-the-analytic-cohort) — EXECUTING
 Plan: 2 of 2 (16-01 COMPLETE; 16-02 ready to execute)
-Status: Executing
+Status: Phase complete — ready for verification
 Last activity: 2026-09-22
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
@@ -51,7 +51,7 @@ Plan: 2 of 3
 | Phase Status | Complete |
 | Milestone | 1 of 1 |
 
-**Progress:** [████████░░] 80%
+**Progress:** [█████████░] 85%
 
 **Phase status at a glance:**
 
@@ -116,6 +116,7 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 | Phase 18 P02 | 45 | 3 tasks | 2 files |
 | Phase 16 P01 | 25 | 2 tasks | 1 files |
 | Phase 16 P01 | 25 | 3 tasks | 1 files |
+| Phase 16 P02 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 

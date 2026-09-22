@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: — Variable Harmonization
 status: executing
-last_updated: "2026-09-22T16:55:45.728Z"
+last_updated: "2026-09-22T19:11:56.308Z"
 last_activity: 2026-09-22
 progress:
   total_phases: 13
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 20
-  completed_plans: 17
+  completed_plans: 18
   percent: 85
 ---
 
@@ -23,15 +23,15 @@ progress:
 
 **Core Value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current Focus:** Phase 17 — summary-stats-by-domain-context
+**Current Focus:** Phase 07 — cohort-missingness
 
 ---
 
 ## Current Position
 
-Phase: 18
+Phase: 08
 Plan: Not started
-Status: Executing Phase 17
+Status: Executing Phase 07
 Last activity: 2026-09-22
   As first written it re-specified delivered work: g.master_data_harmonized already exists
   (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven

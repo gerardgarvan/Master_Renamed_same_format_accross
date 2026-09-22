@@ -255,4 +255,7 @@ Plans:
   2. PCM-D-05 is resolved and recorded with attribution. Its ORIGINAL rationale is void: PCM-F-12 held that ambulatory patients were never eligible for the geriatric assessments, and PCM-F-19 disproved it -- most cognitive and frailty scores belong to patients OUTSIDE the admitted cohort
   3. The decision record states what the restriction actually does. Phase 13 measured it: the admitted cohort is a different clinical population, not a subset. Charlson 0 falls from 60.8% to 34.5%, general anaesthesia rises from 57.6% to 84.2%, and the excluded group is largely ambulatory endoscopy -- GI service 18.4% to 1.7%, colonoscopy 8.5% to 0.4%
   4. The racial composition shift is recorded in the decision and carried into any methods section: RACE=WHITE is 79.8% in the full file and 87.1% in the cohort, a 7.3-point difference that bears directly on generalisability
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 16-01-PLAN.md -- Write sas/16b_cohort_rebuild.sas: read g.master_data_harmonized, INPATIENT+OBSERVATION filter, promote g.analytic_cohort (174 cols, ~13,890 rows), full-file complete-case assertions, assert source unmodified (HARM-10)
+- [ ] 16-02-PLAN.md -- Resolve PCM-D-05 in docs/DECISIONS.md (BMI-forces-restriction rationale, five population-shift figures, attribution); record measured baselines in STATE.md (PCM-D-05, HARM-10)

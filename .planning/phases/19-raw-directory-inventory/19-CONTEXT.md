@@ -95,8 +95,9 @@ plans execute; update REQUIREMENTS.md accordingly.
   - `COMP10_` → `complications` (length 7, matched first)
   - `complication_sum` → `complications` (exact-match row, also length > 3)
   - `COM` → `dCDT` (length 3, matched only when no longer prefix fires)
-  Every column name is uppercased before comparison so that `complication_sum`
-  (lowercase) matches `COMPLICATION_SUM` in the lookup without a separate row.
+  Both the column name and the lookup prefix are uppercased before comparison
+  so that `complication_sum` (lowercase) matches `COMPLICATION_SUM` in the
+  lookup without a separate row.
 - **COM scouting step (before locking DATALINES):** `COM` is broad — it would
   also capture `COMORBID*`, `COMMENT*`, `COMPLICATION*` (without `10_`), and
   anything else starting with those three letters. Before the planner locks the
@@ -166,11 +167,26 @@ plans execute; update REQUIREMENTS.md accordingly.
   `listed-not-profiled` (extension says it should be readable) nor silently
   skipped. Without this status, the only choices are aborting the whole
   inventory or producing a silent undercount.
-- **Import error handling:** Wrap each import attempt in a macro that uses
-  `%sysfunc(open(...))` or a condition on `%sysfunc(exist(work.&dsname))` after
-  the import to detect failure; set status and reason without `%abort cancel`.
-  The program aborts only if a required file (see D-02b presence check) fails
-  to import.
+- **Import error handling — SAS traps to avoid:**
+  - **Syntax-check mode:** In batch, an ERROR from PROC IMPORT puts SAS into
+    syntax-check mode (`OBS=0`). Every subsequent step then "runs" on zero
+    rows without aborting — the rest of the inventory appears successful but
+    is empty. Set `options nosyntaxcheck noerrorabend;` in the program header
+    (before any import) to prevent this.
+  - **`&syserr` as the failure signal:** After each import attempt, read
+    `&syserr`. A non-zero value means the import failed; record it as the
+    `fail_reason` column value and set status to `read-failed`. Then reset
+    `%let syscc = 0;` so the accumulated error code does not propagate to the
+    program's exit code (which matters for RUN-01's batch orchestration).
+  - **Do not rely on `%sysfunc(exist(work.&dsname))` alone:** If a dataset
+    with that name was created by an earlier iteration, `exist()` returns true
+    even after a failed import. Delete `work.&dsname` with `proc datasets`
+    before each import attempt so a stale dataset cannot mask a failure.
+  - **Multi-sheet XLSX:** `%import_xlsx` creates one dataset per sheet; a
+    single `exist()` check does not cover all sheets. For XLSX files, success
+    means the count of datasets produced in WORK matches the sheet count from
+    `dictionary.tables` for that libname. Any shortfall is a `read-failed`.
+  The program aborts only if a D-02b required file fails to import.
 - **INV-06 assertion (three terms):** After all files are processed:
   ```
   n_profiled + n_listed_not_profiled + n_read_failed = n_total_files
@@ -188,8 +204,11 @@ plans execute; update REQUIREMENTS.md accordingly.
   auditable.
 
 ### Claude's Discretion
-- Directory traversal implementation: `FILENAME pipe "dir /s /b &raw_path"` or
-  equivalent Windows command; parse into a FILES dataset before any import
+- Directory traversal implementation: `FILENAME pipe "dir /s /b /a-d ""&raw_path"""` —
+  the `/a-d` flag lists files only (excludes subdirectory names); without it,
+  folder paths appear as FILES rows, certutil fails on them, and the INV-06
+  three-term assertion trips on rows with no valid status. Parse output into a
+  FILES dataset before any import.
 - Macro structure (one macro per file type vs generalised loop over dslist)
 - Whether the SHA-256 PIPE call is wrapped in a macro or open-coded per file
 - Report ordering within each sheet (FILES sorted by path; VARIABLES sorted

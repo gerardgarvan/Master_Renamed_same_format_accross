@@ -129,7 +129,7 @@ SAS call sequence outside the single-runner scope boundary.
 - No PHI in git: `.gitignore` excludes `*.sas7bdat`, `*.xlsx`, `*.csv`, `data/` tree
 - Repo on local disk, not P: drive -- git against network share is slow and prone to index corruption
 - Delivery: UF colors (#0021A5, #FA4616) on visual deliverables; KEY sheet leftmost in workbooks
-- Restart SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it
+- **PCM-C-05** -- Restart SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it; in batch, each program is a separate invocation with exit code 3 on abort (PCM-D-12)
 
 ---
 

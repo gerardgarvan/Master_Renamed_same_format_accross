@@ -849,9 +849,9 @@ quit;
 
 data work.key_legend;
   length sheet_name $20 column_name $50 description $200 notes $250;
-  infile datalines dsd dlm='|' truncover;
+  infile datalines4 dsd dlm='|' truncover;
   input sheet_name $ column_name $ description $ notes $;
-  datalines;
+  datalines4;
 FILES|full_path|Full path of the file on disk|Read-only source
 FILES|filename|File name with extension|
 FILES|ext|File extension (lowercased)|
@@ -902,7 +902,8 @@ FAMILIES|n_cols|Number of columns in this family for this file|Sums to the VARIA
 FAMILIES|pct_missing_min|Minimum pct_missing in the family|
 FAMILIES|pct_missing_median|Median pct_missing in the family|
 FAMILIES|pct_missing_max|Maximum pct_missing in the family|
-;
+;;;;
+
 
 /* UF blue header style (swap in the program 17 template block if it differs) */
 ods path(prepend) work.templat(update);

@@ -23,6 +23,8 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-12 | %abort cancel return code on Windows batch | **Resolved 2026-09-22 -- return code = 3** | Gerard |
 | PCM-D-13 | SSDI/CPT1/label-sweep concept harmonization (HARM-04) | **Resolved 2026-09-22 -- see entry below** | Gerard |
 | PCM-D-14 | Pipeline-derived column rule (HARM-07) | **Resolved 2026-09-14 -- see entry below** | Gerard |
+| PCM-D-17 | pecan_ID derivation method + MRN retention | **Resolved 2026-09-23 -- see entry below** | Gerard |
+| PCM-D-18 | pecan_ID attach point (10b + 16b at build time) | **Resolved 2026-09-23 -- see entry below** | Gerard |
 
 ---
 
@@ -518,3 +520,76 @@ is invalid in headless batch mode on this machine.
 from the SAS process means all phases completed without an abort.
 
 **Resolved:** 2026-09-22 | Owner: Gerard | Phase 8 Plan 02
+
+---
+
+## PCM-D-17 -- pecan_ID Derivation Method: RESOLVED
+
+**Decision:** pecan_ID is a surrogate sequential integer (1, 2, 3...). Distinct
+ENCRYPTED_MRN values in g.master_data_merged are numbered in ascending order of each
+MRN's smallest PRECEDE_STUDY_ID, evaluated numerically (so that "10" follows "9", not
+precedes it). MRNs added on later pipeline runs are appended after the existing maximum,
+preserving all prior patient numbers. Blank MRNs (empty after strip()) and placeholder
+MRNs (literal string NULL after strip(upcase())) receive no pecan_ID and are excluded
+from the crosswalk entirely.
+
+**Crosswalk:** g.pecan_id_xwalk (columns: ENCRYPTED_MRN $40, pecan_ID num) is
+append-only. The reference for "unchanged" is the latest dated backup, not the table
+itself. On each re-run: (1) assert the current g.pecan_id_xwalk equals the latest backup
+before appending; (2) add new MRNs via PROC APPEND only -- the table is never fully
+rewritten; (3) after appending, assert every backup row is still present; (4) write a
+new dated backup. First run: skip pre/post assertions, build the crosswalk, write the
+first backup, and log the run as the initial build.
+
+**MRN retention:** ENCRYPTED_MRN is retained in all analysis outputs
+(g.master_data_harmonized, g.analytic_cohort) alongside pecan_ID. No DROP statement;
+no schema change to existing columns.
+
+**Backup:** A dated backup copy of g.pecan_id_xwalk is written to the path defined by
+the macro variable xwalk_backup_path in 00_config.sas, which points to a directory on
+P: outside qc/ and outside the git working tree (ENCRYPTED_MRN values must not enter
+qc/ or git). If the crosswalk is ever deleted, program 20 aborts with an error directing
+the user to restore from the backup before re-running.
+
+**Ruled out:** Unsalted SHA-256 hash (no privacy benefit over the MRN itself; produces
+a 64-char key awkward for analysis joins). Salted/keyed hash (requires managing a secret
+outside git). Program 20 rewriting 10b/16b output datasets directly (violates PCM-T-02
+and PCM-T-05 single-producer rule).
+
+**Attribution:** Gerard Garvan, 2026-09-23.
+
+**Resolved:** 2026-09-23 | Owner: Gerard | Phase 20 Plan 01
+
+---
+
+## PCM-D-18 -- pecan_ID Attach Point: RESOLVED
+
+**Decision:** pecan_ID is attached to analysis datasets by programs 10b and 16b at
+build time (option 2 -- attachment at the producer step). Each dataset has a single
+producer. The merged file g.master_data_merged is untouched -- no pecan_ID column is
+added to it.
+
+**Datasets that receive pecan_ID:**
+- g.master_data_harmonized: attached by program 10b (sas/10b_concept_harmonize.sas);
+  column count goes from 174 to 175.
+- g.analytic_cohort: attached by program 16b (sas/16b_cohort_rebuild.sas);
+  column count goes from 174 to 175.
+
+**PID-05 assertions** (one set in each producer program): row count unchanged after
+join; zero blank pecan_ID where ENCRYPTED_MRN is non-blank and non-placeholder; zero
+PRECEDE_STUDY_IDs gaining a second pecan_ID after attachment.
+
+**Column-count assertions** updated in both 10b and 16b: g.master_data_harmonized and
+g.analytic_cohort each assert 175 columns after the join. The g.master_data_merged
+column-count assertion in 10b (176 columns) is unaffected -- pecan_ID is not added
+to merged.
+
+**DATA_DICTIONARY.xlsx** is updated by program 08 (sas/08_dictionary.sas), which
+appends an explicit pecan_ID row to work.dict_final after the main derivation_map join
+(the join is left on g.master_data_merged columns, so an entry in derivation_map would
+be silently dropped). The _gate5 assertion is updated to expect n_dict_meta + 1 rows.
+One row; derivation note names both datasets that carry pecan_ID.
+
+**Attribution:** Gerard Garvan, 2026-09-23.
+
+**Resolved:** 2026-09-23 | Owner: Gerard | Phase 20 Plan 01

@@ -105,7 +105,7 @@ PCM-D-18 attach point, PID-07 linkage reach output
 
 **User's choice:** Plain text.
 
-**Notes:** Reader is Claude (deciding PCM-D-15 join key for v2.1), not a downstream
+**Notes:** Reader is **Gerard** (deciding PCM-D-15 join key for v2.1), not a downstream
 program; CSV doesn't buy much. Matches Phase 18 pattern for qc/ folder consistency.
 
 | Scope Option | Description | Selected |

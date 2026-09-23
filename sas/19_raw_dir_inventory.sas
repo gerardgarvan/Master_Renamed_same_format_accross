@@ -849,7 +849,7 @@ quit;
 
 data work.key_legend;
   length sheet_name $20 column_name $50 description $200 notes $250;
-  infile datalines4 dsd dlm='|' truncover;
+  infile datalines dsd dlm='|' truncover;
   input sheet_name $ column_name $ description $ notes $;
   datalines4;
 FILES|full_path|Full path of the file on disk|Read-only source

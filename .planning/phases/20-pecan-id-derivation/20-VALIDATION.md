@@ -22,7 +22,7 @@ created: 2026-09-23
 | **Framework** | SAS 9.4M8 assertion macros (`%assert_eq`, `%assert_zero`, `%abort cancel`) |
 | **Config file** | `sas/00_config.sas` |
 | **Quick run command** | Run the specific program in SAS batch; check log for ERROR/ABORT |
-| **Full suite command** | Run programs in order: 20 → 10b → 16b → 08; inspect qc/ output files |
+| **Full suite command** | Run programs in order: 20 → 10b → 16b → 08 → 17 → 18; inspect qc/ output files |
 | **Estimated runtime** | ~5-15 minutes for full suite |
 
 ---
@@ -42,8 +42,8 @@ created: 2026-09-23
 | 20-01-01 | 01 | 1 | PID-01 | SAS assertion + file inspect | `qc/19_raw_files.csv` exists; certutil hash matches; program log has no ABORT | ⬜ pending |
 | 20-01-02 | 01 | 1 | PID-02 | SAS log inspect | Log reports blank count, distinct MRN count, PRECEDE count, both cardinalities | ⬜ pending |
 | 20-01-03 | 01 | 1 | PID-03 | SAS assertion | `%assert_eq` for PRECEDE→1 MRN fires and does not abort (all pass); manual verify cardinality output | ⬜ pending |
-| 20-01-04 | 01 | 2 | PID-04 | SAS + file inspect | `g.pecan_id_xwalk` dataset exists; row count = distinct non-blank MRN count; no duplicate pecan_IDs | ⬜ pending |
-| 20-01-05 | 01 | 2 | PID-04 | SAS assertion | Re-run program 20: backup comparison assertion passes; PROC APPEND adds 0 rows (no new MRNs on second run) | ⬜ pending |
+| 20-01-04 | 01 | 1 | PID-04 | SAS + file inspect | `g.pecan_id_xwalk` dataset exists; row count = distinct non-blank MRN count; no duplicate pecan_IDs | ⬜ pending |
+| 20-01-05 | 01 | 1 | PID-04 | SAS assertion | Re-run program 20: backup comparison assertion passes; PROC APPEND adds 0 rows (no new MRNs on second run) | ⬜ pending |
 | 20-02-01 | 02 | 1 | PID-05 | SAS assertion | 10b log: row count assertion = 41150; zero blank pecan_ID where MRN non-blank; column count = 175 | ⬜ pending |
 | 20-02-02 | 02 | 1 | PID-06 | File inspect | `qc/16b_pecan_id_counts.txt` exists; contains counts for both harmonized and cohort; 1/2/3+ distribution visible | ⬜ pending |
 | 20-02-03 | 02 | 1 | PID-05 | SAS assertion | 16b log: row count assertion = 13890; zero blank pecan_ID; column count = 175; zero duplicate pecan_ID per PRECEDE | ⬜ pending |

@@ -27,6 +27,10 @@ plans execute; update REQUIREMENTS.md accordingly.
   `FILENAME ... PIPE` statement (not an `X` statement, which cannot return
   output to SAS). Paths must be double-quoted inside the pipe command because
   file names under `raw` contain spaces.
+- **Parse guard:** Some Windows builds print the hash with spaces between byte
+  pairs. Strip all spaces from the certutil output line before testing for
+  64 consecutive hex characters; otherwise the parse finds no hash line on
+  those machines.
 - Dependency: `XCMD` must be enabled in the SAS batch session. The runner
   (`99_run_all.sas`) will rely on XCMD too (RUN-01), so this is a shared
   constraint, not a Phase 19-specific one. Document it in the program header.
@@ -47,43 +51,91 @@ plans execute; update REQUIREMENTS.md accordingly.
     checksum appearing in the INV-01 record. Treat a missing md3 source as
     a hard blocker.
 
-### D-03: Variable profiling — all columns, one-pass missingness
+### D-03: Variable profiling — all columns, one-pass missingness, sentinel separation
 - **D-03:** Every column in every readable file appears individually in the
   VARIABLES sheet (satisfies INV-03 literally; 40,000+ rows is well within
   Excel's 1,048,576-row limit).
 - Missingness is computed in one pass per file:
-  - PROC MEANS with `NMISS` option for numeric columns
+  - PROC MEANS with `NMISS` option for numeric columns (counts true SAS missing `.`)
   - A single DATA step scanning all character columns in one read for char vars
   Not one query per variable — that would be prohibitively slow on r2 (3,987 cols).
+- **Sentinel separation (two columns, not one):** Report `pct_missing` (true SAS
+  missing only, as produced by NMISS / char-scan) and `pct_sentinel` (values that
+  are `-999` for numerics or the literal string `NULL` for character columns)
+  as separate VARIABLES columns. Rationale:
+  - PROC MEANS NMISS does not count `-999`, so folding sentinels into
+    `pct_missing` would silently understate dCDT missingness.
+  - `-999` may be a legitimate non-missing value in files outside dCDT;
+    applying a recode universally would overstate missingness there.
+  - Two columns keep the raw count transparent without making a silent
+    recoding choice. The consumer decides how to treat sentinels.
+  - `pct_sentinel` is counted in the same pass: the numeric DATA step or
+    PROC MEANS extension counts `n(var = -999)` alongside NMISS; the char
+    DATA step counts `upcase(strip(var)) = 'NULL'` alongside blank counts.
 - INV-04 key-column detection sweeps every column name regardless of family,
   because a key column could sit inside a wide family.
+- **Type note (KEY sheet):** Column type in VARIABLES reflects the type as
+  imported by SAS (PROC IMPORT guessingrows=max for CSV; XLSX engine for
+  workbooks), not the source system type. Note this in the KEY sheet legend
+  to avoid confusion when, for example, ENCRYPTED_MRN imports as numeric in
+  one file and character in another.
 
-### D-04: FAMILIES sheet — DATALINES-defined prefix lookup
+### D-04: FAMILIES sheet — DATALINES-defined prefix lookup with longest-match
 - **D-04:** A FAMILIES sheet summarises known wide-column families. Families
-  are defined in a DATALINES lookup table (prefix, family_name) in the program,
-  following the concept_decisions.csv pattern: the program applies exactly what
-  is listed; a new family is a one-line edit to the DATALINES block.
+  are defined in a DATALINES lookup table with columns (prefix, family_name)
+  in the program, following the concept_decisions.csv pattern: the program
+  applies exactly what is listed; a new family is a one-line edit.
+- **Exclusion mechanism — longest-match-wins:** Rather than a plain prefix
+  table with a separate exclude flag, use longest-match assignment. Map the
+  longer specific prefix first, then the shorter general one. Example:
+  - `COMP10_` → `complications` (longer, matched first)
+  - `complication_sum` → `complications` (exact match row)
+  - `COM` → `dCDT` (shorter, matched only when neither longer rule fires)
+  This is simpler to audit than an exclude flag: every column's family
+  assignment is deterministic and visible by reading the DATALINES rows in
+  order of decreasing prefix length.
 - Families identified in Phase 18 (minimum list; extend as needed):
-  - `COM` prefix → dCDT clock features (EXCLUDE `COMP10_*` and
-    `complication_sum`, which are complication variables, not clock features)
-  - `LINUS` prefix → LINUS columns
+  - `COMP10_` / `complication_sum` → complications
+  - `COM` → dCDT clock features
+  - `LINUS` → LINUS columns
   - (Others discovered during scouting of r2 headers can be added)
-- Columns matching no prefix go in an `unassigned` row per source file.
-- **Assertion:** FAMILIES column counts must sum to the VARIABLES row count
-  for each file. If they diverge, `%abort cancel` fires — the summary cannot
-  silently drop columns.
+- Columns matching no prefix go in `unassigned` per source file.
+- **Assertion (correct implementation):** After building the FAMILIES dataset,
+  compute:
+  ```sas
+  proc sql noprint;
+    select count(*) into :n_bad trimmed
+    from (
+      select f.source_file
+      from (select source_file, sum(n_cols) as fam_total from families
+            group by source_file) f
+      join  (select source_file, count(*) as var_total from variables
+            group by source_file) v
+        on f.source_file = v.source_file
+      where f.fam_total ne v.var_total
+    );
+  quit;
+  ```
+  Then call `%abort cancel` inside a named macro when `&n_bad > 0`.
+  Do NOT use `&SQLOBS` (ruled out in STATE.md) and do NOT use `INTO :check`
+  with `GROUP BY` (captures only the first row).
 - Each FAMILIES row reports: family_name, source_file, n_cols,
-  pct_missing_min, pct_missing_median, pct_missing_max.
+  pct_missing_min, pct_missing_median, pct_missing_max (not median alone —
+  a median can hide a block of fully empty columns within a wide family).
 
 ### D-05: Excel output — ODS Excel, KEY sheet first
 - **D-05:** Output via ODS Excel (established in Phase 17 for UF colors and
   sheet control). Sheet order is controlled by the order of `ods excel
   options(sheet_name=)` calls; write KEY first so it is leftmost in the
   workbook (INV-07). UF blue (#0021A5) column headers throughout.
-- ODS Excel can be slow on a 40,000-row VARIABLES sheet. If that becomes a
-  problem, the VARIABLES data is written using the XLSX libname engine instead
-  and then the other sheets use ODS Excel — that is a targeted fallback, not a
-  full redesign.
+- **Fallback if ODS Excel is too slow on VARIABLES:** ODS Excel writes the
+  entire workbook when it closes, so VARIABLES cannot be swapped to the XLSX
+  libname engine within the same file — a post-close XLSX write to the same
+  path would append VARIABLES as the last sheet and likely drop ODS styling.
+  If the fallback is ever needed, write VARIABLES to a separate workbook
+  (`qc/19_raw_variables.xlsx`) and keep all other sheets in the primary
+  workbook (`qc/19_raw_inventory.xlsx`). This is a separate-file split, not
+  a drop-in swap; the plan should not assume otherwise.
 
 ### D-06: Unreadable files (listed-not-profiled)
 - **D-06:** Files with extensions outside {sas7bdat, csv, xlsx, xls} (e.g.,
@@ -174,9 +226,14 @@ plans execute; update REQUIREMENTS.md accordingly.
 - Writes: `logs/19_raw_dir_inventory.log`
 - Does NOT write to any `g.*` dataset
 - Does NOT read `g.analysis_base` or `g.master_data_merged` — standalone scan
-- Phase 20 (PID-01) reads the INV-01 checksum record for the md3 source CSV
-  from `19_raw_inventory.xlsx`; the FILES sheet must include a checksummed row
-  for that file before Phase 20 can run
+- **Machine-readable FILES output for Phase 20:** In addition to the Excel
+  workbook, program 19 writes `qc/19_raw_files.csv` (or `work.inv_files` saved
+  via PROC EXPORT) containing the FILES dataset — path, filename, checksum, and
+  status columns. This is not a `g.*` write. Phase 20 (PID-01) reads this CSV
+  to verify the md3 source checksum; it does NOT parse the styled Excel
+  workbook, which is fragile to ODS type-guessing and formatting on re-import.
+  The Excel workbook remains the human-facing deliverable; the CSV is the
+  machine-readable handoff.
 
 ### Known Pitfalls (carry-forward from Phase 18)
 - Paths with spaces: double-quote in all pipe/certutil calls
@@ -185,20 +242,26 @@ plans execute; update REQUIREMENTS.md accordingly.
   ENCRYPTED_MRN, ENCRYPTED_ENCOUNTER (spaces vs underscores, mixed case,
   positional VARnn from XLSX engine) — PCM-T-12; sweep every column
 - r2 has 3,987 columns and 14,807 rows — one-pass missingness is mandatory
-- Two missing sentinels: `-999` in dCDT numerics, literal `NULL` in
-  Excel-sourced char columns — treat both as missing in pct_missing
+- Sentinel values (`-999` numeric, literal `NULL` char) are NOT the same as
+  true SAS missing: NMISS does not count `-999`; blank-test does not catch
+  `NULL`. Report as `pct_sentinel` separate from `pct_missing` (see D-03).
+  Do not recode sentinels — that makes a silent choice the consumer should make.
 - `COM` prefix includes complication variables (`COMP10_*`, `complication_sum`)
-  which are NOT dCDT clock features; the FAMILIES DATALINES block must
-  exclude these prefixes explicitly
+  which are NOT dCDT clock features. Use longest-match DATALINES (D-04):
+  map `COMP10_` and `complication_sum` to `complications` before mapping
+  `COM` to `dCDT`, so the longer match fires first.
+- FAMILIES assertion: do NOT use `INTO :check` with `GROUP BY` (captures only
+  first row) and do NOT use `&SQLOBS`. Use `count(*) into :n_bad trimmed` over
+  the joined mismatch subquery (see D-04 for correct pattern).
 
 </code_context>
 
 <specifics>
 ## Specific Ideas
 
-- PIPE command for certutil: `filename ck pipe "certutil -hashfile ""&fpath"" SHA256"` — two double-quotes around the path to handle embedded spaces; read with an INFILE over the PIPE fileref and pick the line that is 64 hex chars
-- FAMILIES assertion: `proc sql; select file, sum(n_cols) into :check trimmed from families group by file having calculated check ne var_count; quit;` — if rows returned, fire `%abort cancel`
-- KEY sheet content: column-by-column legend (column name, sheet it appears in, description) matching the Phase 17 DATA_DICTIONARY KEY sheet style (UF blue header, leftmost position)
+- PIPE command for certutil: `filename ck pipe "certutil -hashfile ""&fpath"" SHA256"` — two double-quotes around the path to handle embedded spaces; read each output line with INFILE, compress/strip spaces, then test `lengthn(compressed_line) = 64 and notxdigit(compressed_line) = 0` to identify the hash line (guards against Windows builds that print spaces between byte pairs)
+- KEY sheet content: column-by-column legend (column name, sheet it appears in, description, units/notes) matching the Phase 17 DATA_DICTIONARY KEY sheet style (UF blue header, leftmost position). Include a note that `type` in VARIABLES reflects the SAS-imported type, not the source system type.
+- Program also writes `qc/19_raw_files.csv` via PROC EXPORT from the FILES work dataset before ODS Excel opens — this is the Phase 20 handoff file; write it early so a crash during ODS export does not block Phase 20.
 
 </specifics>
 

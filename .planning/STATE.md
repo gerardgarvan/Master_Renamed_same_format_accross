@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 ## Current Position
 
-Phase: 20 (pecan_ID Derivation) — NOT STARTED
+Phase: 20 (pecan_ID Derivation) — Plan 01 complete, Plan 02 in progress
 Last activity: 2026-09-23
 
 ### v2.0 Phase Status

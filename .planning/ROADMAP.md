@@ -35,7 +35,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Raw Directory Inventory | 0/? | Not started | - |
+| 19. Raw Directory Inventory | 0/2 | Not started | - |
 | 20. pecan_ID Derivation | 0/? | Not started | - |
 | 21. Runner Wiring & D3 Fix | 0/? | Not started | - |
 
@@ -57,11 +57,14 @@
 **Requirements**: INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07
 **Success Criteria** (what must be TRUE):
   1. User can open `qc/19_raw_inventory.xlsx` and see every file under `raw` with its path, size, last-modified date, and SHA-256 checksum — no file is silently skipped
-  2. User can see row count, column count, and per-sheet counts for every readable data file (sas7bdat, csv, xlsx/xls); unreadable files (pdf, docx, zip) are listed-not-profiled with their status explicit
-  3. User can see variable name, type, length, label or original header, and percent missing for every variable in every readable data file
+  2. User can see row count, column count, and per-sheet counts for every readable data file (sas7bdat, csv, xlsx/xls); unreadable files (pdf, docx, zip) are listed-not-profiled with their status explicit; files whose import fails are read-failed with a fail_reason recorded
+  3. User can see variable name, type, length, label or original header, pct_missing, and pct_sentinel (separate columns) for every variable in every readable data file
   4. User can see which files carry `PRECEDE_STUDY_ID`, `ENCRYPTED_MRN`, or `ENCRYPTED_ENCOUNTER` in the KEY_COLUMNS sheet, with all naming variants accounted for per PCM-T-12
-  5. User can see which files are known (md1-md8 or Phase 18 supplemental set) and which are flagged NEW, and can confirm total files = profiled + listed-not-profiled with zero unknowns
-**Plans**: TBD
+  5. User can see which files are known (md1-md8 or Phase 18 supplemental set) and which are flagged NEW, and can confirm total files = profiled + listed-not-profiled + read-failed with zero unknowns
+**Plans**: 2 plans
+Plans:
+- [ ] 19-01-PLAN.md — Update REQUIREMENTS.md INV-07 + write complete sas/19_raw_dir_inventory.sas (all 14 sections)
+- [ ] 19-02-PLAN.md — Run program, fix errors, human-verify workbook (KEY leftmost, 7 sheets, UF blue) and CSV handoff
 
 ### Phase 20: pecan_ID Derivation
 **Goal**: Users can confirm that every patient with a valid ENCRYPTED_MRN has a stable, derivation-documented linkage key (pecan_ID) attached to pipeline outputs, with cardinality assertions passing and r7/r8/r9 linkage reach explicitly tested

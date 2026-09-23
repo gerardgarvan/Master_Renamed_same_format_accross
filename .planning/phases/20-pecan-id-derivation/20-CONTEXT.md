@@ -38,18 +38,26 @@ These sit next to `qc/19_raw_files.csv` and follow the same anti-fragile pattern
 
 ### PCM-D-17: pecan_ID Derivation Method
 
-- **D-01:** pecan_ID is a **surrogate sequential integer** (1, 2, 3...). Within the
-  crosswalk, each distinct ENCRYPTED_MRN gets the integer corresponding to its
-  **smallest PRECEDE_STUDY_ID** in `g.master_data_merged`. Blank MRNs (empty after
+- **D-01:** pecan_ID is a **surrogate sequential integer** (1, 2, 3...). Distinct
+  ENCRYPTED_MRN values are numbered 1, 2, 3... in **ascending order of each MRN's
+  smallest PRECEDE_STUDY_ID** in `g.master_data_merged` (pecan_ID is a rank, not the
+  PRECEDE_STUDY_ID value itself). If PRECEDE_STUDY_ID is stored as character, order
+  it numerically, since character sorting puts "10" before "9". MRNs added on later
+  runs are appended in the same order after the existing maximum. Blank MRNs (empty after
   `strip()`) and placeholder MRNs (literal string `'NULL'` after `strip(upcase())`)
   receive **no pecan_ID** — they are excluded from the crosswalk entirely.
 - **D-02:** `g.pecan_id_xwalk` (ENCRYPTED_MRN, pecan_ID) is **append-only**:
-  - On re-run, assert that every existing row in `g.pecan_id_xwalk` is unchanged
-    (same ENCRYPTED_MRN ↔ pecan_ID pairing). Any change aborts — it means the
-    crosswalk was corrupted or the source data changed identity.
-  - New MRNs are added via PROC APPEND (new rows only); the table is never fully
-    rewritten. The next available integer is `max(pecan_ID) + 1` from the existing
-    crosswalk.
+  - The reference for "unchanged" is the **latest dated backup** (D-04), not the
+    crosswalk itself — comparing the table to itself always passes. Sequence on re-run:
+    1. Before appending, assert the current `g.pecan_id_xwalk` equals the latest
+       backup (same rows, same ENCRYPTED_MRN ↔ pecan_ID pairings). Any difference
+       aborts — the crosswalk was corrupted or edited outside program 20.
+    2. Add new MRNs via PROC APPEND (new rows only); the table is never fully
+       rewritten. The next available integer is `max(pecan_ID) + 1`.
+    3. After appending, assert every backup row is still present and unchanged.
+    4. Only then write the new dated backup.
+  - First run (no crosswalk and no backup exists): skip steps 1 and 3, build the
+    crosswalk, write the first backup, and log the run as the initial build.
 - **D-03:** ENCRYPTED_MRN is **retained in all analysis outputs**
   (`g.master_data_harmonized`, `g.analytic_cohort`) alongside pecan_ID. No DROP
   statement; no schema change to existing columns.
@@ -73,8 +81,10 @@ These sit next to `qc/19_raw_files.csv` and follow the same anti-fragile pattern
   - Row count unchanged after join
   - Zero blank pecan_ID where ENCRYPTED_MRN is non-blank and non-placeholder
   - Zero PRECEDE_STUDY_IDs gaining a second pecan_ID after attachment
-- **D-07:** Column-count assertions and DATA_DICTIONARY variable totals are updated
-  in 10b and 16b (one KEEP list and one assertion each).
+- **D-07:** Column-count assertions are updated in 10b and 16b (one KEEP list and
+  one assertion each): `g.master_data_harmonized` and `g.analytic_cohort` each go
+  from 174 to 175 columns. DATA_DICTIONARY variable totals are **not** handled in
+  10b/16b — the dictionary is produced only by `08_dictionary.sas` (D-27).
 
 ### Program 20 Scope (PID-01 through PID-04, PID-07, PID-08)
 
@@ -106,11 +116,12 @@ These sit next to `qc/19_raw_files.csv` and follow the same anti-fragile pattern
   mandatory cross-check below.
 - **D-14 (cross-check logic):** Join the CSV to `g.master_data_merged` on
   PRECEDE_STUDY_ID. Before comparing:
-  - Apply the same normalization the prep programs applied: `strip()` whitespace
-    from ENCRYPTED_MRN on both sides; treat `strip(upcase(ENCRYPTED_MRN)) = 'NULL'`
-    as blank on both sides. The merge pipeline cleared literal `NULL` sentinels and
-    trimmed values (PREP-02); comparing raw CSV to normalized merged values without
-    this step would abort on intentional pipeline transformations.
+  - Apply to the CSV side **exactly the transformations the md3 prep program
+    applies** to ENCRYPTED_MRN and PRECEDE_STUDY_ID. The planner must read the md3
+    prep program and copy its rules; do not assume them. The expected rules are
+    `strip()` whitespace and treating `strip(upcase(ENCRYPTED_MRN)) = 'NULL'` as
+    blank (PREP-02), but the prep program is authoritative. Any transformation the
+    cross-check misses shows up as a false mismatch and aborts the run.
   - Cast PRECEDE_STUDY_ID to the same type on both sides before joining (CSV import
     may read it as numeric).
   Assert:
@@ -188,6 +199,13 @@ These sit next to `qc/19_raw_files.csv` and follow the same anti-fragile pattern
   This is the correct pattern because pecan_ID is not in `g.master_data_merged`
   (which 08 reads), and any row added elsewhere would be overwritten the next time
   08 runs.
+  **Verify before planning the edit:** `RT_ENVELOPE_FLAG` and `N_SOURCES` already
+  exist in `g.master_data_merged`, so the block at lines 234–244 may only supply
+  derivation text for columns 08 finds there. If it annotates existing columns
+  rather than adding rows, a pecan_ID entry will be silently dropped; in that case
+  the pecan_ID row needs an explicit output of its own. Also check whether 08
+  asserts a variable count (176) that the new row would change, and update that
+  assertion if so.
   **Do not use PROC SQL UPDATE or xlsx manipulation** — PCM-T-01 bans PROC SQL UPDATE;
   you cannot SQL-update an xlsx file.
 - **D-28 (DECISIONS.md):** Record PCM-D-17 and PCM-D-18, attributed to Gerard
@@ -221,8 +239,9 @@ These sit next to `qc/19_raw_files.csv` and follow the same anti-fragile pattern
 - `qc/19_raw_key_columns.csv` — INV-04 key-column flags (PID-07 scope + D-25)
 - `qc/19_raw_sheets.csv` — sheet metadata (PID-07 targeted import + D-25)
 - `qc/19_raw_variables_md3.csv` — ENCRYPTED_MRN type/length for md3 (D-11)
-  *(These files are written by Phase 19 Plan 01 amendment — confirm they exist
-  before Phase 20 planning proceeds.)*
+  *(These files are written by the Phase 19 Plan 01 amendment. They do not exist
+  until program 19 runs, so their presence is checked at the start of Phase 20
+  execution (program 20 aborts if any is missing), not during planning.)*
 
 ### Programs Phase 20 Creates or Modifies
 - `sas/20_pecan_id.sas` — new program (PID-01 through PID-04, PID-07, PID-08)
@@ -277,17 +296,20 @@ These sit next to `qc/19_raw_files.csv` and follow the same anti-fragile pattern
 <specifics>
 ## Specific Requirements
 
-- Crosswalk append-only: assert existing rows unchanged on re-run; PROC APPEND new rows only (D-02)
+- Crosswalk append-only: compare against the latest dated backup before and after
+  appending; PROC APPEND new rows only; first run logged as initial build (D-02)
 - Dated backup of crosswalk in protected location outside qc/ and git (D-04)
 - CSV ENCRYPTED_MRN read at `$64`; assert max length ≤ 40 (D-12)
-- Cross-check: normalize both sides (strip, NULL→blank, same PRECEDE type) before asserting
+- Cross-check: apply the md3 prep program's own rules to the CSV side, plus the same
+  PRECEDE type on both sides, before asserting
   equality and set membership; any mismatch aborts (D-14)
 - Placeholder values are testable: `missing()` OR `strip(upcase()) = 'NULL'` (D-15)
 - PID-07: counts behind every rate; section per file+sheet+column; exclusions list for
   UNENC_MRN-only files; numeric-MRN "type mismatch: not compared" block; explicit
   r7/r8/r9 PCM-D-16 YES/NO line where YES = any distinct MRN matches (D-20 through D-26)
 - PID-08: pecan_ID as static entry in 08_dictionary.sas derived-vars block; one row,
-  note names datasets that carry it; no PROC SQL UPDATE, no xlsx manipulation (D-27)
+  note names datasets that carry it; verify the block adds rows (not only annotates)
+  and update any 176-variable assertion; no PROC SQL UPDATE, no xlsx manipulation (D-27)
 
 </specifics>
 

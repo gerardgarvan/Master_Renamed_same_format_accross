@@ -4,7 +4,7 @@
 **Owner:** Gerard Garvan (ggarvan)
 **Working folder:** `P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross`
 **Repo:** local disk (see PCM-C-04 -- do NOT put the git repo on the P: drive)
-**Status:** v1 SHIPPED 2026-09-22
+**Status:** v2.0 IN PROGRESS (v1 SHIPPED 2026-09-22)
 **Supersedes:** all ad-hoc `master_data_*` merge/stack/dedup code written before this document
 
 ---
@@ -26,6 +26,19 @@ a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 The harmonized overlay (`g.master_data_harmonized`) and rebuilt analytic cohort
 (`g.analytic_cohort`, 13,890 rows) are produced by a separate but fully-documented
 SAS call sequence outside the single-runner scope boundary.
+
+## Current Milestone: v2.0 pecan_ID + Raw Directory Inventory
+
+**Goal:** Add a patient-level linkage key (pecan_ID, derived from ENCRYPTED_MRN) to pipeline outputs per PCM-D-18, and produce a complete file-and-variable inventory of the raw directory tree.
+
+**Target features:**
+- Phase 19: Raw directory inventory (19_raw_dir_inventory.sas) — recursive file listing with checksums, variable-level profiling, key-column flags, reconciliation against known sources, qc/19_raw_inventory.xlsx
+- Phase 20: pecan_ID derivation (20_pecan_id.sas) — source audit, crosswalk g.pecan_id_xwalk per PCM-D-17, attachment per PCM-D-18, linkage reach test for r7/r8/r9, DATA_DICTIONARY + DECISIONS.md updates
+- Carry-over candidates (optional): 99_run_all.sas wiring, D3 cognitive DATALINES fix, PCM-D-15 gap-fill wiring
+
+**Open decisions:** PCM-D-17 (pecan_ID derivation method + MRN retention), PCM-D-18 (attach point)
+
+---
 
 ## Current State (after v1 milestone)
 
@@ -149,4 +162,23 @@ SAS call sequence outside the single-runner scope boundary.
 
 ---
 
-*Last updated: 2026-09-22 after v1 milestone -- pipeline complete, all phases shipped*
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
+---
+
+*Last updated: 2026-09-23 — v2.0 milestone started (pecan_ID + Raw Directory Inventory)*

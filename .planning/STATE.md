@@ -1,21 +1,21 @@
 ---
 gsd_state_version: 1.0
-milestone: v1
-milestone_name: PeCAN Master Dataset Integration Pipeline
-status: complete
-last_updated: "2026-09-22T00:00:00Z"
-last_activity: 2026-09-22
+milestone: v2.0
+milestone_name: pecan_ID + Raw Directory Inventory
+status: defining_requirements
+last_updated: "2026-09-23T00:00:00Z"
+last_activity: 2026-09-23
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-09-22 | **Milestone:** v1 SHIPPED
+**Project:** PCM | **Last Updated:** 2026-09-23 | **Milestone:** v2.0 IN PROGRESS
 
 ---
 
@@ -31,16 +31,10 @@ See: .planning/PROJECT.md (updated 2026-09-22 after v1 milestone)
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
-Status: Executing Phase 07
-Last activity: 2026-09-22
-  As first written it re-specified delivered work: g.master_data_harmonized already exists
-  (187 columns, 41,150 rows, 11 harmonized columns, 11 aliases dropped after being proven
-  redundant), and summary statistics already cover every variable. What remains open is the
-  LABEL-similarity sweep -- the one alias class name matching cannot reach -- plus three
-  unprofiled concept groups, a rule for the 12 no-information pipeline columns, and
-  rebuilding g.analytic_cohort, which is still 176 columns from before harmonisation.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-23 — Milestone v2.0 started
 
 ### v1.0 Position (preserved)
 

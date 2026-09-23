@@ -9,12 +9,12 @@
 ### Raw Directory Inventory (Phase 19)
 
 - [ ] **INV-01** — User can inspect a recursive file listing of `P:\PeCAN Master Data\Gerard\raw` containing path, file name, extension, size, last-modified date, and SHA-256 checksum for every file in the tree; no file is opened for write
-- [ ] **INV-02** — User can see row count, column count, and sheet name(s) for every readable data file (sas7bdat, csv, xlsx/xls); multi-sheet workbooks are profiled per sheet, producing one row per sheet in the FILES output
+- [ ] **INV-02** — User can see row count, column count, and sheet name(s) for every readable data file (sas7bdat, csv, xlsx/xls); FILES has one row per file; multi-sheet workbooks are profiled per sheet with row and column counts recorded in a separate SHEETS sheet
 - [ ] **INV-03** — User can see variable-level inventory (variable name, type, length, label or original header, percent missing) for every variable in every readable data file, whether or not it is in the PRECEDE data dictionary
 - [ ] **INV-04** — User can see which files carry `PRECEDE_STUDY_ID`, `ENCRYPTED_MRN`, or `ENCRYPTED_ENCOUNTER`; matching uses normalized headers with all naming variants enumerated (e.g. "Encrypted MRN", "ENCRYPTED_MRN", positional VARnn names from the XLSX engine) per PCM-T-12 so that key flags cannot miss files
 - [ ] **INV-05** — User can see which files are known (md1–md8 raw\master mapping or Phase 18 supplemental set) and which are flagged NEW (present in raw but absent from both known sets)
 - [ ] **INV-06** — User can confirm that every file under `raw` has a resolved status: either profiled (readable data file) or listed-not-profiled (unreadable: pdf, docx, zip, etc.); no file is silently skipped; assertion holds: files listed = files profiled + files listed-not-profiled, zero files of unknown status
-- [ ] **INV-07** — User can open `qc/19_raw_inventory.xlsx` with KEY sheet leftmost, UF blue (#0021A5) headers, and sheets FILES, VARIABLES, KEY_COLUMNS, RECONCILIATION
+- [ ] **INV-07** — User can open `qc/19_raw_inventory.xlsx` with KEY sheet leftmost, UF blue (#0021A5) headers, and sheets FILES, SHEETS, VARIABLES, KEY_COLUMNS, RECONCILIATION
 
 ### pecan_ID Derivation (Phase 20)
 

@@ -35,7 +35,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Raw Directory Inventory | 1/2 | In Progress|  |
+| 19. Raw Directory Inventory | 2/2 | Complete | 2026-09-23 |
 | 20. pecan_ID Derivation | 0/? | Not started | - |
 | 21. Runner Wiring & D3 Fix | 0/? | Not started | - |
 
@@ -43,7 +43,7 @@
 
 ## Phases
 
-- [ ] **Phase 19: Raw Directory Inventory** - Produce a complete, checksummed, variable-level inventory of every file under `raw`, output to `qc/19_raw_inventory.xlsx`
+- [x] **Phase 19: Raw Directory Inventory** - Produce a complete, checksummed, variable-level inventory of every file under `raw`, output to `qc/19_raw_inventory.xlsx`
 - [ ] **Phase 20: pecan_ID Derivation** - Build the patient-level linkage key from ENCRYPTED_MRN, assert cardinality, attach to pipeline outputs, test r7/r8/r9 linkage reach, and document decisions
 - [ ] **Phase 21: Runner Wiring & D3 Fix** - Wire all programs into `99_run_all.sas` and fix the D3 cognitive domain in the Phase 17 workbook
 
@@ -64,7 +64,7 @@
 **Plans**: 2 plans
 Plans:
 - [x] 19-01-PLAN.md — Update REQUIREMENTS.md INV-07 + write complete sas/19_raw_dir_inventory.sas (all 14 sections)
-- [ ] 19-02-PLAN.md — Run program, fix errors, human-verify workbook (KEY leftmost, 7 sheets, UF blue) and CSV handoff
+- [x] 19-02-PLAN.md — Run program, fix errors, human-verify workbook (KEY leftmost, 7 sheets, UF blue) and CSV handoff
 
 ### Phase 20: pecan_ID Derivation
 **Goal**: Users can confirm that every patient with a valid ENCRYPTED_MRN has a stable, derivation-documented linkage key (pecan_ID) attached to pipeline outputs, with cardinality assertions passing and r7/r8/r9 linkage reach explicitly tested

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: pecan_ID + Raw Directory Inventory
 status: executing
-last_updated: "2026-09-23T16:36:24.554Z"
+last_updated: "2026-09-23"
 last_activity: 2026-09-23
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 50
+  completed_plans: 2
+  percent: 33
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -25,26 +25,24 @@ See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 **Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Phase 19 — raw-directory-inventory
+**Current focus:** Phase 20 — pecan_ID Derivation (Phase 19 complete 2026-09-23)
 
 ---
 
 ## Current Position
 
-Phase: 19 (raw-directory-inventory) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
+Phase: 20 (pecan_ID Derivation) — NOT STARTED
 Last activity: 2026-09-23
 
 ### v2.0 Phase Status
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 19 | Raw Directory Inventory | Not started |
+| 19 | Raw Directory Inventory | Complete (2026-09-23) |
 | 20 | pecan_ID Derivation | Not started |
 | 21 | Runner Wiring & D3 Fix | Not started |
 
-**Progress:** [█████░░░░░] 50%
+**Progress:** [███░░░░░░░] 33%
 
 ### v1.0 Position (preserved)
 

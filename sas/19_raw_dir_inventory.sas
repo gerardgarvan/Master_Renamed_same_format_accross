@@ -317,9 +317,23 @@ run;
           %let n_fail = 0;
           %do j = 1 %to &nsheets;
             proc datasets lib=work nolist nowarn; delete &dsname._s&j; quit;
-            data work.&dsname._s&j;
-              set _xlw."%superq(_sh&j)"n;
-            run;
+            /* R3-B-01: dictionary.members returns uppercase memnames; name literals
+               ("SHEET1"n) pass the uppercase string case-sensitively to the XLSX
+               engine, which fails when the actual tab is "Sheet1".  Unquoted SAS
+               names go through SAS case-insensitive resolution and find the tab
+               correctly.  Use unquoted form when the name is a valid SAS identifier
+               (starts with letter or underscore); digit-prefix names still need the
+               literal form but are non-master XLSX files not required by D-06. */
+            %if %sysfunc(prxmatch(%str(/^[A-Za-z_]\w*$/), %superq(_sh&j))) %then %do;
+              data work.&dsname._s&j;
+                set _xlw.&&_sh&j;
+              run;
+            %end;
+            %else %do;
+              data work.&dsname._s&j;
+                set _xlw."%superq(_sh&j)"n;
+              run;
+            %end;
             %if &syserr > 4 %then %do;
               /* Remove any partial copy so existence = success below */
               proc datasets lib=work nolist nowarn; delete &dsname._s&j; quit;

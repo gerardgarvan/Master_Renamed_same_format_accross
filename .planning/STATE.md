@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: pecan_ID + Raw Directory Inventory
-status: defining_requirements
+status: roadmap_ready
 last_updated: "2026-09-23T00:00:00Z"
 last_activity: 2026-09-23
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,50 +21,50 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-22 after v1 milestone)
+See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 **Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Planning next milestone. v1 is archived. Run `/gsd:new-milestone` to define v2 scope.
+**Current focus:** Phase 19 — Raw Directory Inventory. Run `/gsd:plan-phase 19` to begin.
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap defined; ready to plan Phase 19)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-23 — Milestone v2.0 started
+Status: Roadmap ready
+Last activity: 2026-09-23 — v2.0 roadmap created (3 phases, 17 requirements)
+
+### v2.0 Phase Status
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 19 | Raw Directory Inventory | Not started |
+| 20 | pecan_ID Derivation | Not started |
+| 21 | Runner Wiring & D3 Fix | Not started |
+
+**Progress:** [░░░░░░░░░░] 0%
 
 ### v1.0 Position (preserved)
 
-Phase: 08 (documentation-handoff) — EXECUTING
-Plan: 2 of 3
-| Field | Value |
-|-------|-------|
-| Current Phase | 5 — Merge QC (COMPLETE) |
-| Current Plan | 05-03-PLAN.md — all 4 tasks complete; QC-01 through QC-07 pass |
-| Phase Status | Complete |
-| Milestone | 1 of 1 |
-
-**Progress:** [█████████░] 85%
-
-**Phase status at a glance:**
+All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 
 | Phase | Name | Status |
 |---|---|---|
-| 1 | Source Verification & Freeze | ✅ Complete (2 of 2 plans) |
-| 2 | Ownership Map | ✅ Complete (2 of 2 plans) |
-| 3 | Per-Source Normalization | ✅ Complete (6 of 6 plans) |
-| 4 | Merge | ✅ Complete — re-run after 03-06 verified clean (41,150 rows, MRG-07 counts confirmed) |
-| 5 | Merge QC | ✅ Complete (3 of 3 plans) — QC-01 through QC-07 all pass |
-| 6 | Variable Reconciliation | ✅ Complete (3 of 3 plans) |
-| 7 | Cohort & Missingness | ✅ Complete (2 of 2 plans) — PCM-D-05 resolved; g.analytic_cohort 13,890 rows; all 4 assertions pass |
-| 8 | Documentation & Handoff | ✅ Complete (3 of 3 plans) — 176-var DATA_DICTIONARY.xlsx verified, PCM-D-12 recorded (exit code = 3), all four DOC requirements satisfied 2026-09-22 |
-| 15 | Extend the Harmonized Dataset | ✅ Complete (2 of 2 plans) — PCM-D-13 resolved; h_ssdi_death added (29,316 / 71.2%); HARM-07 assertions pass 2026-09-22 |
-| 18 | Supplemental Raw Inventory | ✅ Complete (2 of 2 plans) — all 4 UAT tests pass; PCM-D-15 gate approved 2026-09-22 |
-
-**Phase 3 closure (2026-09-14):** 03-06 complete. PREP-08 flag-dont-null + MRG-07 + PREP-09 scan verified. Phase 3->4->5 re-run clean. PCM-D-10 closed (only anchor-offset negatives in rt_* scan; no additional variables of concern).
+| 1 | Source Verification & Freeze | Complete (2026-08-26) |
+| 2 | Ownership Map | Complete (2026-08-26) |
+| 3 | Per-Source Normalization | Complete (2026-09-14) |
+| 4 | Merge | Complete (2026-08-27) |
+| 5 | Merge QC | Complete (2026-09-14) |
+| 6 | Variable Reconciliation | Complete (2026-09-14) |
+| 7 | Cohort & Missingness | Complete (2026-09-22) |
+| 8 | Documentation & Handoff | Complete (2026-09-22) |
+| 14 | Label-Similarity Sweep | Complete (2026-09-21) |
+| 15 | Extend the Harmonized Dataset | Complete (2026-09-21) |
+| 16 | Rebuild the Analytic Cohort | Complete (2026-09-22) |
+| 17 | Summary Stats by Domain | Complete (2026-09-22) |
+| 18 | Supplemental Raw Inventory | Complete (2026-09-22) |
 
 ---
 
@@ -72,62 +72,48 @@ Plan: 2 of 3
 
 | Metric | Target | Actual | Source |
 |--------|--------|--------|--------|
-| Source row count (md3 spine) | 41,150 | **41,150** ✓ | qc/src_counts.txt |
-| Merged row count | 41,150 | **41,150** ✓ | QC-01, 2026-08-26 |
-| Distinct merged IDs | 41,150 | **41,150** ✓ | Phase 4 assertions |
-| Blank PRECEDE_STUDY_ID | 0 | **0** ✓ | MRG-02 |
-| Surviving NULL strings | 0 | **0** ✓ | QC-03, all char vars |
-| Char vars missing from width ref | 0 | **0** ✓ | QC-02 |
-| Truncated char vars | 0 | **0** ✓ | QC-02 |
-| md8-owned variables (derived) | ~20 | **20** ✓ | QC-04 |
-| QC-04 scoping violations | 0 | **0** ✓ | 20 of 20 passed |
+| Source row count (md3 spine) | 41,150 | **41,150** | qc/src_counts.txt |
+| Merged row count | 41,150 | **41,150** | QC-01, 2026-08-26 |
+| Distinct merged IDs | 41,150 | **41,150** | Phase 4 assertions |
+| Blank PRECEDE_STUDY_ID | 0 | **0** | MRG-02 |
+| Surviving NULL strings | 0 | **0** | QC-03, all char vars |
+| Char vars missing from width ref | 0 | **0** | QC-02 |
+| Truncated char vars | 0 | **0** | QC-02 |
+| md8-owned variables (derived) | ~20 | **20** | QC-04 |
+| QC-04 scoping violations | 0 | **0** | 20 of 20 passed |
 | QC-05 range assertions | 5 | 8 → **5** | three inert ceilings dropped (QC-07, PCM-D-09) |
 | Negative operative intervals | 0 | **67** → nulled by PREP-08 | 52 rt1 + 15 rt2, disjoint |
 | QC-06 unflagged violations | 0 | **0** (after MRG-05) | assertion passes |
-| rt_envelope_flag = 1 | reported | **9** | 5 rt1 + 4 rt2 — flagged, not nulled (PCM-D-08) |
-| MRG-06 gap-fill variables | 5 | **5** ✓ | md8 donor, 0 disagreements (PCM-F-18) |
-| Complete-case N (BMI), merged | — | **12,726** | unchanged by MRG-06 — md8 recovers 0 BMI |
-| Complete-case N (Cognitive), merged | — | 12,128 → **20,540** ✓ | +8,412 from md8 (MRG-06) |
-| Complete-case N (Frailty), merged | — | 14,043 → **23,311** ✓ | +9,268 from md8 (MRG-06) |
-| Complete-case N (all three), merged | — | **6,523** | Measured 2026-09-22 via 16b_cohort_rebuild.sas within-cohort (47.0% of 13,890); 6,523 within cohort |
-| Admitted cohort N | — | **13,890** | INPATIENT 13,223 + OBSERVATION 667; verified 16-01 |
-| Within-cohort BMI | — | **12,726** (91.6%) | ALL BMI values are inside the admitted cohort; PCM-D-05 rationale PASSED |
-| Within-cohort Cognitive | — | **7,252** (52.2%) | 13,288 of 20,540 sit OUTSIDE the cohort (prior merged reference) |
-| Within-cohort Frailty | — | **8,150** (58.7%) | 15,161 of 23,311 sit OUTSIDE the cohort (prior merged reference) |
-| g.analytic_cohort (harmonized) | — | **13,890 rows, 174 cols** | Rebuilt 2026-09-22 from g.master_data_harmonized; includes all h_* columns |
-
-**md8-only block population** — the old "22,473 for the whole block" target was wrong and has
-been removed. Within-md8 population varies by design: `Total_Midazolam_mg` 22,473 (100%),
-`AVG_ABP_Mean` 4,005 (~18%), `BIS_INDEX_LESS_30_COUNT` 3,604 (~16%),
-`ABP_LESS_THAN_60_COUNT` 3,519 (~16%). Monitoring-derived columns are populated only where
-the arterial line or BIS monitor was in use. This is logged, not asserted.
+| rt_envelope_flag = 1 | reported | **9** | 5 rt1 + 4 rt2 -- flagged, not nulled (PCM-D-08) |
+| MRG-06 gap-fill variables | 5 | **5** | md8 donor, 0 disagreements (PCM-F-18) |
+| Complete-case N (BMI), merged | — | **12,726** | unchanged by MRG-06 |
+| Complete-case N (Cognitive), merged | — | 12,128 → **20,540** | +8,412 from md8 (MRG-06) |
+| Complete-case N (Frailty), merged | — | 14,043 → **23,311** | +9,268 from md8 (MRG-06) |
+| Complete-case N (all three), merged | — | **6,523** | 47.0% of 13,890 cohort |
+| Admitted cohort N | — | **13,890** | INPATIENT 13,223 + OBSERVATION 667 |
+| Within-cohort BMI | — | **12,726** (91.6%) | ALL BMI values inside admitted cohort |
+| Within-cohort Cognitive | — | **7,252** (52.2%) | verified 2026-09-22 |
+| Within-cohort Frailty | — | **8,150** (58.7%) | verified 2026-09-22 |
+| g.analytic_cohort (harmonized) | — | **13,890 rows, 174 cols** | rebuilt 2026-09-22 from g.master_data_harmonized |
+| pecan_ID distinct count (merged) | TBD | — | Phase 20 |
+| pecan_ID distinct count (cohort) | TBD | — | Phase 20 |
+| r7/r8/r9 MRN linkage reach | TBD | — | Phase 20 (PID-07) |
 
 ---
-| Phase 06 P01 | 15 | 2 tasks | 1 files |
-| Phase 07 P01 | 30 | 1 tasks | 1 files |
-| Phase 08 P01 | 30 | 1 tasks | 2 files |
-| Phase 14 P01 | 15 | 1 tasks | 1 files |
-| Phase 17 P01 | 140 | 2 tasks | 1 files |
-| Phase 17 P02 | 420 | 2 tasks | 1 files |
-| Phase 17 P03 | 420 | 2 tasks | 1 files |
-| Phase 18 P01 | 15 | 4 tasks | 4 files |
-| Phase 18 P02 | 45 | 3 tasks | 2 files |
-| Phase 16 P01 | 25 | 2 tasks | 1 files |
-| Phase 16 P01 | 25 | 3 tasks | 1 files |
-| Phase 16 P02 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
+**v2.0 (2026-09-23):**
+- Phase 19 added: Raw Directory Inventory (INV-01 through INV-07)
+- Phase 20 added: pecan_ID Derivation (PID-01 through PID-08); depends on Phase 19 (INV-01 checksum, INV-04 key-column flags)
+- Phase 21 added: Runner Wiring & D3 Fix (RUN-01, FIX-01); must follow Phases 19 and 20 to include programs 19 and 20 in 99_run_all.sas
+
+**v1.0 (archived):**
 - Phase 5 added: Merge QC (QC-01 through QC-05)
-- ROADMAP corrected 2026-08-27: Phase 1 restored, Phases 6–8 added (total 8, was 4/5),
-  Phase 4 and 5 descriptions brought in line with the executed code
-
-- AMENDMENT-01 raised 2026-08-26 by the QC-05 abort: adds PREP-08, PREP-09 (Phase 3) and
-  QC-06 (Phase 5); plans 03-06 and 05-03
-
-- Phase 17 added: summary-stats-by-domain-CONTEXT
+- AMENDMENT-01 raised 2026-08-26: adds PREP-08, PREP-09 (Phase 3) and QC-06 (Phase 5)
+- Phase 17 added: summary-stats-by-domain
 - Phase 18 added: Supplemental Raw Inventory
 
 ### Established Decisions
@@ -138,137 +124,48 @@ the arterial line or BIS monitor was in use. This is logged, not asserted.
 - Single ownership per variable (prevents last-wins overwrite, PCM-T-05)
 - md8 stores literal `NULL` where others store blank; md8 numerics were forced to CHAR $4/$11 in prior work
 - Coalescing BMI from other sources recovers nothing; 28,424 missing are missing at source
-- `PRECEDE_Study_ID_1` in md6 is a duplicate column identical to `PRECEDE_STUDY_ID` — proven, then dropped
-- Encoding damage confined to `Base_Procedure_1`, ≤9 rows per file — flag only, do not re-encode
-- SRC-05 runs before SRC-01: blank key is "unique" when it occurs once and must be caught first (01-02)
-- `&SQLOBS` not used anywhere; all counts use explicit `SELECT COUNT(*) INTO :macvar TRIMMED` (01-02)
-- docs/DECISIONS.md created as committed stub before 02_ownership.sas runs (02-01)
-- Stale-artifact filter uses `IN` not `IN:` — `IN:` prefix match would readmit master_data_7b (02-01)
-- PROC CONTENTS writes to work.allvars; filter step writes to work.allvars_src — no in-place rewrite (02-01)
-- src libname left open at end of 02_ownership.sas Plan 01; Plan 02 needs src for coalesce reads (02-01)
-- Ownership enforced by generated `KEEP=` lists, NOT `RENAME=` — the `_d_varname_mdN` scheme
-  overflows SAS's 32-char variable-name limit on a dozen-plus variables and will not compile (04-01)
+- `PRECEDE_Study_ID_1` in md6 is a duplicate column identical to `PRECEDE_STUDY_ID` -- proven, then dropped
+- Encoding damage confined to `Base_Procedure_1`, <=9 rows per file -- flag only, do not re-encode
+- SRC-05 runs before SRC-01: blank key is "unique" when it occurs once and must be caught first
+- `&SQLOBS` not used anywhere; all counts use explicit `SELECT COUNT(*) INTO :macvar TRIMMED`
+- KEEP= lists generated from `qclib.ownership_map` at run time, never hand-transcribed
+- Ownership resolution is a RULE (md3 if present, else highest-row-count source, ties to lowest number), with md7 override for five frailty components
+- QC-05 bounds calibrated to OBSERVED data: Admit_BMI 10-100, Cognitive_Score 0-3
+- Age_at_Encounter floor of 18 is a type-sanity guard only; do NOT tighten to 64 (PCM-D-07 deferred)
+- g library lives OUTSIDE the git working tree -- `git clean -xdf` deletes ignored files
+- Impossible VALUES are nulled at source (PREP-08); impossible COMBINATIONS are flagged, not nulled (MRG-05)
+- PCM-D-05 RESOLVED 2026-09-21: analytic cohort restricted to INPATIENT+OBSERVATION (N=13,890); BMI forces restriction
+- PCM-D-15 APPROVED 2026-09-22: per-column gap candidates for r1-r9 extension columns; wiring deferred to v2.1 pending PID-07 result
+- PCM-D-16 DIAGNOSED: r7/r8/r9 2022 IDs match 0 base rows -- schema-change-era format change; documented, not fixed
+- PCM-T-12 (method): sweep ALL candidates, do not spot check -- Cognitive_Category and Frailty_Category were found only by full sweep
 
-- KEEP= lists are generated from `qclib.ownership_map` at run time, never hand-transcribed (04-01)
-- LENGTH block uses each variable's OWNER width, not the cross-source max — only the owner's
-  copy reaches the merge under KEEP= (04-01)
+### Open Decisions (v2.0 blockers)
 
-- Ownership resolution is a RULE (md3 if present, else highest-row-count source, ties to lowest
-  number), with an explicit md7 override for the five frailty components on the width signal (04-01)
+- **PCM-D-17** -- pecan_ID derivation method + MRN retention: surrogate integer vs hash; whether raw ENCRYPTED_MRN is retained alongside pecan_ID. Must be resolved before Phase 20 plan executes.
+- **PCM-D-18** -- pecan_ID attach point: which datasets receive pecan_ID (merged only, or also harmonized and analytic cohort). Must be resolved before Phase 20 plan executes.
 
-- QC-04 covers the md8-OWNED single-source block, NOT the eight PREP-03 conversion targets —
-  those are md3-owned and span all 41,150 rows (05-01)
+### Pending Todos
 
-- QC-05 bounds are calibrated to OBSERVED data: Admit_BMI 10–100 (observed max 88.32; a
-  ceiling of 80 would abort on correct data), Cognitive_Score 0–3 (NOT MMSE 0–30) (05-01)
-
-- Age_at_Encounter floor of 18 cannot fire (observed min 64) and is a type-sanity guard only.
-  Do NOT tighten it to 64 before PCM-D-07 is resolved (05-01)
-
-- The g library lives OUTSIDE the git working tree — `git clean -xdf` deletes ignored files (03-01)
-- All pipeline paths are on P: — g_path, logs_path, qc_path. QC reports are therefore NOT
-  version-controlled; copy to the repo qc/ folder separately if commit history is wanted
-
-- Preserve rather than reconcile: where two sources name the same concept differently and
-  nothing verifies they measure the same thing, both columns are kept (D-01, D-02, D-03)
-
-- Impossible VALUES are nulled at source (PREP-08); impossible COMBINATIONS are flagged, not
-  nulled (MRG-05) — nulling a combination destroys good values to punish an unidentifiable one
-
-- A bound that has never fired and cannot fire is not a check (QC-07). Floors at source,
-  containment by relationship assertion
-
-- **PCM-F-17 WITHDRAWN 2026-08-27 — it was false.** It claimed md3-owns costs nothing, on a
-  check that tested md3<-md5 and md3<-md6 and OMITTED md8, the largest non-spine source.
-  md5 and md6 hold only duplicates, so the zeros were real but irrelevant. See PCM-F-18.
-
-- **PCM-D-05 RESOLVED 2026-09-21** — Analytic cohort restricted to INPATIENT + OBSERVATION
-  (N = 13,890). Rationale: Admit_BMI forces the restriction -- all 12,726 BMI values are
-  inside the admitted cohort, zero ambulatory. Old rationale PCM-F-12 is VOID after MRG-06.
-  g.analytic_cohort rebuilt from g.master_data_harmonized by sas/16b_cohort_rebuild.sas
-  (HARM-10 satisfied). Decided by Gerard. See docs/DECISIONS.md for full entry.
-
-- **PCM-F-18** — md3-owns DID discard data, from md8 only. A sweep of all 578 owner/donor/
-  variable combinations found exactly five variables losing values, all donated by md8,
-  all with ZERO disagreements where both sources hold a value:
-    Cognitive_Score 8,412 | Cognitive_Category 8,445 | Frailty_Score 9,268 |
-    Frailty_Category 1,789 | ORAL_MORPHINE_EQUIV_mg_POD_DAY6 7,695
-  Arithmetic confirms: 12,128 + 8,412 = 20,540 and 14,043 + 9,268 = 23,311, matching the
-  Phase 7 expectations that had been failing.
-
-- **PCM-T-12 (method)** — spot checks produced the wrong answer twice on this question. The
-  variables at risk were not the ones anyone would have guessed: Cognitive_Category and
-  Frailty_Category were found only by sweeping every shared variable. Sweep, do not sample.
-
-### Pending Decisions (blockers)
-
-**Resolved 2026-08-27** — see `docs/DECISIONS.md`:
-
-- **PCM-D-01** — Death variable naming: **keep separate**. Three columns in the merged file
-- **PCM-D-02** — Frailty component encoding: **keep separate**. Ten columns for five concepts
-- **PCM-D-03** — ISO_SEV naming: **keep separate**. md8's is a TOTAL, not an average
-- **PCM-D-04** — Emergent usability: **retain despite rarity**; caveat in the data dictionary
-- **PCM-D-06** — PRECEDE_Study_ID_1: resolved as drop (PREP-04), proven identical first
-- **PCM-D-07** — Age floor of 64: **deferred, not pursuing**. The QC-05 floor of 18 stays a
-  type-sanity guard — do NOT tighten it to 64
-
-- **PCM-D-08** — The 9 envelope-violating rows: **flag, don't null** (`rt_envelope_flag`,
-  MRG-05, derived in Phase 4). QC-06 asserts zero UNFLAGGED violations and passes
-
-- **PCM-D-09** — QC-05 operative-interval ceilings: **drop them** (QC-07). QC-05 8 → 5 assertions
-- **PCM-D-11** — md3-owns missingness: **REOPENED then RESOLVED 2026-08-27.** The original
-  closure ("costs nothing") was wrong — see PCM-F-17 withdrawn / PCM-F-18. Resolved by
-  MRG-06: `04_merge.sas` builds `work.md8_donors` and fills md3's blanks from md8 for the
-  five affected variables. One-way only — an md3 value is never overwritten.
-
-**Still open:** None -- all numbered decisions resolved as of Phase 16.
-
-- **PCM-D-10** — CLOSED 2026-09-14: PREP-09 scan showed only rt_ANCHOR_to_*_days negatives (expected offsets). No other rt_*_mins variable had negatives. Retain-with-doc, no further action. See docs/DECISIONS.md.
-
-**Follow-up item (PCM-D-05):**
-
-- Inform Price of PCM-D-05 resolution (decided by Gerard, 2026-09-21; admitted-only cohort,
-  BMI-forces-it rationale). Update DECISIONS.md attribution line from "Price: informed" to
-  reflect Price's response once received.
-
-**Phase 6 is no longer blocked on Price.** D-01 and D-02 were its entry conditions and both are
-resolved as keep-separate, which is a valid resolution. Phase 6 is now largely a documentation
-exercise: record the three multi-column concepts in the data dictionary.
-
-### Todos
-
-- Report upstream to the PeCAN data group: the source system emits impossible operative
-  timestamp combinations (9 rows) and negative intervals concentrated in percutaneous services
-  (46% Neurosurgery, 20% EP/interventional cardiology among the 52)
-
-- Raise with the PeCAN data group: the source system records incision/dressing times for
-  percutaneous procedures that do not have them (46% Neurosurgery, 20% EP/interventional
-  cardiology among the 52). Affects anyone using operative duration in this cohort
-
-- Decide whether `.planning/PROJECT.md` should be replaced by the full original — the condensed
-  version dropped the PCM-T-01..T-11 trap list, which is what prevents the CATS-truncation and
-  `data X; set X;` incidents recurring
-
-- Copy `ownership_map.sas7bdat` to the P: qc path if running Phase 5 on a machine that did not run Phase 2
+- Inform Price of PCM-D-05 resolution (decided by Gerard 2026-09-21; update attribution on Price's response)
+- Report to PeCAN data group: source system emits impossible operative timestamp combinations (9 rows) and negative intervals concentrated in percutaneous services
+- Decide whether `.planning/PROJECT.md` should restore the full PCM-T-01..T-11 trap list
+- Copy `ownership_map.sas7bdat` to P: qc path if running Phase 5 on a machine that did not run Phase 2
 
 ### Blockers
 
-- Phase 5 is COMPLETE — QC-01 through QC-07 all pass; 41,150 rows, 9 envelope-flagged rows
-- Phase 6 is NO LONGER blocked — D-01 and D-02 resolved as keep-separate 2026-08-27
-- No decision blockers remain for Phases 3–6. D-05 is a Phase 7 question; D-10 needs the
-  PREP-09 report that 03-06 produces
+- PCM-D-17 and PCM-D-18 must be resolved before Phase 20 plans can execute (they are referenced in PID-04 and PID-05 assertions)
+- Phase 21 is blocked on completion of Phases 19 and 20 (programs 19 and 20 must exist before runner wiring)
 
 ---
 
 ## Session Continuity
 
-To resume: read this file, then `ROADMAP.md`, then `.planning/AMENDMENT-01-timestamp-integrity.md`,
-then `03-06-PLAN.md`.
+To resume: read this file, then `.planning/ROADMAP.md`, then `.planning/REQUIREMENTS.md`.
 
 **Key file locations:**
 
 - Source data: `P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\` (read-only)
-- g library: P: merge tree — **outside the git working tree** (PCM-C-04)
+- g library: P: merge tree -- **outside the git working tree** (PCM-C-04)
 - SAS programs: `sas/` (version-controlled, local disk)
 - QC outputs: `qc/` on the P: merge tree
 - Logs: `logs/` on the P: merge tree
@@ -277,8 +174,7 @@ then `03-06-PLAN.md`.
 
 **Do NOT** put the git repo on the P: drive (slow + index corruption risk).
 **Do NOT** commit `*.sas7bdat`, `*.xlsx`, `*.csv`, or anything under `data/` (PHI).
-**Do** restart the SAS session between programs — `%abort cancel` leaves an interactive
-session that swallows the next submit without executing it.
+**Do** restart the SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-22 — Phase 8 complete; PCM-D-12 recorded (exit code = 3, -sasuser WORK required in headless batch); DATA_DICTIONARY.xlsx verified 176 vars, KEY sheet leftmost; all eight phases have reviewable git commits; git status clean*
+*Last updated: 2026-09-23 — v2.0 roadmap created; 3 phases (19-21), 17 requirements mapped; ready for `/gsd:plan-phase 19`*

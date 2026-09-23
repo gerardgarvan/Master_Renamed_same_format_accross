@@ -27,12 +27,9 @@
 - [ ] **PID-07** — User can see which raw files carry ENCRYPTED_MRN (from INV-04 key-column flags) and their match rate to `g.pecan_id_xwalk`; output explicitly tests whether r7/r8/r9 (2022 files) link on MRN where they failed on PRECEDE_STUDY_ID (PCM-D-16)
 - [ ] **PID-08** — User can find pecan_ID with a derivation note in `DATA_DICTIONARY.xlsx`; PCM-D-17 and PCM-D-18 are recorded, attributed, and dated in `DECISIONS.md`
 
-### Runner Wiring (Carry-over from v1)
+### Runner Wiring & D3 Fix (Phase 21)
 
 - [ ] **RUN-01** — User can execute the full pipeline end-to-end via `99_run_all.sas`, covering programs 1–8, 10b, 16b, 17, 18, 19, and 20; each program is a separate batch invocation per PCM-C-05 (restart SAS between programs; exit code 3 on abort per PCM-D-12)
-
-### D3 Cognitive Fix (Carry-over from v1)
-
 - [ ] **FIX-01** — User can regenerate `qc/17_summary_stats_by_domain.xlsx` with COGNITIVE_SCORE and COGNITIVE_CATEGORY assigned to instrument stat_route in the domain lookup DATALINES, applied under the DOMAIN_MAP_APPROVED gate; the regenerated workbook contains a D3 sheet and both cognitive variables appear on it
 
 ---
@@ -48,7 +45,7 @@
 - REC-05 (PCM-D-07) — Age floor of 64 investigation: upstream inclusion criterion; not pursuing
 - Statistical modelling — project ends at analysis-ready file
 - INS abstract / dCDT pipeline — separate project
-- UTF-8 encoding repair — encoding damage confined to ≤9 rows of Base_Procedure_1; flag only (PCM-C-01)
+- UTF-8 encoding repair — encoding damage confined to <=9 rows of Base_Procedure_1; flag only (PCM-C-01)
 
 ---
 
@@ -56,20 +53,20 @@
 
 | REQ-ID | Phase | Notes |
 |--------|-------|-------|
-| INV-01 | 19 | |
+| INV-01 | 19 | Checksum record reused by PID-01 |
 | INV-02 | 19 | |
 | INV-03 | 19 | |
-| INV-04 | 19 | Required by PID-07 |
+| INV-04 | 19 | Key-column flags reused by PID-07 |
 | INV-05 | 19 | |
 | INV-06 | 19 | |
 | INV-07 | 19 | |
 | PID-01 | 20 | Depends on INV-01 checksum record |
 | PID-02 | 20 | |
 | PID-03 | 20 | |
-| PID-04 | 20 | |
-| PID-05 | 20 | |
+| PID-04 | 20 | Depends on PCM-D-17 resolution |
+| PID-05 | 20 | Depends on PCM-D-18 resolution |
 | PID-06 | 20 | |
-| PID-07 | 20 | Depends on INV-04 |
+| PID-07 | 20 | Depends on INV-04 key-column flags |
 | PID-08 | 20 | |
-| RUN-01 | 21 (TBD) | |
-| FIX-01 | 21 (TBD) | |
+| RUN-01 | 21 | Must follow Phases 19 and 20 (programs 19, 20 included) |
+| FIX-01 | 21 | Independent of Phases 19/20; grouped for delivery efficiency |

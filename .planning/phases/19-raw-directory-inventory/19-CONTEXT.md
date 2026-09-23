@@ -14,7 +14,7 @@ Output: `qc/19_raw_inventory.xlsx` with sheets FILES, SHEETS, VARIABLES,
 KEY_COLUMNS, RECONCILIATION, FAMILIES, KEY (KEY leftmost).
 
 Note: INV-07 as written lists FILES, SHEETS, VARIABLES, KEY_COLUMNS, RECONCILIATION —
-the FAMILIES sheet (added by D-05) and KEY sheet must be reflected there before Phase 19
+the FAMILIES sheet (added by D-04) and KEY sheet must be reflected there before Phase 19
 plans execute; update REQUIREMENTS.md accordingly.
 
 </domain>
@@ -55,23 +55,25 @@ plans execute; update REQUIREMENTS.md accordingly.
 - **D-03:** Every column in every readable file appears individually in the
   VARIABLES sheet (satisfies INV-03 literally; 40,000+ rows is well within
   Excel's 1,048,576-row limit).
-- Missingness is computed in one pass per file:
-  - PROC MEANS with `NMISS` option for numeric columns (counts true SAS missing `.`)
-  - A single DATA step scanning all character columns in one read for char vars
-  Not one query per variable — that would be prohibitively slow on r2 (3,987 cols).
-- **Sentinel separation (two columns, not one):** Report `pct_missing` (true SAS
-  missing only, as produced by NMISS / char-scan) and `pct_sentinel` (values that
-  are `-999` for numerics or the literal string `NULL` for character columns)
-  as separate VARIABLES columns. Rationale:
-  - PROC MEANS NMISS does not count `-999`, so folding sentinels into
-    `pct_missing` would silently understate dCDT missingness.
-  - `-999` may be a legitimate non-missing value in files outside dCDT;
-    applying a recode universally would overstate missingness there.
-  - Two columns keep the raw count transparent without making a silent
-    recoding choice. The consumer decides how to treat sentinels.
-  - `pct_sentinel` is counted in the same pass: the numeric DATA step or
-    PROC MEANS extension counts `n(var = -999)` alongside NMISS; the char
-    DATA step counts `upcase(strip(var)) = 'NULL'` alongside blank counts.
+- **Missingness — one DATA step per file, not PROC MEANS:** Use a single DATA
+  step with a `_numeric_` array and a `_character_` array, reading every row
+  of the imported dataset in one pass. For each variable accumulate:
+  - `n_missing`: count of true SAS missing (`.` for numeric; `' '` for char)
+  - `n_sentinel`: count of `-999` for numerics; `upcase(strip(var)) = 'NULL'`
+    for character columns
+  PROC MEANS is not used for this step — it has no option to count `-999`,
+  and adding it would still require a second pass for character sentinels.
+  One DATA step handles all four counts in a single read; it is correct for
+  r2's 3,987 columns and produces no per-variable queries.
+- **Sentinel separation (two columns, not one):** Report `pct_missing` (true
+  SAS missing only) and `pct_sentinel` (`-999` / `NULL`) as separate VARIABLES
+  columns. Rationale:
+  - `-999` is not counted by NMISS, so folding sentinels into `pct_missing`
+    would silently understate dCDT missingness.
+  - `-999` may be legitimate outside dCDT; a universal recode would overstate
+    missingness there.
+  - Two columns keep the raw counts transparent; the consumer decides how to
+    treat sentinels.
 - INV-04 key-column detection sweeps every column name regardless of family,
   because a key column could sit inside a wide family.
 - **Type note (KEY sheet):** Column type in VARIABLES reflects the type as
@@ -86,33 +88,45 @@ plans execute; update REQUIREMENTS.md accordingly.
   in the program, following the concept_decisions.csv pattern: the program
   applies exactly what is listed; a new family is a one-line edit.
 - **Exclusion mechanism — longest-match-wins:** Rather than a plain prefix
-  table with a separate exclude flag, use longest-match assignment. Map the
-  longer specific prefix first, then the shorter general one. Example:
-  - `COMP10_` → `complications` (longer, matched first)
-  - `complication_sum` → `complications` (exact match row)
-  - `COM` → `dCDT` (shorter, matched only when neither longer rule fires)
-  This is simpler to audit than an exclude flag: every column's family
-  assignment is deterministic and visible by reading the DATALINES rows in
-  order of decreasing prefix length.
-- Families identified in Phase 18 (minimum list; extend as needed):
+  table with a separate exclude flag, use longest-match assignment. The lookup
+  table is sorted by descending prefix length in code (not by DATALINES row
+  order, which is fragile to one-line insertions) before matching. Example
+  assignments after sorting:
+  - `COMP10_` → `complications` (length 7, matched first)
+  - `complication_sum` → `complications` (exact-match row, also length > 3)
+  - `COM` → `dCDT` (length 3, matched only when no longer prefix fires)
+  Every column name is uppercased before comparison so that `complication_sum`
+  (lowercase) matches `COMPLICATION_SUM` in the lookup without a separate row.
+- **COM scouting step (before locking DATALINES):** `COM` is broad — it would
+  also capture `COMORBID*`, `COMMENT*`, `COMPLICATION*` (without `10_`), and
+  anything else starting with those three letters. Before the planner locks the
+  DATALINES prefix list, the researcher must:
+  1. List every column name across all files that starts with `COM` (case-
+     insensitive) and is not already captured by a longer prefix in the list.
+  2. Confirm by inspection that the residual set is dCDT clock columns.
+  3. If the dCDT columns share a longer common prefix (e.g., `CLOCK_`), use
+     that instead of `COM` and remove `COM` from the lookup.
+  This scouting result must be recorded in the plan before coding begins.
+- Families identified in Phase 18 (minimum seed; extend after scouting):
   - `COMP10_` / `complication_sum` → complications
-  - `COM` → dCDT clock features
+  - `COM` → dCDT clock features (subject to scouting result above)
   - `LINUS` → LINUS columns
-  - (Others discovered during scouting of r2 headers can be added)
 - Columns matching no prefix go in `unassigned` per source file.
-- **Assertion (correct implementation):** After building the FAMILIES dataset,
-  compute:
+- **Assertion (correct implementation — full join):** After building the
+  FAMILIES dataset, use a FULL JOIN so that a file with VARIABLES rows but
+  no FAMILIES rows (or the reverse) is not silently dropped by an inner join:
   ```sas
   proc sql noprint;
     select count(*) into :n_bad trimmed
     from (
-      select f.source_file
+      select coalesce(f.source_file, v.source_file) as src
       from (select source_file, sum(n_cols) as fam_total from families
             group by source_file) f
-      join  (select source_file, count(*) as var_total from variables
+      full join
+           (select source_file, count(*) as var_total from variables
             group by source_file) v
         on f.source_file = v.source_file
-      where f.fam_total ne v.var_total
+      where coalesce(f.fam_total, 0) ne coalesce(v.var_total, 0)
     );
   quit;
   ```
@@ -137,13 +151,33 @@ plans execute; update REQUIREMENTS.md accordingly.
   workbook (`qc/19_raw_inventory.xlsx`). This is a separate-file split, not
   a drop-in swap; the plan should not assume otherwise.
 
-### D-06: Unreadable files (listed-not-profiled)
-- **D-06:** Files with extensions outside {sas7bdat, csv, xlsx, xls} (e.g.,
-  PDF, DOCX, ZIP) are listed in FILES with status = `listed-not-profiled`.
-  They receive a checksum (certutil handles any file type) but no row/column
-  counts and no VARIABLES rows.
-- INV-06 assertion: total files in FILES = (profiled count) + (listed-not-profiled
-  count); zero files of unknown status.
+### D-06: File status — three categories, not two
+- **D-06:** Every file discovered in the directory traversal lands in exactly
+  one of three statuses in the FILES sheet:
+  - `profiled` — readable data file (csv, xlsx, xls, sas7bdat) that imported
+    successfully and received row/column counts and VARIABLES rows
+  - `listed-not-profiled` — extension outside the readable set (pdf, docx,
+    zip, etc.); receives a checksum but no data profiling
+  - `read-failed` — extension is in the readable set but import failed (file
+    locked, corrupt, Excel `~$` temp file, or any other import error); receives
+    a checksum and a `fail_reason` column with the error message; no row/column
+    counts or VARIABLES rows
+  `read-failed` is necessary because a locked or corrupt file is neither
+  `listed-not-profiled` (extension says it should be readable) nor silently
+  skipped. Without this status, the only choices are aborting the whole
+  inventory or producing a silent undercount.
+- **Import error handling:** Wrap each import attempt in a macro that uses
+  `%sysfunc(open(...))` or a condition on `%sysfunc(exist(work.&dsname))` after
+  the import to detect failure; set status and reason without `%abort cancel`.
+  The program aborts only if a required file (see D-02b presence check) fails
+  to import.
+- **INV-06 assertion (three terms):** After all files are processed:
+  ```
+  n_profiled + n_listed_not_profiled + n_read_failed = n_total_files
+  ```
+  Assert this with `select count(*) into :n_bad trimmed` on any FILES row
+  whose status is not in (`profiled`, `listed-not-profiled`, `read-failed`);
+  abort if `&n_bad > 0`.
 
 ### D-07: RECONCILIATION sheet — known-file list
 - **D-07:** Known files are the eight md1-md8 master extracts (raw\master)
@@ -217,8 +251,8 @@ plans execute; update REQUIREMENTS.md accordingly.
 - No bare open-code `%IF`; no `%PUT` with apostrophes or embedded semicolons
 - `dictionary.columns.type` is char `'char'`/`'num'` (PCM-T-13); never compare
   to numeric 1/2
-- `PROC MEANS NMISS` for numeric missingness; single DATA step for char —
-  not one query per variable on wide files
+- One DATA step with `_numeric_` and `_character_` arrays for missingness and
+  sentinel counting — not PROC MEANS (cannot count -999), not one query per variable
 
 ### Integration Points
 - Reads: everything under `&raw_path` (recursive, read-only)
@@ -227,8 +261,8 @@ plans execute; update REQUIREMENTS.md accordingly.
 - Does NOT write to any `g.*` dataset
 - Does NOT read `g.analysis_base` or `g.master_data_merged` — standalone scan
 - **Machine-readable FILES output for Phase 20:** In addition to the Excel
-  workbook, program 19 writes `qc/19_raw_files.csv` (or `work.inv_files` saved
-  via PROC EXPORT) containing the FILES dataset — path, filename, checksum, and
+  workbook, program 19 writes `qc/19_raw_files.csv` containing the FILES
+  dataset — path, filename, checksum, and
   status columns. This is not a `g.*` write. Phase 20 (PID-01) reads this CSV
   to verify the md3 source checksum; it does NOT parse the styled Excel
   workbook, which is fragile to ODS type-guessing and formatting on re-import.
@@ -242,17 +276,21 @@ plans execute; update REQUIREMENTS.md accordingly.
   ENCRYPTED_MRN, ENCRYPTED_ENCOUNTER (spaces vs underscores, mixed case,
   positional VARnn from XLSX engine) — PCM-T-12; sweep every column
 - r2 has 3,987 columns and 14,807 rows — one-pass missingness is mandatory
-- Sentinel values (`-999` numeric, literal `NULL` char) are NOT the same as
-  true SAS missing: NMISS does not count `-999`; blank-test does not catch
-  `NULL`. Report as `pct_sentinel` separate from `pct_missing` (see D-03).
-  Do not recode sentinels — that makes a silent choice the consumer should make.
-- `COM` prefix includes complication variables (`COMP10_*`, `complication_sum`)
-  which are NOT dCDT clock features. Use longest-match DATALINES (D-04):
-  map `COMP10_` and `complication_sum` to `complications` before mapping
-  `COM` to `dCDT`, so the longer match fires first.
-- FAMILIES assertion: do NOT use `INTO :check` with `GROUP BY` (captures only
-  first row) and do NOT use `&SQLOBS`. Use `count(*) into :n_bad trimmed` over
-  the joined mismatch subquery (see D-04 for correct pattern).
+- Sentinel values (`-999` numeric, literal `NULL` char) are NOT SAS missing:
+  PROC MEANS NMISS does not count `-999`; blank-test does not catch `NULL`.
+  Use the one-DATA-step approach (D-03): `_numeric_` array counts both `.`
+  and `-999` in one pass; `_character_` array counts both blank and `'NULL'`.
+  Report as `pct_sentinel` separate from `pct_missing`; do not recode.
+- `COM` is broader than dCDT — `COMORBID*`, `COMMENT*`, `COMPLICATION*`
+  (without `10_`) would all land there under a naïve prefix match. Scout all
+  `COM*` columns first (D-04 scouting step); sort the lookup by descending
+  prefix length in code; upcase both sides before matching.
+- FAMILIES assertion must use a FULL JOIN with `coalesce(..., 0)` so that a
+  file with VARIABLES rows but no FAMILIES rows is not dropped. Do NOT use
+  an inner join, `INTO :check` with `GROUP BY`, or `&SQLOBS` (see D-04).
+- Import failures on readable-extension files are `read-failed`, not silently
+  dropped and not cause for aborting the whole inventory (see D-06). An inner
+  check on `%sysfunc(exist(work.&dsname))` after each import detects failure.
 
 </code_context>
 

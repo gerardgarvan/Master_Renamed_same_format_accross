@@ -290,10 +290,12 @@ run;
       %else %do;
         %let nsheets = 0;
         proc sql noprint;
+          /* dictionary.members gives the SAS memname as registered; use it
+             for both the SHEETS row label and the dataset copy reference */
           create table work._sheetlist0 as
           select memname as sheet_name length=200
-          from dictionary.tables
-          where libname = '_XLW';
+          from dictionary.members
+          where libname = '_XLW' and memtype = 'DATA';
           select count(*) into :nsheets trimmed from work._sheetlist0;
         quit;
 
@@ -384,7 +386,7 @@ run;
     %end;
 
     /* nobs / ncols for single-table files (workbooks are in SHEETS) */
-    %if &fstatus = profiled and %length(&dsname) > 0 %then %do;
+    %if %bquote(&fstatus) = profiled and %length(&dsname) > 0 %then %do;
       proc sql noprint;
         select nobs, nvar into :fr_nobs trimmed, :fr_ncols trimmed
         from dictionary.tables

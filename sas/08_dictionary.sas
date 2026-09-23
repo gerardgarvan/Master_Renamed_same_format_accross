@@ -322,14 +322,42 @@ data work.dict_final;
 run;
 
 /* =========================================================================
+   SECTION 5d -- Append explicit pecan_ID row (PID-08, PCM-D-18, D-27)
+   pecan_ID is NOT in g.master_data_merged, so a derivation_map entry would
+   be silently dropped by the LEFT JOIN (Pitfall 1 from RESEARCH.md).
+   Append an explicit row AFTER dict_final is fully assembled.
+   Use dict_final_all intermediary to avoid set-self ambiguity.
+   ========================================================================= */
+
+data work.pecan_row;
+  length varname $64 type $4 length 8 source $32 derivation $200 label $256 coverage_pct 8;
+  varname      = "pecan_ID";
+  type         = "num";
+  length       = 8;
+  source       = "Phase 20";
+  derivation   = "surrogate patient key derived from ENCRYPTED_MRN in Phase 20; attached to g.master_data_harmonized and g.analytic_cohort by programs 10b and 16b";
+  label        = "PeCAN surrogate patient linkage key";
+  coverage_pct = .;
+  output;
+run;
+
+data work.dict_final_all;
+  set work.dict_final work.pecan_row;
+run;
+
+data work.dict_final;
+  set work.dict_final_all;
+run;
+
+/* =========================================================================
    SECTION 6 -- ASSERTIONS (all must pass before ODS EXCEL opens)
    ========================================================================= */
 proc sql noprint;
   select count(*) into :n_final trimmed from work.dict_final;
 quit;
 %macro _gate5;
-  %if &n_final ne &n_dict_meta %then %do;
-    %fail_out(msg=dict_final row count &n_final does not match dict_meta count &n_dict_meta);
+  %if &n_final ne %eval(&n_dict_meta + 1) %then %do;
+    %fail_out(msg=dict_final row count &n_final does not match n_dict_meta + 1 (expected %eval(&n_dict_meta + 1) -- pecan_ID explicit row adds 1));
   %end;
 %mend _gate5;
 %_gate5;

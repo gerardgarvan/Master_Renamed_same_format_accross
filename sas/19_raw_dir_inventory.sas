@@ -835,6 +835,56 @@ run;
 %put NOTE: qc/19_raw_files.csv written -- Phase 20 handoff file ready;
 
 
+/* ---- Phase 20 handoff: key columns CSV ---- */
+proc export data=work.key_columns
+  outfile="&qc_path.\19_raw_key_columns.csv"
+  dbms=csv replace;
+run;
+%put NOTE: qc/19_raw_key_columns.csv written -- Phase 20 PID-07 handoff ready;
+
+/* ---- Phase 20 handoff: sheets CSV (join sheets_out to files_meta for full_path) ---- */
+proc sql noprint;
+  create table work.sheets_csv as
+  select f.full_path, f.filename, s.file_id, s.sheet_seq, s.sheet_name,
+         s.sheet_ds, s.sheet_status, s.nobs, s.ncols
+  from work.sheets_out s
+  inner join work.files_meta f on s.file_id = f.file_id
+  order by f.full_path, s.sheet_seq;
+quit;
+proc export data=work.sheets_csv
+  outfile="&qc_path.\19_raw_sheets.csv"
+  dbms=csv replace;
+run;
+%put NOTE: qc/19_raw_sheets.csv written -- Phase 20 PID-07 handoff ready;
+
+/* ---- Phase 20 handoff: md3 variables CSV (D-11) ---- */
+%macro assert_one_md3_source;
+  %local n_md3_vars_src;
+  proc sql noprint;
+    select count(distinct source_file) into :n_md3_vars_src trimmed
+    from work.variables
+    where upcase(scan(source_file, -1, '\')) =
+          '2018_2022_X_MASTER_DATASET_20240402.CSV'
+      and upcase(scan(source_file, -2, '\')) = 'MASTER';
+  quit;
+  %if &n_md3_vars_src ne 1 %then
+    %fail_out(msg=variables_md3 filter matched &n_md3_vars_src distinct source files -- expected exactly 1);
+%mend assert_one_md3_source;
+%assert_one_md3_source;
+proc sql noprint;
+  create table work.variables_md3 as
+  select * from work.variables
+  where upcase(scan(source_file, -1, '\')) =
+        '2018_2022_X_MASTER_DATASET_20240402.CSV'
+    and upcase(scan(source_file, -2, '\')) = 'MASTER';
+quit;
+proc export data=work.variables_md3
+  outfile="&qc_path.\19_raw_variables_md3.csv"
+  dbms=csv replace;
+run;
+%put NOTE: qc/19_raw_variables_md3.csv written -- Phase 20 D-11 handoff ready;
+
+
 /* ============================================================
    SECTION 13 -- ODS Excel (D-05): KEY leftmost, UF blue headers
    ============================================================ */
@@ -957,6 +1007,15 @@ ods listing;
   %end;
   %if %sysfunc(fileexist(&qc_path.\19_raw_files.csv)) = 0 %then %do;
     %fail_out(msg=OUTPUT MISSING -- qc/19_raw_files.csv was not created);
+  %end;
+  %if %sysfunc(fileexist(&qc_path.\19_raw_key_columns.csv)) = 0 %then %do;
+    %fail_out(msg=OUTPUT MISSING -- qc/19_raw_key_columns.csv was not created);
+  %end;
+  %if %sysfunc(fileexist(&qc_path.\19_raw_sheets.csv)) = 0 %then %do;
+    %fail_out(msg=OUTPUT MISSING -- qc/19_raw_sheets.csv was not created);
+  %end;
+  %if %sysfunc(fileexist(&qc_path.\19_raw_variables_md3.csv)) = 0 %then %do;
+    %fail_out(msg=OUTPUT MISSING -- qc/19_raw_variables_md3.csv was not created);
   %end;
   %put NOTE: Phase 19 outputs verified;
 %mend verify_output;

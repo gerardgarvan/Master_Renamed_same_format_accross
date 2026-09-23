@@ -36,21 +36,34 @@ Two independent deliverables:
 
 - **D-04: Warning visibility.** Continuing on exit code 1 can hide unexpected warnings in programs 1-8. The driver scans each log for `WARNING:` lines after the program exits and writes the count to its summary. Log scanning is summary-only -- it never stops the run; exit code decides that.
 
-- **D-05: `in_pipeline` flag via `RUN_ALL` environment variable.** `-set RUN_ALL 1` creates an OS-level environment variable readable inside each SAS session via `%sysget(RUN_ALL)`. `00_config.sas` must be updated: add a check so that when `%sysget(RUN_ALL) = 1`, `in_pipeline` is set to 1. This suppresses each program's internal PROC PRINTTO redirect, so the `-log` path named by the driver is the single log for that program. The 13 existing programs need no changes.
+- **D-05: `in_pipeline` flag via `RUN_ALL` environment variable.** `-set RUN_ALL 1` creates an OS-level environment variable readable inside each SAS session. `00_config.sas` must be updated to check for it using `envlen` (not `%sysget` directly, which writes a WARNING when the variable is undefined). Correct pattern:
+  ```sas
+  %if %sysfunc(envlen(RUN_ALL)) > 0 %then %do;
+    %if %sysget(RUN_ALL) = 1 %then %let in_pipeline = 1;
+  %end;
+  ```
+  `envlen` returns -1 silently when the variable is absent. The check must set `in_pipeline = 1` unconditionally (not guard with "only if it doesn't already exist"), because `%_set_pipeline_default` today sets `in_pipeline` only when absent. This suppresses each program's internal PROC PRINTTO redirect, so the `-log` path named by the driver is the sole log for that program. The 13 existing programs need no changes.
 
 - **D-06: Master log.** `logs/99_run_all.log` becomes the driver's summary: one line per program with timestamp, exit code, and WARNING count. This replaces the single combined SAS log that the old `%include` runner produced. The per-program logs on the P: drive are the full execution record.
 
-- **D-07: Program order.** Fixed in Phase 20:
-  `1 -- 2 -- 3 -- 4 -- 5 -- 6 -- 7 -- 8 -- 19 -- 20 -- 10b -- 16b -- 17 -- 18`
-  Programs 10 (concept_profile) and 14 (label_similarity) are human-gated prerequisites, not pipeline steps; they are NOT included in the driver.
+- **D-07: Program order and exact file names.** The driver must enumerate file names explicitly (Phase 3 alone involves multiple prep programs). Take the exact list and order from `sas/99_run_all.sas` (the current %include-based runner). The sas.exe path varies by machine; define it as a variable at the top of the `.cmd` script. Programs 10 (`10_concept_profile.sas`) and 14 (`14_label_similarity.sas`) are human-gated prerequisites, not pipeline steps; they are NOT in the driver.
+
+- **D-07a: `g.analysis_base` provenance -- OPEN QUESTION requiring human input before plan execution.** Program 17 reads `g.analysis_base` as its primary source. No program in the repo writes this dataset -- it is a P: drive artifact of unknown provenance. If no runner program produces it, a clean end-to-end run per RUN-01 depends on a pre-existing file the pipeline cannot rebuild. Two resolution paths:
+  - **Option A (v2.0):** Identify what created `g.analysis_base` and confirm it is equivalent to `g.analytic_cohort` (what 16b now produces). If so, add an explicit step or alias before program 17.
+  - **Option B (v2.1):** Update program 17 to read `g.analytic_cohort` instead of `g.analysis_base`. Scope this as a v2.1 change and document the dependency explicitly in RUN-01's acceptance criteria.
+  **Gerard must decide Option A or B before the plan can finalize program 17's treatment.**
 
 - **D-08: Human-gated programs run as-is.** Program 17 runs with whatever `DOMAIN_MAP_APPROVED` value is set in the source file. Program 18 runs with whatever `D15_APPROVED` value is set in `00_config.sas`. The driver does not inject gate values; those are set by the analyst before the run.
 
 ### FIX-01: D3 Cognitive Domain Fix
 
-- **D-09: DOMAIN_MAP_APPROVED=1 is the entire fix (PCM-D-19).** The DATALINES rows for `COGNITIVE_SCORE` and `COGNITIVE_CATEGORY` at lines 1711-1712 of `17_summary_stats_by_domain.sas` are correct: domain=D3, assign_rule=instrument. `stat_route` is computed from `vtype`/`n_levels`, not stored in the lookup, so no structural change is needed. The gate at line 145 (`%let DOMAIN_MAP_APPROVED = 0`) is changed to 1 with a comment recording this as PCM-D-19, attributed to Gerard, 2026-09-23. The comment should note that this approval supersedes the v1 checkpoint-2 approval (which was made when D3 was missing) and confirms the D3 sheet is populated.
+- **D-09: DOMAIN_MAP_APPROVED=1 is the entire code change (PCM-D-19).** The DATALINES rows for `COGNITIVE_SCORE` and `COGNITIVE_CATEGORY` at lines 1711-1712 of `17_summary_stats_by_domain.sas` are correct: domain=D3, assign_rule=instrument. `stat_route` is computed from `vtype`/`n_levels`, not stored in the lookup, so no structural change is needed. Sequence for this deliverable:
+  1. Set the gate (`%let DOMAIN_MAP_APPROVED = 0` → 1) with a comment pointing to PCM-D-19 in DECISIONS.md; do not assert the result in the comment.
+  2. Run program 17.
+  3. Open the workbook and confirm the D3 sheet is present and populated.
+  4. Add PCM-D-19 to `docs/DECISIONS.md` alongside D-17 and D-18, stating that it supersedes the v1 checkpoint-2 approval (which was made when D3 was absent) and recording the confirmed result.
 
-- **D-10: No pecan_ID DATALINES row needed.** `pecan_ID` is not in `g.master_data_merged` (PCM-D-05: merged file is untouched). `g.analysis_base` is a pre-v2 artifact that predates Phase 20 and does not carry pecan_ID. Program 17's two inputs are both pecan_ID-free; Section 3b's identifier regex and GUARD 5 are not triggered. No DATALINES entry is required.
+- **D-10: No pecan_ID DATALINES row needed.** `pecan_ID` is not in `g.master_data_merged` (PCM-D-05: merged file is untouched). `g.analysis_base` predates Phase 20 and does not carry pecan_ID. Program 17's two inputs are both pecan_ID-free; Section 3b's identifier regex and GUARD 5 are not triggered. No DATALINES entry is required. (Note: if D-07a resolves to Option B and program 17 is redirected to read `g.analytic_cohort`, this decision must be revisited, since `g.analytic_cohort` does carry pecan_ID.)
 
 - **D-11: Variable name case is not an issue.** The Section 4 join upcases both sides (`upcase(strip(ds.varname)) = dl.varname_u`), so `Cognitive_Score` from 16b matches `COGNITIVE_SCORE` in the lookup. No rename needed.
 
@@ -90,7 +103,7 @@ Two independent deliverables:
 ### Established Patterns
 - `start "" /wait sas.exe -sysin ... -log ... -nosplash -icon -sasuser WORK` is the correct Windows batch pattern for waiting on a GUI executable and capturing its exit code
 - `-set VAR VALUE` creates an OS environment variable; `%sysget(VAR)` reads it inside SAS -- this is the only way to pass a flag across separate sas.exe sessions without modifying program source files
-- Programs 19 and 20 call `%sysget(XCMD_ENABLED)` already -- same mechanism; follow that pattern in 00_config.sas for RUN_ALL
+- Use `%sysfunc(envlen(VAR))` to test presence before calling `%sysget`; `envlen` returns -1 silently when absent, whereas `%sysget` writes a WARNING
 
 ### Integration Points
 - `00_config.sas` is `%include`d as the first statement in every program -- the RUN_ALL check goes there, not in individual programs
@@ -104,7 +117,9 @@ Two independent deliverables:
 
 - `start "" /wait` is mandatory for `sas.exe` (GUI app); omitting it breaks exit-code capture
 - `.cmd` over PowerShell: no execution-policy risk on UF-managed machines
-- PCM-D-19 comment in program 17 must state: approval supersedes v1 checkpoint-2 (made when D3 was missing); confirms D3 sheet is populated in the new run
+- **`%ERRORLEVEL%` inside `FOR` or parenthesized `IF` blocks is unreliable** -- it is expanded once when the block is parsed, not after each program runs. Use `setlocal EnableDelayedExpansion` with `!ERRORLEVEL!`, or keep each launch and exit-code check as flat (non-nested) lines. The driver must also exit with a nonzero code on overall failure so a scheduler can detect it, and print a single PASS/FAIL summary line at the end.
+- The sas.exe path must be a variable at the top of the `.cmd` script (SASHome location varies by machine)
+- PCM-D-19 code comment in program 17 points to DECISIONS.md entry; it does not assert the workbook result (which is confirmed post-run, not pre-run)
 - DATALINES rules (apply if any new row is ever added): no em dashes (use `--`), no commas inside the description field, ASCII only
 
 </specifics>

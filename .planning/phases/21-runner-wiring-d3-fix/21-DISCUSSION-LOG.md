@@ -56,6 +56,8 @@ Order: 1-8 -- 19 -- 20 -- 10b -- 16b -- 17 -- 18
 
 User correction: description had the 20/10b dependency direction wrong. Program 20 writes g.pecan_id_xwalk; program 10b reads it (not the reverse).
 
+Claude corrected premise: pecan_ID is not in g.master_data_merged (PCM-D-05 -- merged file untouched); g.analysis_base predates Phase 20. No DATALINES row for pecan_ID needed (under current program 17 inputs).
+
 Programs 10 (concept_profile) and 14 (label_similarity) are human-gated prerequisites -- NOT in the runner.
 
 ---

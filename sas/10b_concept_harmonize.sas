@@ -953,6 +953,72 @@ quit;
 
 
 /* =========================================================================
+   SECTION 5b: Attach pecan_ID (PID-05, PCM-D-18)
+   WORK-then-promote pattern (PCM-T-02: no in-place rewrite of g.* datasets).
+   g.pecan_id_xwalk built by program 20 (Phase 20 Plan 01, Wave 1).
+   ========================================================================= */
+
+proc sql noprint;
+  create table work.harmonized_with_pid as
+  select h.*, x.pecan_ID
+  from g.master_data_harmonized as h
+  left join g.pecan_id_xwalk as x
+    on h.ENCRYPTED_MRN = x.ENCRYPTED_MRN
+  order by h.PRECEDE_STUDY_ID;
+quit;
+
+data g.master_data_harmonized;
+  set work.harmonized_with_pid;
+run;
+
+/* PID-05 attachment assertions */
+%macro assert_pecan_attach;
+  %local n_post n_blank_pid n_dup_pid;
+  proc sql noprint;
+    select count(*) into :n_post trimmed from g.master_data_harmonized;
+    select count(*) into :n_blank_pid trimmed
+    from g.master_data_harmonized
+    where pecan_ID is missing
+      and not missing(ENCRYPTED_MRN)
+      and strip(upcase(ENCRYPTED_MRN)) ne 'NULL';
+    select count(*) into :n_dup_pid trimmed
+    from (
+      select PRECEDE_STUDY_ID, count(distinct pecan_ID) as n_pid
+      from g.master_data_harmonized
+      group by PRECEDE_STUDY_ID
+      having calculated n_pid > 1
+    );
+  quit;
+  %put NOTE: [10b] PID-05 post-attach row count: &n_post;
+  %put NOTE: [10b] PID-05 blank pecan_ID where MRN non-blank/non-NULL: &n_blank_pid;
+  %put NOTE: [10b] PID-05 PRECEDEs with more than one pecan_ID: &n_dup_pid;
+  %if &n_post ne &n_rows %then %do;
+    %fail_out(msg=PID-05 ABORT -- g.master_data_harmonized row count changed after pecan_ID join: &n_post rows expected &n_rows);
+  %end;
+  %if &n_blank_pid > 0 %then %do;
+    %fail_out(msg=PID-05 ABORT -- &n_blank_pid rows have blank pecan_ID with non-blank non-NULL ENCRYPTED_MRN);
+  %end;
+  %if &n_dup_pid > 0 %then %do;
+    %fail_out(msg=PID-05 ABORT -- &n_dup_pid PRECEDE_STUDY_IDs have more than one distinct pecan_ID after attachment);
+  %end;
+  %put NOTE: [10b] PID-05 all attachment assertions passed;
+%mend assert_pecan_attach;
+%assert_pecan_attach;
+
+/* Column-count confirmation: g.master_data_harmonized must have 175 columns */
+%macro assert_harm_175;
+  %local n_hc;
+  proc sql noprint;
+    select count(*) into :n_hc trimmed from dictionary.columns
+    where libname='G' and upcase(memname)='MASTER_DATA_HARMONIZED';
+  quit;
+  %if &n_hc ne 175 %then %fail_out(msg=g.master_data_harmonized has &n_hc columns after pecan_ID join%str(,) expected 175);
+  %put NOTE: [10b] g.master_data_harmonized has 175 columns after pecan_ID attach;
+%mend assert_harm_175;
+%assert_harm_175;
+
+
+/* =========================================================================
    SECTION 6: Assertions
    ========================================================================= */
 

@@ -3,6 +3,7 @@ phase: 19
 reviewers: [human-author]
 reviewed_at: 2026-09-23
 plans_reviewed: [19-01-PLAN.md, 19-02-PLAN.md]
+review_rounds: 2
 ---
 
 # Cross-AI Plan Review — Phase 19
@@ -135,6 +136,93 @@ Plan 01 defers COM scouting to runtime (the executor runs a query and reviews th
 - Section-by-section structure mirrors CONTEXT.md decisions precisely
 - INV-06 three-term assertion and FAMILIES full-join assertion are correctly planned
 - Plan 02 wave/checkpoint split is appropriate
+
+### Divergent Views
+
+None — single reviewer.
+
+---
+
+## Human Author Review — Round 2 (post-revision read-through)
+
+### Summary
+
+All Round 1 issues landed correctly. A close read of the revised code sketches reveals five further problems: three that break the run and two that produce wrong results, plus three smaller correctness issues.
+
+---
+
+## Bugs That Would Break the Run
+
+### R2-B-01 — `=:` operator invalid in PROC SQL (CRITICAL)
+
+Section 8 key-column query uses `upcase(var_name) =: 'ENCRYPTED_MRN'`. The `=:` starts-with operator is valid in DATA step `WHERE` clauses but **PROC SQL rejects it** — syntax error, run stops.
+
+Fix: use `eqt` (sounds-like/starts-with in SQL context is not the right operator — use `upcase(var_name) like 'ENCRYPTED_%'` is tempting but `_` is a wildcard in LIKE). The correct replacement is to test the prefix explicitly:
+
+```sas
+substr(upcase(compress(var_name,' _-')), 1, 9) = 'ENCRYPTED'
+```
+
+or use `index(upcase(var_name), 'ENCRYPTED_') = 1`. Either avoids the invalid `=:` and avoids the LIKE `_` wildcard problem.
+
+### R2-B-02 — `&dsname_&sheetnum` resolves wrong macro variable (CRITICAL, silent)
+
+In Section 6's xlsx import branch, `&dsname_&sheetnum` causes SAS to look for a macro variable named `dsname_` (which doesn't exist), so the reference resolves to blank and every sheet copy fails silently — every workbook including md8 comes out `read-failed`, and `%assert_masters_profiled` then aborts the run.
+
+Fix: `&dsname._&sheetnum` — the period terminates the first macro variable name before the underscore.
+
+### R2-B-03 — PROC PRINT output does not go to the SAS log (CRITICAL)
+
+The COM scouting step uses `PROC PRINT` and `%route_log` only redirects the log channel. Plan 02 both greps the log for "COM scouting" and asks the reviewer to find the list there — neither works if PROC PRINT goes to the ODS output destination instead.
+
+Fix (pick one):
+- Replace `PROC PRINT` with a `DATA _null_; set work.com_scout; put var_name=; run;` so output lands in the log.
+- Or write to a separate `COM_SCOUTING` sheet in the ODS Excel workbook and update the Plan 02 checkpoint to direct the reviewer there instead of the log.
+
+---
+
+## Issues That Would Give Wrong Results
+
+### R2-W-01 — `ENCOUNTERID` and `STUDYID`/`STUDY_ID` violate the W-01 rule
+
+The plan maps `ENCOUNTERID` → `ENCRYPTED_ENCOUNTER` and `STUDYID`/`STUDY_ID` → a study-ID key type, but W-01 (from Round 1) says: only promote to an `ENCRYPTED_*` key type when the column name starts with `ENCRYPTED_`. `ENCOUNTERID` does not start with `ENCRYPTED_` — it should be `UNENC_ENCOUNTER` with `match_basis = 'loose'`. Similarly `STUDYID`/`STUDY_ID` could belong to another study; classify as `match_basis = 'loose'` rather than `match_basis = 'name'`.
+
+### R2-W-02 — Required-file presence check doesn't restrict to `raw\master\`
+
+Section 4 checks that each md1–md8 filename appears somewhere under `raw` (the full recursive listing). If a copy of the md3 CSV sits in another subfolder, the check passes even though the canonical copy in `raw\master\` may be absent. PID-01 would then find two `FILES` rows for md3 and could pick the wrong checksum.
+
+Fix: require the `path` column to contain `\master\` (or the canonical subdirectory). Also assert exactly one `FILES` row per required file — not just ≥1.
+
+---
+
+## Smaller Correctness Fixes
+
+### R2-S-01 — `&sysmsg` is not where PROC IMPORT warnings land
+
+`&sysmsg` holds the most recent system message, not the PROC IMPORT warning text. The transcoding warning ends up in `&syswarningtext`. Use `&syswarningtext` to fill the `import_warning` column.
+
+### R2-S-02 — `&syscc` stays at 4 after a warning-only import
+
+After a `syserr le 4` warning branch, `&syscc` remains 4. A clean run with only transcoding warnings exits with code 1, which RUN-01 (or a calling script) may interpret as failure. Either reset `%let syscc = 0;` in the warning branch (same pattern D-06 prescribes for read-failed), or document that RUN-01 must treat exit code 1 as success for this program.
+
+### R2-S-03 — Zero-row dataset: `nobs` comes out missing, not 0
+
+When a dataset has zero rows, `open()`/`attrn()` returns `.` (missing) for nobs rather than `0`. Any arithmetic on it propagates missing into `pct_missing` and `pct_sentinel`. Wrap with `coalesce(m_nobs.nobs, 0)` (or the equivalent `ifn(nobs=., 0, nobs)`) wherever nobs is used in the FILES and VARIABLES counts.
+
+---
+
+## Consensus Summary (Round 2)
+
+### Agreed Concerns (HIGH severity)
+
+1. `=:` in PROC SQL is a syntax error — run stops immediately at the key-column query (R2-B-01)
+2. `&dsname_&sheetnum` resolves to blank — all workbooks silently read-failed, abort fires (R2-B-02)
+3. PROC PRINT in the COM scouting step doesn't reach the log — Plan 02 checkpoint can't be completed (R2-B-03)
+
+### Agreed Strengths
+
+- All Round 1 fixes verified present
+- assert_masters_profiled, B04-NOSTOP-VERIFIED, r1-r9 DATALINES, /a-d flag, fileref FOPEN pattern all confirmed in plan text
 
 ### Divergent Views
 

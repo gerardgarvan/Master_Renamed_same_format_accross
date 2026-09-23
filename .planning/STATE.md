@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 **Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Phase 20 — pecan_ID Derivation (Phase 19 complete 2026-09-23)
+**Current focus:** Phase 21 — Runner Wiring and D3 Fix (Phase 20 complete 2026-09-23)
 
 ---
 
 ## Current Position
 
-Phase: 20 (pecan_ID Derivation) — Plan 01 complete, Plan 02 in progress
+Phase: 20 (pecan_ID Derivation) — COMPLETE (both plans done 2026-09-23)
 Last activity: 2026-09-23
 
 ### v2.0 Phase Status
@@ -39,7 +39,7 @@ Last activity: 2026-09-23
 | Phase | Name | Status |
 |-------|------|--------|
 | 19 | Raw Directory Inventory | Complete (2026-09-23) |
-| 20 | pecan_ID Derivation | Not started |
+| 20 | pecan_ID Derivation | Complete (2026-09-23) |
 | 21 | Runner Wiring & D3 Fix | Not started |
 
 **Progress:** [███░░░░░░░] 33%
@@ -153,8 +153,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 
 ### Blockers
 
-- PCM-D-17 and PCM-D-18 must be resolved before Phase 20 plans can execute (they are referenced in PID-04 and PID-05 assertions)
-- Phase 21 is blocked on completion of Phases 19 and 20 (programs 19 and 20 must exist before runner wiring)
+- Phase 21 is blocked on completion of Phase 20 (programs 19 and 20 must exist before runner wiring) -- RESOLVED: Phase 20 complete 2026-09-23
 
 ---
 

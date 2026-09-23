@@ -44,11 +44,12 @@ created: 2026-09-23
 | 20-01-03 | 01 | 1 | PID-03 | SAS assertion | `%assert_eq` for PRECEDE→1 MRN fires and does not abort (all pass); manual verify cardinality output | ⬜ pending |
 | 20-01-04 | 01 | 1 | PID-04 | SAS + file inspect | `g.pecan_id_xwalk` dataset exists; row count = distinct non-blank MRN count; no duplicate pecan_IDs | ⬜ pending |
 | 20-01-05 | 01 | 1 | PID-04 | SAS assertion | Re-run program 20: backup comparison assertion passes; PROC APPEND adds 0 rows (no new MRNs on second run) | ⬜ pending |
-| 20-02-01 | 02 | 1 | PID-05 | SAS assertion | 10b log: row count assertion = 41150; zero blank pecan_ID where MRN non-blank; column count = 175 | ⬜ pending |
-| 20-02-02 | 02 | 1 | PID-06 | File inspect | `qc/16b_pecan_id_counts.txt` exists; contains counts for both harmonized and cohort; 1/2/3+ distribution visible | ⬜ pending |
-| 20-02-03 | 02 | 1 | PID-05 | SAS assertion | 16b log: row count assertion = 13890; zero blank pecan_ID; column count = 175; zero duplicate pecan_ID per PRECEDE | ⬜ pending |
-| 20-02-04 | 02 | 2 | PID-07 | File inspect | `qc/20_linkage_reach.txt` exists; contains sections for all ENCRYPTED_MRN-tagged files; r7/r8/r9 explicit YES/NO line; exclusions list; type-mismatch block if applicable | ⬜ pending |
-| 20-02-05 | 02 | 3 | PID-08 | File inspect | `08_dictionary.sas` contains pecan_ID explicit row in dict_final append block; re-running 08 produces DATA_DICTIONARY.xlsx with pecan_ID row; DECISIONS.md contains PCM-D-17 and PCM-D-18 entries | ⬜ pending |
+| 20-01-06 | 01 | 1 | PID-07 | File inspect | `qc/20_linkage_reach.txt` exists; contains sections for all ENCRYPTED_MRN-tagged files; r7/r8/r9 explicit YES/NO line; exclusions list; type-mismatch block if applicable | ⬜ pending |
+| 20-01-07 | 01 | 1 | PID-08 | File inspect | `docs/DECISIONS.md` contains PCM-D-17 and PCM-D-18 with Gerard Garvan attribution dated 2026-09-23 | ⬜ pending |
+| 20-02-01 | 02 | 2 | PID-05 | SAS assertion | 10b log: row count assertion = 41150; zero blank pecan_ID where MRN non-blank; column count = 175 | ⬜ pending |
+| 20-02-02 | 02 | 2 | PID-05 | SAS assertion | 16b log: row count assertion = 13890; zero blank pecan_ID; column count = 175; zero duplicate pecan_ID per PRECEDE | ⬜ pending |
+| 20-02-03 | 02 | 2 | PID-06 | File inspect | `qc/16b_pecan_id_counts.txt` exists; no-pecan-ID row + 1/2/3+ distribution present; counts for both harmonized and cohort | ⬜ pending |
+| 20-02-04 | 02 | 2 | PID-08 | File inspect | `08_dictionary.sas` contains pecan_ID explicit row in dict_final append block; re-running 08 produces DATA_DICTIONARY.xlsx with pecan_ID row | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ needs review*
 

@@ -892,6 +892,16 @@ quit;
 %mend default_srclist;
 %default_srclist;
 
+/* PID-05 precondition: the crosswalk from program 20 must exist before the
+   build step attaches pecan_ID (runner order 19 -> 20 -> 10b). */
+%macro assert_xwalk_present;
+  %if %sysfunc(exist(g.pecan_id_xwalk)) = 0 %then %do;
+    %fail_out(msg=g.pecan_id_xwalk not found -- run program 20 before 10b);
+  %end;
+  %put NOTE: [10b] g.pecan_id_xwalk found -- pecan_ID will be attached in the build step;
+%mend assert_xwalk_present;
+%assert_xwalk_present;
+
 %macro build_harmonized;
   %local i k h emit_src _pi;
   data g.master_data_harmonized
@@ -904,6 +914,19 @@ quit;
     %end;
     ;
     set g.master_data_merged;
+
+    /* PID-05 / PCM-D-18: attach pecan_ID in the single write to
+       g.master_data_harmonized (hash lookup keeps row order unchanged).
+       pecan_ID is declared with LENGTH, not IF 0 THEN SET, so it is not a
+       retained SET variable; a failed lookup sets it to missing explicitly. */
+    length pecan_ID 8;
+    if _n_ = 1 then do;
+      declare hash hx(dataset: "g.pecan_id_xwalk");
+      hx.defineKey("ENCRYPTED_MRN");
+      hx.defineData("pecan_ID");
+      hx.defineDone();
+    end;
+    if hx.find() ne 0 then pecan_ID = .;
     /* Proven-redundant sources dropped here, AFTER the rules below have read
        them -- the DROP statement removes them from the OUTPUT, not the PDV, so
        priority-2 rules still evaluate correctly even for a dropped column.   */
@@ -953,23 +976,11 @@ quit;
 
 
 /* =========================================================================
-   SECTION 5b: Attach pecan_ID (PID-05, PCM-D-18)
-   WORK-then-promote pattern (PCM-T-02: no in-place rewrite of g.* datasets).
-   g.pecan_id_xwalk built by program 20 (Phase 20 Plan 01, Wave 1).
+   SECTION 5b: pecan_ID attachment checks (PID-05, PCM-D-18)
+   pecan_ID is attached inside the %build_harmonized DATA step by a hash
+   lookup on g.pecan_id_xwalk, so g.master_data_harmonized is written once
+   and its row order is unchanged. The checks below verify that attachment.
    ========================================================================= */
-
-proc sql noprint;
-  create table work.harmonized_with_pid as
-  select h.*, x.pecan_ID
-  from g.master_data_harmonized as h
-  left join g.pecan_id_xwalk as x
-    on h.ENCRYPTED_MRN = x.ENCRYPTED_MRN
-  order by h.PRECEDE_STUDY_ID;
-quit;
-
-data g.master_data_harmonized;
-  set work.harmonized_with_pid;
-run;
 
 /* PID-05 attachment assertions */
 %macro assert_pecan_attach;

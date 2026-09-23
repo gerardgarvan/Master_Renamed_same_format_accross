@@ -3,14 +3,16 @@
   Purpose : Build the pecan_ID patient linkage key from ENCRYPTED_MRN.
             Verifies md3 source checksum (PID-01), audits MRN cardinality
             (PID-02, PID-03), builds the append-only crosswalk g.pecan_id_xwalk
-            with a dated backup (PID-04), tests r7/r8/r9 linkage reach (PID-07),
-            and documents PCM-D-17/PCM-D-18 completion (PID-08).
+            with a dated backup (PID-04), tests linkage reach of every raw file
+            carrying ENCRYPTED_MRN including r7/r8/r9 (PID-07), and notes
+            PCM-D-17/PCM-D-18 completion (PID-08).
 
   Reads   : qc/19_raw_files.csv, qc/19_raw_key_columns.csv,
             qc/19_raw_sheets.csv, qc/19_raw_variables_md3.csv  (Phase 19 handoffs)
             raw\master\2018_2022_X_MASTER_DATASET_20240402.csv (md3 source, read-only)
             g.master_data_merged                                (read-only)
             g.pecan_id_xwalk                                    (append-only)
+            Every raw file Phase 19 tagged ENCRYPTED_MRN        (read-only)
 
   Writes  : g.pecan_id_xwalk           (new or appended)
             [xwalk_backup_path]/pecan_id_xwalk_<stamp>.sas7bdat (dated backup)
@@ -26,9 +28,14 @@
     - No in-place dataset rewrite (data g.X; set g.X;) -- PCM-T-02
     - No PROC SQL UPDATE
     - options nosyntaxcheck noerrorabend set before PROC IMPORT calls
+    - Raw file paths never pass through macro parameters; they reach
+      filerefs/librefs through FILENAME()/LIBNAME() inside DATA steps
 
   Requirements: PID-01, PID-02, PID-03, PID-04, PID-07, PID-08
   Created     : 2026-09-23 (Phase 20, plan 01)
+  Revised     : 2026-09-23 (review fixes -- CALL EXECUTE timing, report layout,
+                D-14 orphan/mismatch logic, r7/r8/r9 list, open-code %IF removal,
+                ranking guard, MRN type guard, backup-on-change only)
 ==========================================================================*/
 
 
@@ -42,9 +49,7 @@ options validvarname=v7 nofmterr msglevel=i;
 options nosyntaxcheck noerrorabend;
 
 libname g "&g_path.";
-libname bak "&xwalk_backup_path.";
 
-/* ---- Log routing ---- */
 %macro route_log;
   %if &in_pipeline = 0 %then %do;
     proc printto log="&logs_path.\20_pecan_id.log" new; run;
@@ -57,14 +62,13 @@ libname bak "&xwalk_backup_path.";
   %end;
 %mend restore_log;
 
-/* ---- fail_out: the only macro that may call abort ---- */
+/* The only macro that may call abort */
 %macro fail_out(msg=);
   %put ERROR: &msg;
   %restore_log;
   %abort cancel;
 %mend fail_out;
 
-/* ---- check_dir: verify a path exists ---- */
 %macro check_dir(path=, label=);
   %if %sysfunc(fileexist(&path.)) = 0 %then %do;
     %fail_out(msg=&label. directory not found: &path.);
@@ -77,10 +81,12 @@ libname bak "&xwalk_backup_path.";
 
 %route_log;
 
+/* md3 source identity used throughout */
+%let _md3_file = 2018_2022_X_MASTER_DATASET_20240402.csv;
+
 
 /* ============================================================
-   SECTION 1 -- Preconditions: assert all four Phase 19 CSV handoffs
-   exist, and the md3 source CSV exists (PCM-T-12: enumerated individually)
+   SECTION 1 -- Preconditions (PCM-T-12: enumerated individually)
    ============================================================ */
 
 %macro check_phase19_csvs;
@@ -96,8 +102,8 @@ libname bak "&xwalk_backup_path.";
   %if %sysfunc(fileexist(&qc_path.\19_raw_variables_md3.csv)) = 0 %then %do;
     %fail_out(msg=PRECONDITION FAILED -- qc/19_raw_variables_md3.csv not found -- re-run program 19 first);
   %end;
-  %if %sysfunc(fileexist(&raw_path.\master\2018_2022_X_MASTER_DATASET_20240402.csv)) = 0 %then %do;
-    %fail_out(msg=PRECONDITION FAILED -- md3 source CSV not found at raw\master\2018_2022_X_MASTER_DATASET_20240402.csv);
+  %if %sysfunc(fileexist(&raw_path.\master\&_md3_file.)) = 0 %then %do;
+    %fail_out(msg=PRECONDITION FAILED -- md3 source CSV not found in raw\master);
   %end;
   %put NOTE: [20] SECTION 1 preconditions passed -- all four Phase 19 CSVs and md3 source present;
 %mend check_phase19_csvs;
@@ -105,17 +111,14 @@ libname bak "&xwalk_backup_path.";
 
 
 /* ============================================================
-   SECTION 2 -- PID-01: Checksum the md3 source CSV and compare
+   SECTION 2 -- PID-01: checksum the md3 source CSV and compare
    to the Phase 19 record in qc/19_raw_files.csv
    ============================================================ */
 
-/* Compute the live SHA-256 of the md3 source CSV */
-%let _md3_src_path = &raw_path.\master\2018_2022_X_MASTER_DATASET_20240402.csv;
 %let _computed_sha = FAILED;
-
 data work._sha_md3;
   length _cmd $1000 line $400 compressed $400 sha256 $64;
-  _cmd = 'certutil -hashfile "' || strip("&_md3_src_path.") || '" SHA256';
+  _cmd = 'certutil -hashfile "' || "&raw_path.\master\&_md3_file." || '" SHA256';
   sha256 = 'FAILED';
   infile ckpipe20 pipe filevar=_cmd end=_done truncover lrecl=400;
   do while (not _done);
@@ -129,54 +132,49 @@ data work._sha_md3;
 run;
 
 proc sql noprint;
-  select sha256 into :_computed_sha trimmed
-  from work._sha_md3;
+  select sha256 into :_computed_sha trimmed from work._sha_md3;
 quit;
 %put NOTE: [20] Computed SHA-256 of md3 source CSV: &_computed_sha;
 
-/* Read the expected SHA-256 from the Phase 19 handoff */
 proc import datafile="&qc_path.\19_raw_files.csv"
     out=work.files19 dbms=csv replace;
   guessingrows=max;
 run;
 
-/* Assert exactly one matching row before the lookup */
-%let _n_md3_rows = 0;
-proc sql noprint;
-  select count(*) into :_n_md3_rows trimmed
-  from work.files19
-  where upcase(strip(filename)) = '2018_2022_X_MASTER_DATASET_20240402.CSV'
-    and upcase(scan(full_path, -2, '\')) = 'MASTER';
-quit;
-
-%macro assert_md3_row_count;
-  %if &_n_md3_rows ne 1 %then %do;
-    %fail_out(msg=PID-01 ABORT -- found &_n_md3_rows rows for md3 source in 19_raw_files.csv -- expected exactly 1 -- possible duplicate-folder problem);
+%macro assert_checksum;
+  %local n_rows expected;
+  %let n_rows = 0;
+  %let expected = ;
+  proc sql noprint;
+    select count(*) into :n_rows trimmed
+    from work.files19
+    where upcase(strip(filename)) = upcase("&_md3_file.")
+      and upcase(scan(full_path, -2, '\')) = 'MASTER';
+  quit;
+  %if &n_rows ne 1 %then %do;
+    %fail_out(msg=PID-01 ABORT -- found &n_rows rows for md3 source in 19_raw_files.csv -- expected exactly 1);
   %end;
-%mend assert_md3_row_count;
-%assert_md3_row_count;
-
-%let _expected_sha = ;
-proc sql noprint;
-  select sha256 into :_expected_sha trimmed
-  from work.files19
-  where upcase(strip(filename)) = '2018_2022_X_MASTER_DATASET_20240402.CSV'
-    and upcase(scan(full_path, -2, '\')) = 'MASTER';
-quit;
-%put NOTE: [20] Expected SHA-256 from Phase 19 record: &_expected_sha;
-
-%macro assert_checksum_match;
-  %if %upcase(&_computed_sha) ne %upcase(&_expected_sha) %then %do;
-    %fail_out(msg=PID-01 ABORT -- md3 source SHA-256 mismatch -- computed &_computed_sha expected &_expected_sha -- source file may have changed);
+  proc sql noprint;
+    select sha256 into :expected trimmed
+    from work.files19
+    where upcase(strip(filename)) = upcase("&_md3_file.")
+      and upcase(scan(full_path, -2, '\')) = 'MASTER';
+  quit;
+  %put NOTE: [20] Expected SHA-256 from Phase 19 record: &expected;
+  %if %upcase(&_computed_sha) = FAILED %then %do;
+    %fail_out(msg=PID-01 ABORT -- certutil could not hash the md3 source CSV);
+  %end;
+  %if %upcase(&_computed_sha) ne %upcase(&expected) %then %do;
+    %fail_out(msg=PID-01 ABORT -- md3 source SHA-256 mismatch -- computed &_computed_sha expected &expected -- source file may have changed since program 19 ran);
   %end;
   %put NOTE: [20] PID-01 checksum match confirmed;
-%mend assert_checksum_match;
-%assert_checksum_match;
+%mend assert_checksum;
+%assert_checksum;
 
 
 /* ============================================================
-   SECTION 3 -- PID-01 cont. (D-11): ENCRYPTED_MRN type and length
-   from qc/19_raw_variables_md3.csv
+   SECTION 3 -- PID-01 cont. (D-11): ENCRYPTED_MRN and
+   PRECEDE_STUDY_ID types from qc/19_raw_variables_md3.csv
    ============================================================ */
 
 proc import datafile="&qc_path.\19_raw_variables_md3.csv"
@@ -184,10 +182,10 @@ proc import datafile="&qc_path.\19_raw_variables_md3.csv"
   guessingrows=max;
 run;
 
-%let _mrn_type   = ;
-%let _mrn_len    = 0;
-%let _pid_type   = ;
-%let _precede_is_num = 0;
+%global _mrn_type _mrn_len _pid_type _precede_is_num;
+%let _mrn_type = ;
+%let _mrn_len  = 0;
+%let _pid_type = ;
 
 proc sql noprint;
   select strip(var_type), strip(put(var_length, best12.))
@@ -200,190 +198,172 @@ proc sql noprint;
   where upcase(strip(var_name)) = 'PRECEDE_STUDY_ID';
 quit;
 
-%macro set_precede_type_flag;
+%macro check_md3_types;
+  %if %upcase(&_mrn_type) ne CHAR %then %do;
+    %fail_out(msg=D-11 ABORT -- ENCRYPTED_MRN in the md3 source imported as type [&_mrn_type] not char -- resolve before building the crosswalk);
+  %end;
+  %if %length(&_pid_type) = 0 %then %do;
+    %fail_out(msg=D-11 ABORT -- PRECEDE_STUDY_ID not found in 19_raw_variables_md3.csv);
+  %end;
   %if %upcase(&_pid_type) = NUM %then %let _precede_is_num = 1;
   %else %let _precede_is_num = 0;
-%mend set_precede_type_flag;
-%set_precede_type_flag;
-
-%put NOTE: [20] D-11 ENCRYPTED_MRN type=&_mrn_type length=&_mrn_len;
-%put NOTE: [20] D-11 PRECEDE_STUDY_ID type=&_pid_type precede_is_num=&_precede_is_num;
+  %put NOTE: [20] D-11 ENCRYPTED_MRN type=&_mrn_type length=&_mrn_len;
+  %put NOTE: [20] D-11 PRECEDE_STUDY_ID type=&_pid_type precede_is_num=&_precede_is_num;
+%mend check_md3_types;
+%check_md3_types;
 
 
 /* ============================================================
-   SECTION 4 -- PID-01 cont. (D-12): Import md3 CSV at $64;
-   assert max ENCRYPTED_MRN length <= 40
+   SECTION 4 -- PID-01 cont. (D-12): import the md3 CSV and assert
+   max ENCRYPTED_MRN length <= 40. GUESSINGROWS=MAX scans every row
+   and sets the column length to the longest value, so the import
+   itself cannot truncate.
    ============================================================ */
 
-options nosyntaxcheck noerrorabend;
-proc import datafile="&raw_path.\master\2018_2022_X_MASTER_DATASET_20240402.csv"
+proc import datafile="&raw_path.\master\&_md3_file."
     out=work.md3csv dbms=csv replace;
   guessingrows=max;
 run;
 
-%let _max_mrn_len = 0;
-proc sql noprint;
-  select max(lengthn(strip(ENCRYPTED_MRN))) into :_max_mrn_len trimmed
-  from work.md3csv;
-quit;
-%put NOTE: [20] D-12 max ENCRYPTED_MRN length in md3 source CSV: &_max_mrn_len;
-
-%macro assert_mrn_length;
-  %if &_max_mrn_len > 40 %then %do;
-    %fail_out(msg=D-12 ABORT -- source holds MRN longer than 40 chars (&_max_mrn_len) -- merged file would silently truncate);
+%macro assert_md3_import;
+  %local max_len n_rows n_dist;
+  %if %sysfunc(exist(work.md3csv)) = 0 %then %do;
+    %fail_out(msg=D-12 ABORT -- md3 source CSV did not import);
   %end;
-  %put NOTE: [20] D-12 truncation guard passed -- max MRN length &_max_mrn_len le 40;
-%mend assert_mrn_length;
-%assert_mrn_length;
+  %let max_len = 0;
+  proc sql noprint;
+    select coalesce(max(lengthn(strip(ENCRYPTED_MRN))), 0) into :max_len trimmed
+    from work.md3csv;
+    select count(*), count(distinct PRECEDE_STUDY_ID)
+      into :n_rows trimmed, :n_dist trimmed
+    from work.md3csv;
+  quit;
+  %put NOTE: [20] D-12 max ENCRYPTED_MRN length in md3 source CSV: &max_len;
+  %if &max_len > 40 %then %do;
+    %fail_out(msg=D-12 ABORT -- source holds MRN of length &max_len -- the $40 merged column would silently truncate it);
+  %end;
+  /* A duplicated PRECEDE in the CSV would fan out the D-14 join */
+  %if &n_rows ne &n_dist %then %do;
+    %fail_out(msg=D-14 ABORT -- md3 source CSV has &n_rows rows but &n_dist distinct PRECEDE_STUDY_IDs);
+  %end;
+  %put NOTE: [20] D-12 truncation guard passed and CSV PRECEDE_STUDY_ID is unique;
+  %let syscc = 0;
+%mend assert_md3_import;
+%assert_md3_import;
 
 
 /* ============================================================
-   SECTION 5 -- D-14 cross-check: join CSV to g.master_data_merged
-   on PRECEDE_STUDY_ID after applying md3 prep normalization
+   SECTION 5 -- D-14 cross-check: join the CSV to g.master_data_merged
+   on PRECEDE_STUDY_ID after applying md3 prep normalization.
+   Merged PRECEDE_STUDY_ID must convert cleanly to a number -- this is
+   also required by the SECTION 8 numeric ranking (D-01).
    ============================================================ */
 
-/* Apply md3 prep normalization to the CSV side:
-   strip() on ENCRYPTED_MRN; strip(upcase()) = NULL -> blank.
-   PRECEDE_STUDY_ID: if CSV imported as numeric, build _pid_key_num from it;
-   on merged side compute _pid_key_num = input(strip(PRECEDE_STUDY_ID), best32.).
-   Assert no missing conversion on merged side before joining. */
+%macro assert_merged_pid_numeric;
+  %local n_fail;
+  data _null_;
+    set g.master_data_merged(keep=PRECEDE_STUDY_ID) end=_eof;
+    retain _nf 0;
+    if not missing(PRECEDE_STUDY_ID)
+       and missing(input(strip(PRECEDE_STUDY_ID), ?? best32.)) then _nf + 1;
+    if _eof then call symputx('n_fail', _nf, 'L');
+  run;
+  %if %length(&n_fail) = 0 %then %let n_fail = 0;
+  %if &n_fail > 0 %then %do;
+    %fail_out(msg=D-01 ABORT -- &n_fail PRECEDE_STUDY_ID values in g.master_data_merged are not numeric -- cannot order or join numerically);
+  %end;
+  %put NOTE: [20] Merged PRECEDE_STUDY_ID converts to numeric for every row;
+%mend assert_merged_pid_numeric;
+%assert_merged_pid_numeric;
 
-%if &_precede_is_num = 1 %then %do;
-  /* CSV PRECEDE is numeric -- join numerically */
+%macro d14_crosscheck;
+  %local n_mismatch n_csv_orphan n_mrg_orphan;
+
   proc sql noprint;
     create table work._crosscheck as
     select
-      c.PRECEDE_STUDY_ID as _pid_csv_num,
-      case when missing(strip(upcase(c.ENCRYPTED_MRN))) or strip(upcase(c.ENCRYPTED_MRN)) = 'NULL'
+      case when c.PRECEDE_STUDY_ID is not missing then 1 else 0 end as _in_csv,
+      case when m.PRECEDE_STUDY_ID is not missing then 1 else 0 end as _in_mrg,
+      case when missing(c.ENCRYPTED_MRN) or strip(upcase(c.ENCRYPTED_MRN)) = 'NULL'
            then '' else strip(c.ENCRYPTED_MRN) end as _mrn_csv length=40,
-      m.PRECEDE_STUDY_ID as _pid_mrg_char,
-      input(strip(m.PRECEDE_STUDY_ID), best32.) as _pid_mrg_num,
-      case when missing(strip(upcase(m.ENCRYPTED_MRN))) or strip(upcase(m.ENCRYPTED_MRN)) = 'NULL'
+      case when missing(m.ENCRYPTED_MRN) or strip(upcase(m.ENCRYPTED_MRN)) = 'NULL'
            then '' else strip(m.ENCRYPTED_MRN) end as _mrn_mrg length=40
     from work.md3csv as c
     full join g.master_data_merged as m
-      on c.PRECEDE_STUDY_ID = input(strip(m.PRECEDE_STUDY_ID), best32.);
-  quit;
-%end;
-%else %do;
-  /* CSV PRECEDE is char -- join on stripped char */
-  proc sql noprint;
-    create table work._crosscheck as
-    select
-      strip(c.PRECEDE_STUDY_ID) as _pid_csv_char length=12,
-      case when missing(strip(upcase(c.ENCRYPTED_MRN))) or strip(upcase(c.ENCRYPTED_MRN)) = 'NULL'
-           then '' else strip(c.ENCRYPTED_MRN) end as _mrn_csv length=40,
-      m.PRECEDE_STUDY_ID as _pid_mrg_char,
-      case when missing(strip(upcase(m.ENCRYPTED_MRN))) or strip(upcase(m.ENCRYPTED_MRN)) = 'NULL'
-           then '' else strip(m.ENCRYPTED_MRN) end as _mrn_mrg length=40
-    from work.md3csv as c
-    full join g.master_data_merged as m
-      on strip(c.PRECEDE_STUDY_ID) = strip(m.PRECEDE_STUDY_ID);
-  quit;
-%end;
-
-/* If numeric PRECEDE on merged side, assert no conversion failures */
-%if &_precede_is_num = 1 %then %do;
-  %let _n_conv_fail = 0;
-  proc sql noprint;
-    select count(*) into :_n_conv_fail trimmed
-    from work._crosscheck
-    where _pid_mrg_char ne '' and _pid_mrg_num = .;
-  quit;
-  %macro assert_pid_conversion;
-    %if &_n_conv_fail > 0 %then %do;
-      %fail_out(msg=D-14 ABORT -- &_n_conv_fail non-numeric PRECEDE_STUDY_ID values in g.master_data_merged -- cannot join numerically);
+    %if &_precede_is_num = 1 %then %do;
+      on  c.PRECEDE_STUDY_ID is not missing
+      and c.PRECEDE_STUDY_ID = input(strip(m.PRECEDE_STUDY_ID), best32.)
     %end;
-    %put NOTE: [20] D-14 PRECEDE numeric conversion check passed;
-  %mend assert_pid_conversion;
-  %assert_pid_conversion;
-%end;
+    %else %do;
+      on  strip(c.PRECEDE_STUDY_ID) ne ''
+      and strip(c.PRECEDE_STUDY_ID) = strip(m.PRECEDE_STUDY_ID)
+    %end;
+    ;
 
-/* Assert (a) MRN equal on all matched rows */
-%let _n_mrn_mismatch = 0;
-proc sql noprint;
-  select count(*) into :_n_mrn_mismatch trimmed
-  from work._crosscheck
-  where _mrn_csv ne '' and _mrn_mrg ne '' and _mrn_csv ne _mrn_mrg;
-quit;
-%put NOTE: [20] D-14 MRN mismatch count on matched rows: &_n_mrn_mismatch;
+    /* (a) matched rows: normalized MRN must be identical, blank vs value included */
+    select count(*) into :n_mismatch trimmed
+    from work._crosscheck
+    where _in_csv = 1 and _in_mrg = 1 and _mrn_csv ne _mrn_mrg;
 
-%macro assert_mrn_match;
-  %if &_n_mrn_mismatch > 0 %then %do;
-    %fail_out(msg=D-14 ABORT -- &_n_mrn_mismatch matched rows have differing ENCRYPTED_MRN values between CSV and merged file);
+    /* (b) orphans: PRECEDE present on one side only */
+    select count(*) into :n_csv_orphan trimmed
+    from work._crosscheck where _in_csv = 1 and _in_mrg = 0;
+
+    select count(*) into :n_mrg_orphan trimmed
+    from work._crosscheck where _in_csv = 0 and _in_mrg = 1;
+  quit;
+
+  %put NOTE: [20] D-14 matched rows with differing MRN: &n_mismatch;
+  %put NOTE: [20] D-14 PRECEDEs in CSV only: &n_csv_orphan -- in merged only: &n_mrg_orphan;
+
+  %if &n_mismatch > 0 %then %do;
+    %fail_out(msg=D-14 ABORT -- &n_mismatch matched PRECEDE_STUDY_IDs have a different ENCRYPTED_MRN in the CSV and the merged file);
   %end;
-  %put NOTE: [20] D-14 MRN equality assertion passed;
-%mend assert_mrn_match;
-%assert_mrn_match;
-
-/* Assert (b) no orphans on either side */
-%let _n_csv_orphan = 0;
-%let _n_mrg_orphan = 0;
-proc sql noprint;
-  select count(*) into :_n_csv_orphan trimmed
-  from work._crosscheck
-  where _mrn_mrg = '' and _mrn_csv ne '';
-
-  select count(*) into :_n_mrg_orphan trimmed
-  from work._crosscheck
-  where _mrn_csv = '' and _mrn_mrg ne '';
-quit;
-%put NOTE: [20] D-14 CSV orphans (in CSV not in merged): &_n_csv_orphan;
-%put NOTE: [20] D-14 Merged orphans (in merged not in CSV): &_n_mrg_orphan;
-
-%macro assert_no_orphans;
-  %if &_n_csv_orphan > 0 or &_n_mrg_orphan > 0 %then %do;
-    %fail_out(msg=D-14 ABORT -- &_n_csv_orphan CSV orphans and &_n_mrg_orphan merged orphans found -- merged file does not reflect its source);
+  %if &n_csv_orphan > 0 or &n_mrg_orphan > 0 %then %do;
+    %fail_out(msg=D-14 ABORT -- PRECEDE sets differ -- &n_csv_orphan in CSV only and &n_mrg_orphan in merged only);
   %end;
-  %put NOTE: [20] D-14 orphan assertion passed -- PRECEDE sets are identical;
-%mend assert_no_orphans;
-%assert_no_orphans;
+  %put NOTE: [20] D-14 cross-check passed -- same PRECEDE set and same MRN on every row;
+%mend d14_crosscheck;
+%d14_crosscheck;
 
 
 /* ============================================================
-   SECTION 6 -- PID-02: Source audit on g.master_data_merged
-   (blank MRN, placeholder MRN, distinct MRN, cardinalities)
+   SECTION 6 -- PID-02: source audit on g.master_data_merged
    ============================================================ */
 
-%let _n_blank_mrn    = 0;
-%let _n_null_mrn     = 0;
-%let _n_incl_mrn     = 0;
-%let _n_incl_precede = 0;
+%let _n_blank_mrn     = 0;
+%let _n_null_mrn      = 0;
+%let _n_incl_mrn      = 0;
+%let _n_incl_precede  = 0;
 %let _max_mrn_per_pid = 0;
 %let _max_pid_per_mrn = 0;
 
 proc sql noprint;
   select count(*) into :_n_blank_mrn trimmed
-  from g.master_data_merged
-  where missing(ENCRYPTED_MRN);
+  from g.master_data_merged where missing(ENCRYPTED_MRN);
 
   select count(*) into :_n_null_mrn trimmed
   from g.master_data_merged
-  where not missing(ENCRYPTED_MRN)
-    and strip(upcase(ENCRYPTED_MRN)) = 'NULL';
+  where not missing(ENCRYPTED_MRN) and strip(upcase(ENCRYPTED_MRN)) = 'NULL';
 
   select count(distinct ENCRYPTED_MRN) into :_n_incl_mrn trimmed
   from g.master_data_merged
-  where not missing(ENCRYPTED_MRN)
-    and strip(upcase(ENCRYPTED_MRN)) ne 'NULL';
+  where not missing(ENCRYPTED_MRN) and strip(upcase(ENCRYPTED_MRN)) ne 'NULL';
 
   select count(distinct PRECEDE_STUDY_ID) into :_n_incl_precede trimmed
   from g.master_data_merged
-  where not missing(ENCRYPTED_MRN)
-    and strip(upcase(ENCRYPTED_MRN)) ne 'NULL';
+  where not missing(ENCRYPTED_MRN) and strip(upcase(ENCRYPTED_MRN)) ne 'NULL';
 
   select max(n_mrn) into :_max_mrn_per_pid trimmed
   from (select PRECEDE_STUDY_ID, count(distinct ENCRYPTED_MRN) as n_mrn
         from g.master_data_merged
-        where not missing(ENCRYPTED_MRN)
-          and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
+        where not missing(ENCRYPTED_MRN) and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
         group by PRECEDE_STUDY_ID);
 
   select max(n_pid) into :_max_pid_per_mrn trimmed
   from (select ENCRYPTED_MRN, count(distinct PRECEDE_STUDY_ID) as n_pid
         from g.master_data_merged
-        where not missing(ENCRYPTED_MRN)
-          and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
+        where not missing(ENCRYPTED_MRN) and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
         group by ENCRYPTED_MRN);
 quit;
 
@@ -396,27 +376,23 @@ quit;
 
 
 /* ============================================================
-   SECTION 7 -- PID-03: Cardinality assertion
-   Every PRECEDE_STUDY_ID maps to exactly one ENCRYPTED_MRN
+   SECTION 7 -- PID-03: every PRECEDE_STUDY_ID maps to exactly one MRN
    ============================================================ */
 
-%let _n_multi_mrn = 0;
-proc sql noprint;
-  select count(*) into :_n_multi_mrn trimmed
-  from (
-    select PRECEDE_STUDY_ID
-    from g.master_data_merged
-    where not missing(ENCRYPTED_MRN)
-      and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
-    group by PRECEDE_STUDY_ID
-    having count(distinct ENCRYPTED_MRN) > 1
-  );
-quit;
-%put NOTE: [20] PID-03 PRECEDEs mapping to more than one MRN: &_n_multi_mrn;
-
 %macro assert_pid_cardinality;
-  %if &_n_multi_mrn > 0 %then %do;
-    %fail_out(msg=PID-03 ABORT -- &_n_multi_mrn PRECEDE_STUDY_IDs map to more than one ENCRYPTED_MRN -- crosswalk cannot be safely built);
+  %local n_multi;
+  %let n_multi = 0;
+  proc sql noprint;
+    select count(*) into :n_multi trimmed
+    from (select PRECEDE_STUDY_ID
+          from g.master_data_merged
+          where not missing(ENCRYPTED_MRN) and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
+          group by PRECEDE_STUDY_ID
+          having count(distinct ENCRYPTED_MRN) > 1);
+  quit;
+  %put NOTE: [20] PID-03 PRECEDEs mapping to more than one MRN: &n_multi;
+  %if &n_multi > 0 %then %do;
+    %fail_out(msg=PID-03 ABORT -- &n_multi PRECEDE_STUDY_IDs map to more than one ENCRYPTED_MRN -- crosswalk cannot be safely built);
   %end;
   %put NOTE: [20] PID-03 cardinality assertion passed;
 %mend assert_pid_cardinality;
@@ -425,26 +401,49 @@ quit;
 
 /* ============================================================
    SECTION 8 -- PID-04: build_or_append_xwalk (D-01, D-02, D-04)
-   Named macro %build_or_append_xwalk
+   Four cases on (crosswalk exists, backup exists):
+     no  / no  -> first run: build and write the first backup
+     yes / yes -> re-run: compare to latest backup, append new MRNs,
+                  re-compare, write a new backup only if rows were added
+     no  / yes -> abort: restore from backup, never renumber
+     yes / no  -> write the first backup with a WARNING, then re-run path
    ============================================================ */
 
-%macro build_or_append_xwalk;
-  %local xwalk_exists n_backups latest_bak bak_stamp;
+/* Rank MRNs by their smallest PRECEDE_STUDY_ID (numeric), MRN as tie-breaker.
+   Writes work.&out with ENCRYPTED_MRN and _min_pid_num. */
+%macro rank_mrns(out=, exclude_existing=0);
+  %local n_missing;
+  proc sql noprint;
+    create table work.&out as
+    select ENCRYPTED_MRN,
+           min(input(strip(PRECEDE_STUDY_ID), best32.)) as _min_pid_num
+    from g.master_data_merged
+    where not missing(ENCRYPTED_MRN)
+      and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
+    %if &exclude_existing = 1 %then %do;
+      and ENCRYPTED_MRN not in (select ENCRYPTED_MRN from g.pecan_id_xwalk)
+    %end;
+    group by ENCRYPTED_MRN
+    order by _min_pid_num, ENCRYPTED_MRN;
 
-  /* Pre-condition: backup folder must exist */
+    select count(*) into :n_missing trimmed
+    from work.&out where _min_pid_num is missing;
+  quit;
+  %if &n_missing > 0 %then %do;
+    %fail_out(msg=D-01 ABORT -- &n_missing MRNs have no usable PRECEDE_STUDY_ID for ranking);
+  %end;
+%mend rank_mrns;
+
+%macro build_or_append_xwalk;
+  %local xwalk_exists n_backups latest_bak bak_stamp n_xwalk_only n_bak_only
+         max_pid n_new n_bak_lost n_built;
+
   %if %sysfunc(fileexist(&xwalk_backup_path.)) = 0 %then %do;
     %fail_out(msg=D-04 ABORT -- xwalk_backup_path does not exist -- create the folder first: &xwalk_backup_path);
   %end;
+  libname bak "&xwalk_backup_path.";
 
-  /* Detect whether g.pecan_id_xwalk exists */
-  %let xwalk_exists = 0;
-  proc sql noprint;
-    select count(*) into :xwalk_exists trimmed
-    from dictionary.tables
-    where libname = 'G' and memname = 'PECAN_ID_XWALK';
-  quit;
-
-  /* Detect whether any dated backup exists in bak library */
+  %let xwalk_exists = %sysfunc(exist(g.pecan_id_xwalk));
   %let n_backups = 0;
   %let latest_bak = ;
   proc sql noprint;
@@ -455,164 +454,105 @@ quit;
   quit;
   %put NOTE: [20] xwalk_exists=&xwalk_exists n_backups=&n_backups latest_bak=&latest_bak;
 
-  /* Compute dated backup name for new writes */
+  /* B8601DT15. gives e.g. 20260923T140500 -- valid in a name, sorts by time */
   %let bak_stamp = %sysfunc(datetime(), B8601DT15.);
-  /* B8601DT15. yields e.g. 20260923T140500 -- valid SAS dataset name, sorts chronologically */
 
-  /* CASE 3: backup present but xwalk missing -- do not rebuild, restore from backup */
+  /* Crosswalk missing but a backup exists: never rebuild */
   %if &xwalk_exists = 0 and &n_backups > 0 %then %do;
-    %fail_out(msg=D-04 ABORT -- g.pecan_id_xwalk is missing but &n_backups backup(s) exist at &xwalk_backup_path -- restore from backup before re-running);
+    %fail_out(msg=D-04 ABORT -- g.pecan_id_xwalk is missing but &n_backups backups exist at &xwalk_backup_path -- restore the latest backup to g before re-running);
   %end;
 
-  /* CASE 1: first run -- no xwalk and no backup */
-  %else %if &xwalk_exists = 0 and &n_backups = 0 %then %do;
+  /* First run */
+  %if &xwalk_exists = 0 and &n_backups = 0 %then %do;
     %put NOTE: [20] First run -- building g.pecan_id_xwalk from g.master_data_merged;
-
-    proc sql noprint;
-      create table work._mrn_rank as
-      select ENCRYPTED_MRN,
-             min(input(strip(PRECEDE_STUDY_ID), best32.)) as _min_pid_num
-      from g.master_data_merged
-      where not missing(ENCRYPTED_MRN)
-        and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
-      group by ENCRYPTED_MRN
-      order by calculated _min_pid_num;
-    quit;
+    %rank_mrns(out=_mrn_rank, exclude_existing=0);
 
     data g.pecan_id_xwalk;
-      set work._mrn_rank;
       length ENCRYPTED_MRN $40 pecan_ID 8;
+      set work._mrn_rank;
       pecan_ID = _N_;
       keep ENCRYPTED_MRN pecan_ID;
     run;
 
-    /* Write first dated backup */
     data bak.pecan_id_xwalk_&bak_stamp.;
       set g.pecan_id_xwalk;
     run;
 
-    %let _n_xwalk_built = 0;
     proc sql noprint;
-      select count(*) into :_n_xwalk_built trimmed from g.pecan_id_xwalk;
+      select count(*) into :n_built trimmed from g.pecan_id_xwalk;
     quit;
-    %put NOTE: [20] PID-04 initial crosswalk built with &_n_xwalk_built distinct MRNs;
-    %put NOTE: [20] PID-04 first backup written: pecan_id_xwalk_&bak_stamp;
+    %put NOTE: [20] PID-04 initial build -- &n_built distinct MRNs -- first backup pecan_id_xwalk_&bak_stamp;
+    %return;
   %end;
 
-  /* CASE 4: xwalk present but no backup -- write first backup and continue */
-  %else %if &xwalk_exists = 1 and &n_backups = 0 %then %do;
+  /* Crosswalk present but no backup: write the first one, then continue */
+  %if &xwalk_exists = 1 and &n_backups = 0 %then %do;
     %put WARNING: [20] D-04 no backup found -- writing first backup now;
     data bak.pecan_id_xwalk_&bak_stamp.;
       set g.pecan_id_xwalk;
     run;
-    %put NOTE: [20] PID-04 first backup written: pecan_id_xwalk_&bak_stamp;
-    /* Re-read n_backups so CASE 2 logic continues correctly after this case */
-    %let n_backups = 1;
     %let latest_bak = PECAN_ID_XWALK_&bak_stamp.;
+    %put NOTE: [20] PID-04 first backup written: &latest_bak;
   %end;
 
-  /* CASE 2: re-run -- xwalk and backup both exist */
-  %if &xwalk_exists = 1 and &n_backups > 0 %then %do;
-    %put NOTE: [20] Re-run detected -- asserting xwalk equals latest backup before appending;
-
-    /* Compare xwalk to latest backup (two-way NOT EXISTS diff) */
-    %let _n_xwalk_only = 0;
-    %let _n_bak_only   = 0;
-    proc sql noprint;
-      select count(*) into :_n_xwalk_only trimmed
-      from g.pecan_id_xwalk as x
-      where not exists (
-        select 1 from bak.&latest_bak as b
-        where b.ENCRYPTED_MRN = x.ENCRYPTED_MRN
-          and b.pecan_ID = x.pecan_ID
-      );
-      select count(*) into :_n_bak_only trimmed
-      from bak.&latest_bak as b
-      where not exists (
-        select 1 from g.pecan_id_xwalk as x
-        where x.ENCRYPTED_MRN = b.ENCRYPTED_MRN
-          and x.pecan_ID = b.pecan_ID
-      );
-    quit;
-    %put NOTE: [20] Pre-append diff -- xwalk_only=&_n_xwalk_only bak_only=&_n_bak_only;
-
-    %macro assert_xwalk_matches_backup;
-      %if &_n_xwalk_only > 0 or &_n_bak_only > 0 %then %do;
-        %fail_out(msg=D-02 ABORT -- g.pecan_id_xwalk differs from latest backup (&latest_bak) -- xwalk_only=&_n_xwalk_only bak_only=&_n_bak_only -- crosswalk may have been edited outside program 20);
-      %end;
-      %put NOTE: [20] D-02 pre-append xwalk=backup assertion passed;
-    %mend assert_xwalk_matches_backup;
-    %assert_xwalk_matches_backup;
-
-    /* Find new MRNs (in merged, not in xwalk) */
-    %let _max_pid = 0;
-    proc sql noprint;
-      select max(pecan_ID) into :_max_pid trimmed from g.pecan_id_xwalk;
-    quit;
-    %put NOTE: [20] Current max pecan_ID: &_max_pid;
-
-    proc sql noprint;
-      create table work._new_mrns_rank as
-      select ENCRYPTED_MRN,
-             min(input(strip(PRECEDE_STUDY_ID), best32.)) as _min_pid_num
-      from g.master_data_merged
-      where not missing(ENCRYPTED_MRN)
-        and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'
-        and ENCRYPTED_MRN not in (select ENCRYPTED_MRN from g.pecan_id_xwalk)
-      group by ENCRYPTED_MRN
-      order by calculated _min_pid_num;
-    quit;
-
-    %let _n_new = 0;
-    proc sql noprint;
-      select count(*) into :_n_new trimmed from work._new_mrns_rank;
-    quit;
-    %put NOTE: [20] New MRNs to append: &_n_new;
-
-    %if &_n_new > 0 %then %do;
-      data work._new_rows;
-        set work._new_mrns_rank;
-        length ENCRYPTED_MRN $40 pecan_ID 8;
-        pecan_ID = &_max_pid + _N_;
-        keep ENCRYPTED_MRN pecan_ID;
-      run;
-
-      proc append base=g.pecan_id_xwalk data=work._new_rows; run;
-      %put NOTE: [20] PID-04 appended &_n_new new MRN rows via PROC APPEND;
-    %end;
-
-    /* Assert every backup row still present after append */
-    %let _n_bak_lost = 0;
-    proc sql noprint;
-      select count(*) into :_n_bak_lost trimmed
-      from bak.&latest_bak as b
-      where not exists (
-        select 1 from g.pecan_id_xwalk as x
-        where x.ENCRYPTED_MRN = b.ENCRYPTED_MRN
-          and x.pecan_ID = b.pecan_ID
-      );
-    quit;
-    %put NOTE: [20] Post-append backup rows lost: &_n_bak_lost;
-
-    %macro assert_backup_rows_intact;
-      %if &_n_bak_lost > 0 %then %do;
-        %fail_out(msg=D-02 ABORT -- &_n_bak_lost backup rows missing after PROC APPEND -- existing pecan_ID assignments may have been altered);
-      %end;
-      %put NOTE: [20] D-02 post-append backup integrity assertion passed;
-    %mend assert_backup_rows_intact;
-    %assert_backup_rows_intact;
-
-    /* Write new dated backup */
-    data bak.pecan_id_xwalk_&bak_stamp.;
-      set g.pecan_id_xwalk;
-    run;
-    %put NOTE: [20] PID-04 new backup written: pecan_id_xwalk_&bak_stamp;
+  /* Re-run path */
+  %put NOTE: [20] Re-run -- asserting xwalk equals latest backup &latest_bak before appending;
+  proc sql noprint;
+    select count(*) into :n_xwalk_only trimmed
+    from g.pecan_id_xwalk as x
+    where not exists (select 1 from bak.&latest_bak as b
+                      where b.ENCRYPTED_MRN = x.ENCRYPTED_MRN and b.pecan_ID = x.pecan_ID);
+    select count(*) into :n_bak_only trimmed
+    from bak.&latest_bak as b
+    where not exists (select 1 from g.pecan_id_xwalk as x
+                      where x.ENCRYPTED_MRN = b.ENCRYPTED_MRN and x.pecan_ID = b.pecan_ID);
+  quit;
+  %put NOTE: [20] Pre-append diff -- xwalk_only=&n_xwalk_only bak_only=&n_bak_only;
+  %if &n_xwalk_only > 0 or &n_bak_only > 0 %then %do;
+    %fail_out(msg=D-02 ABORT -- g.pecan_id_xwalk differs from latest backup &latest_bak -- xwalk_only=&n_xwalk_only bak_only=&n_bak_only -- crosswalk may have been edited outside program 20);
   %end;
 
+  proc sql noprint;
+    select max(pecan_ID) into :max_pid trimmed from g.pecan_id_xwalk;
+  quit;
+  %rank_mrns(out=_new_mrns_rank, exclude_existing=1);
+  proc sql noprint;
+    select count(*) into :n_new trimmed from work._new_mrns_rank;
+  quit;
+  %put NOTE: [20] Current max pecan_ID &max_pid -- new MRNs to append: &n_new;
+
+  %if &n_new = 0 %then %do;
+    %put NOTE: [20] PID-04 no new MRNs -- crosswalk unchanged -- no new backup written;
+    %return;
+  %end;
+
+  data work._new_rows;
+    length ENCRYPTED_MRN $40 pecan_ID 8;
+    set work._new_mrns_rank;
+    pecan_ID = &max_pid + _N_;
+    keep ENCRYPTED_MRN pecan_ID;
+  run;
+  proc append base=g.pecan_id_xwalk data=work._new_rows; run;
+  %put NOTE: [20] PID-04 appended &n_new new MRN rows via PROC APPEND;
+
+  proc sql noprint;
+    select count(*) into :n_bak_lost trimmed
+    from bak.&latest_bak as b
+    where not exists (select 1 from g.pecan_id_xwalk as x
+                      where x.ENCRYPTED_MRN = b.ENCRYPTED_MRN and x.pecan_ID = b.pecan_ID);
+  quit;
+  %if &n_bak_lost > 0 %then %do;
+    %fail_out(msg=D-02 ABORT -- &n_bak_lost backup rows missing after PROC APPEND -- existing pecan_ID assignments may have been altered);
+  %end;
+  %put NOTE: [20] D-02 post-append backup integrity assertion passed;
+
+  data bak.pecan_id_xwalk_&bak_stamp.;
+    set g.pecan_id_xwalk;
+  run;
+  %put NOTE: [20] PID-04 new backup written: pecan_id_xwalk_&bak_stamp;
 %mend build_or_append_xwalk;
 %build_or_append_xwalk;
 
-/* Final crosswalk count */
 %let _n_xwalk_final = 0;
 proc sql noprint;
   select count(*) into :_n_xwalk_final trimmed from g.pecan_id_xwalk;
@@ -621,276 +561,283 @@ quit;
 
 
 /* ============================================================
-   SECTION 9 -- PID-07: Linkage reach report
-   Loop over qc/19_raw_key_columns.csv rows where key_column_type = ENCRYPTED_MRN.
-   Write results to qc/20_linkage_reach.txt using PUT-to-fileref pattern.
-   r7/r8/r9 get explicit PCM-D-16 YES/NO lines.
+   SECTION 9 -- PID-07: linkage reach report (D-20 through D-26)
+   One section per file + sheet + ENCRYPTED_MRN column, each written
+   by the same macro call that computes its counts. No CALL EXECUTE:
+   the loop is a %DO over row numbers, so every count exists before
+   it is written.
    ============================================================ */
 
-/* Read Phase 19 key-column and sheet metadata */
 proc import datafile="&qc_path.\19_raw_key_columns.csv"
     out=work.inv_key_cols dbms=csv replace;
   guessingrows=max;
 run;
 
-proc import datafile="&qc_path.\19_raw_sheets.csv"
-    out=work.inv_sheets dbms=csv replace;
-  guessingrows=max;
-run;
+/* r7/r8/r9 = the three 2022-era supplemental files from Phase 18 (PCM-D-16).
+   Filenames follow the Phase 18 r1-r9 order; confirm against 18-CONTEXT.md. */
+data work.r789;
+  length r_label $4 r_filename $200;
+  infile datalines dlm='|' truncover;
+  input r_label $ r_filename $;
+  datalines;
+r7|2022_Education_20240124.csv
+r8|2022_RES_20230927.csv
+r9|All_YEARS_LAT_LONG_20231127.csv
+;
 
-/* Open the linkage reach report -- fresh write */
+%let _rpt = &qc_path.\20_linkage_reach.txt;
+
+/* Char ENCRYPTED_MRN targets, one row each, with md3 and r7/r8/r9 flags */
+proc sql noprint;
+  create table work._enc_mrn_targets as
+  select k.source_file length=500,
+         k.sheet_name  length=200,
+         k.var_name    length=32,
+         scan(k.source_file, -1, '\') as filename length=200,
+         lowcase(scan(k.source_file, -1, '.')) as ext length=10,
+         case when upcase(scan(k.source_file, -1, '\')) = upcase("&_md3_file.")
+               and upcase(scan(k.source_file, -2, '\')) = 'MASTER'
+              then 1 else 0 end as is_md3,
+         r.r_label
+  from work.inv_key_cols as k
+  left join work.r789 as r
+    on upcase(scan(k.source_file, -1, '\')) = upcase(r.r_filename)
+  where upcase(strip(k.key_column_type)) = 'ENCRYPTED_MRN'
+    and upcase(strip(k.var_type)) ne 'NUM'
+  order by is_md3 desc, filename, sheet_name, var_name;
+quit;
+
+/* Report header */
 data _null_;
-  file "&qc_path.\20_linkage_reach.txt" lrecl=200;
+  file "&_rpt." lrecl=250;
   put "==========================================================================";
   put "Phase 20 -- PID-07 Linkage Reach Report";
   put "Generated: %sysfunc(datetime(), datetime20.)";
   put "Crosswalk: g.pecan_id_xwalk (distinct MRNs: &_n_xwalk_final)";
   put "==========================================================================";
   put " ";
-  put "NOTE: MRN normalization applied on BOTH sides before matching:";
-  put "  strip() to remove whitespace; treat strip(upcase(col)) = NULL as blank.";
+  put "MRN normalization applied before matching: strip() whitespace; the";
+  put "literal string NULL (any case) is treated as blank; blanks are not counted.";
+  put "YES on a PCM-D-16 line means at least one distinct MRN matched; no threshold.";
   put " ";
 run;
 
-/* Identify r7/r8/r9 source files by their known filenames from Phase 18 */
-/* r7 = 2022_Education_20240124.csv, r8 = ... , r9 = All_YEARS_LAT_LONG_20231127.csv */
-/* Use explicit filename list -- key_columns alone does not carry r7/r8/r9 labels */
-
-/* Section: UNENC_MRN-only exclusions */
-proc sql noprint;
-  create table work._unenc_only as
-  select distinct source_file, filename
-  from (
-    select distinct source_file,
-           scan(source_file, -1, '\') as filename,
-           sum(case when upcase(strip(key_column_type)) = 'ENCRYPTED_MRN' then 1 else 0 end) as n_enc,
-           sum(case when upcase(strip(key_column_type)) = 'UNENC_MRN' then 1 else 0 end) as n_unenc
+/* Excluded files: UNENC_MRN only */
+%macro write_exclusions;
+  %local n_ex n_num;
+  proc sql noprint;
+    create table work._unenc_only as
+    select source_file, scan(source_file, -1, '\') as filename length=200
     from work.inv_key_cols
     group by source_file
-  )
-  where n_enc = 0 and n_unenc > 0;
-quit;
+    having sum(upcase(strip(key_column_type)) = 'ENCRYPTED_MRN') = 0
+       and sum(upcase(strip(key_column_type)) = 'UNENC_MRN') > 0;
+    select count(*) into :n_ex trimmed from work._unenc_only;
 
-%let _n_unenc_only = 0;
-proc sql noprint;
-  select count(*) into :_n_unenc_only trimmed from work._unenc_only;
-quit;
-
-%if &_n_unenc_only > 0 %then %do;
-  data _null_;
-    set work._unenc_only;
-    file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-    if _n_ = 1 then do;
-      put "--------------------------------------------------------------------------";
-      put "EXCLUDED FILES (UNENC_MRN only -- ENCRYPTED_MRN not present)";
-      put "--------------------------------------------------------------------------";
-    end;
-    put "  " filename;
-  run;
-  data _null_;
-    file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-    put " ";
-  run;
-%end;
-
-/* Numeric-MRN type mismatch block */
-proc sql noprint;
-  create table work._numeric_mrn as
-  select distinct source_file, scan(source_file, -1, '\') as filename length=200,
-         sheet_name, var_name
-  from work.inv_key_cols
-  where upcase(strip(key_column_type)) = 'ENCRYPTED_MRN'
-    and upcase(strip(var_type)) in ('NUM','NUMERIC');
-quit;
-
-%let _n_numeric_mrn = 0;
-proc sql noprint;
-  select count(*) into :_n_numeric_mrn trimmed from work._numeric_mrn;
-quit;
-
-%if &_n_numeric_mrn > 0 %then %do;
-  data _null_;
-    set work._numeric_mrn;
-    file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-    if _n_ = 1 then do;
-      put "--------------------------------------------------------------------------";
-      put "TYPE MISMATCH -- NOT COMPARED (numeric ENCRYPTED_MRN -- D-26)";
-      put "Silent numeric-to-char conversion can lose digits; these columns excluded.";
-      put "--------------------------------------------------------------------------";
-    end;
-    put "  " filename " sheet=" sheet_name " col=" var_name;
-  run;
-  data _null_;
-    file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-    put " ";
-  run;
-%end;
-
-/* Main linkage reach loop over char ENCRYPTED_MRN entries */
-proc sql noprint;
-  create table work._enc_mrn_targets as
-  select distinct source_file, sheet_name, var_name, var_type,
-         scan(source_file, -1, '\') as filename length=200,
-         scan(source_file, -4, '\') as ext_label length=20,
-         lowcase(scan(source_file, -1, '.')) as ext length=10
-  from work.inv_key_cols
-  where upcase(strip(key_column_type)) = 'ENCRYPTED_MRN'
-    and upcase(strip(var_type)) not in ('NUM','NUMERIC');
-quit;
-
-%let _n_targets = 0;
-proc sql noprint;
-  select count(*) into :_n_targets trimmed from work._enc_mrn_targets;
-quit;
-%put NOTE: [20] PID-07 char ENCRYPTED_MRN targets to process: &_n_targets;
-
-/* r7/r8/r9 filename patterns (from Phase 18 source names) */
-/* r7 = 2022_Education, r8 = second file with MRN from supplemental set,
-   r9 = All_YEARS_LAT_LONG */
-/* For PCM-D-16: r7, r8, r9 are supplemental files from raw\ (not raw\master) */
-/* Apply PCM-D-16 YES/NO label if filename matches known r7/r8/r9 patterns */
-
-%macro is_r789(fn=);
-  /* Returns 1 if filename matches r7, r8, or r9 pattern from Phase 18 */
-  %local _result;
-  %let _result = 0;
-  %if %index(%upcase(&fn), 2022_EDUCATION) > 0 %then %let _result = 1;
-  %if %index(%upcase(&fn), ALL_YEARS_LAT_LONG) > 0 %then %let _result = 1;
-  /* Add additional r8 pattern if applicable */
-  &_result
-%mend is_r789;
-
-/* Process each target in a DATA step loop */
-data _null_;
-  set work._enc_mrn_targets;
-  /* Write section header to reach report for each target */
-  file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-  put "--------------------------------------------------------------------------";
-  is_md3 = (upcase(strip(filename)) = '2018_2022_X_MASTER_DATASET_20240402.CSV'
-             and upcase(strip(ext_label)) = 'MASTER');
-  if is_md3 then
-    put "SOURCE: " filename " (reference -- crosswalk source; 100% by construction)";
-  else
-    put "SOURCE: " filename " sheet=[" sheet_name "]  col=" var_name;
-  put "--------------------------------------------------------------------------";
-run;
-
-/* Because SAS macro cannot loop over dataset rows inline without a CALL EXECUTE
-   or %DO %UNTIL approach, and CALL EXECUTE is available here,
-   use CALL EXECUTE to emit one macro call per row.
-   Each call imports the file, joins to xwalk, writes counts. */
-
-%macro process_one_reach_target(src_file=, sheet=, col=, fn=, is_ext=, ext=);
-  %local _n_total _n_match _n_dist_total _n_dist_match _pct_row _pct_dist;
-  %local _is_r789_file _yes_no;
-
-  options nosyntaxcheck noerrorabend;
-
-  /* Targeted re-import (D-25) -- PROC IMPORT for CSV, LIBNAME XLSX for xlsx */
-  %if %upcase(&ext) = CSV %then %do;
-    proc import datafile="&src_file."
-        out=work._reach_tmp dbms=csv replace;
-      guessingrows=max;
-    run;
-  %end;
-  %else %if %upcase(&ext) in (XLSX XLS) %then %do;
-    /* Use PROC IMPORT with SHEET= from 19_raw_sheets.csv */
-    proc import datafile="&src_file."
-        out=work._reach_tmp dbms=xlsx replace;
-      sheet="&sheet.";
-      getnames=yes;
-    run;
-  %end;
-  %else %do;
-    /* SAS7BDAT or other -- read directly */
-    %local _dslib _dsmem;
-    %let _dslib = %scan(&src_file, -2, \/);
-    %let _dsmem = %scan(&src_file, -1, \/);
-    /* Fall back to PROC IMPORT CSV path; unlikely to be needed */
-    proc import datafile="&src_file."
-        out=work._reach_tmp dbms=csv replace;
-      guessingrows=max;
-    run;
-  %end;
-
-  /* Count total and matched rows/MRNs */
-  %let _n_total = 0;
-  %let _n_match = 0;
-  %let _n_dist_total = 0;
-  %let _n_dist_match = 0;
-
-  proc sql noprint;
-    /* Apply MRN normalization before matching */
-    create table work._reach_norm as
-    select case when missing(strip(upcase(&col.))) or strip(upcase(&col.)) = 'NULL'
-                then '' else strip(&col.) end as _mrn_norm length=40
-    from work._reach_tmp
-    where calculated _mrn_norm ne '';
+    create table work._numeric_mrn as
+    select distinct source_file, scan(source_file, -1, '\') as filename length=200,
+           sheet_name, var_name
+    from work.inv_key_cols
+    where upcase(strip(key_column_type)) = 'ENCRYPTED_MRN'
+      and upcase(strip(var_type)) = 'NUM';
+    select count(*) into :n_num trimmed from work._numeric_mrn;
   quit;
 
-  proc sql noprint;
-    select count(*) into :_n_total trimmed from work._reach_norm;
-    select count(*) into :_n_match trimmed
-    from work._reach_norm as r
-    where r._mrn_norm in (select ENCRYPTED_MRN from g.pecan_id_xwalk);
-    select count(distinct _mrn_norm) into :_n_dist_total trimmed from work._reach_norm;
-    select count(distinct r._mrn_norm) into :_n_dist_match trimmed
-    from work._reach_norm as r
-    where r._mrn_norm in (select ENCRYPTED_MRN from g.pecan_id_xwalk);
-  quit;
-
-  /* Write results */
-  data _null_;
-    file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-    n_total      = &_n_total;
-    n_match      = &_n_match;
-    n_dist_total = &_n_dist_total;
-    n_dist_match = &_n_dist_match;
-    if n_total > 0 then pct_row  = n_match  / n_total  * 100;
-    else pct_row = .;
-    if n_dist_total > 0 then pct_dist = n_dist_match / n_dist_total * 100;
-    else pct_dist = .;
-    put "  Row match:          " n_match 8. " / " n_total 8. "  (" pct_row 6.1 "%)";
-    put "  Distinct MRN match: " n_dist_match 8. " / " n_dist_total 8. "  (" pct_dist 6.1 "%)";
-  run;
-
-  /* PCM-D-16 YES/NO for r7/r8/r9 */
-  %let _is_r789_file = 0;
-  %if %index(%upcase(&fn.), 2022_EDUCATION) > 0 %then %let _is_r789_file = 1;
-  %if %index(%upcase(&fn.), ALL_YEARS_LAT_LONG) > 0 %then %let _is_r789_file = 1;
-
-  %if &_is_r789_file = 1 %then %do;
-    %if &_n_dist_match > 0 %then %let _yes_no = YES;
-    %else %let _yes_no = NO;
+  %if &n_ex > 0 %then %do;
     data _null_;
-      file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
-      put "  Links on MRN (PCM-D-16 test): &_yes_no (&_n_dist_match distinct MRN matches)";
+      set work._unenc_only;
+      file "&_rpt." mod lrecl=250;
+      if _n_ = 1 then do;
+        put "--------------------------------------------------------------------------";
+        put "EXCLUDED FILES (UNENC_MRN only -- no ENCRYPTED_MRN column; not compared)";
+        put "--------------------------------------------------------------------------";
+      end;
+      put "  " filename;
+    run;
+  %end;
+
+  %if &n_num > 0 %then %do;
+    data _null_;
+      set work._numeric_mrn;
+      file "&_rpt." mod lrecl=250;
+      if _n_ = 1 then do;
+        put "--------------------------------------------------------------------------";
+        put "TYPE MISMATCH -- NOT COMPARED (ENCRYPTED_MRN imported as numeric, D-26)";
+        put "A numeric-to-char conversion can lose digits or leading zeros.";
+        put "--------------------------------------------------------------------------";
+      end;
+      put "  " filename " sheet=[" sheet_name "] col=" var_name;
     run;
   %end;
 
   data _null_;
-    file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
+    file "&_rpt." mod lrecl=250;
+    put " ";
+  run;
+%mend write_exclusions;
+%write_exclusions;
+
+/* One target: import, count, write its whole section */
+%macro reach_one(row=);
+  %local col ext is_md3 r_label n_total n_match n_dist n_dmatch ok;
+  %global _rsheet;
+
+  /* Scalar attributes into macro vars; the path itself stays in data */
+  data _null_;
+    set work._enc_mrn_targets(firstobs=&row obs=&row);
+    call symputx('col',     var_name, 'L');
+    call symputx('ext',     ext,      'L');
+    call symputx('is_md3',  is_md3,   'L');
+    call symputx('r_label', r_label,  'L');
+    call symputx('_rsheet', sheet_name, 'G');
+  run;
+
+  /* Section header */
+  data _null_;
+    set work._enc_mrn_targets(firstobs=&row obs=&row);
+    file "&_rpt." mod lrecl=250;
+    put "--------------------------------------------------------------------------";
+    if is_md3 = 1 then
+      put "SOURCE: " filename " -- reference (crosswalk source; 100% by construction)";
+    else if not missing(r_label) then
+      put "SOURCE: " filename " (" r_label ")  sheet=[" sheet_name "]  col=" var_name;
+    else
+      put "SOURCE: " filename "  sheet=[" sheet_name "]  col=" var_name;
+    put "--------------------------------------------------------------------------";
+  run;
+
+  proc datasets lib=work nolist nowarn; delete _reach_tmp _reach_norm; quit;
+  %let ok = 1;
+
+  %if &ext = csv %then %do;
+    data _null_;
+      set work._enc_mrn_targets(firstobs=&row obs=&row);
+      _rc = filename('_rch', source_file);
+    run;
+    proc import datafile=_rch out=work._reach_tmp dbms=csv replace;
+      guessingrows=max;
+    run;
+    %if &syserr > 4 %then %let ok = 0;
+    filename _rch clear;
+  %end;
+  %else %if &ext = xlsx %then %do;
+    /* Targeted read: one column from one sheet through the XLSX libref */
+    data _null_;
+      set work._enc_mrn_targets(firstobs=&row obs=&row);
+      _rc = libname('_rchx', source_file, 'xlsx');
+    run;
+    %if %sysfunc(libref(_rchx)) ne 0 %then %let ok = 0;
+    %else %do;
+      /* Same sheet-name handling as program 19 (unquoted when a valid name) */
+      %if %sysfunc(prxmatch(%str(/^[A-Za-z_]\w{0,31}$/), %superq(_rsheet))) %then %do;
+        data work._reach_tmp;
+          set _rchx.&_rsheet.(keep=&col);
+        run;
+      %end;
+      %else %do;
+        data work._reach_tmp;
+          set _rchx."%superq(_rsheet)"n(keep=&col);
+        run;
+      %end;
+      %if &syserr > 4 %then %let ok = 0;
+      libname _rchx clear;
+    %end;
+  %end;
+  %else %let ok = 0;
+
+  %if &ok = 1 and %sysfunc(exist(work._reach_tmp)) = 0 %then %let ok = 0;
+  %let syscc = 0;
+
+  %if &ok = 0 %then %do;
+    data _null_;
+      file "&_rpt." mod lrecl=250;
+      put "  IMPORT FAILED or unsupported file type [&ext] -- not compared";
+      %if %length(&r_label) > 0 %then %do;
+        put "  Links on MRN (PCM-D-16 test): NOT TESTED (file could not be read)";
+      %end;
+      put " ";
+    run;
+    %put WARNING: [20] PID-07 row &row could not be read -- reported as not compared;
+    %return;
+  %end;
+
+  proc sql noprint;
+    create table work._reach_norm as
+    select strip(&col.) as _mrn_norm length=64
+    from work._reach_tmp
+    where not missing(&col.) and strip(upcase(&col.)) ne 'NULL';
+
+    select count(*) into :n_total trimmed from work._reach_norm;
+    select count(*) into :n_match trimmed
+    from work._reach_norm
+    where _mrn_norm in (select ENCRYPTED_MRN from g.pecan_id_xwalk);
+    select count(distinct _mrn_norm) into :n_dist trimmed from work._reach_norm;
+    select count(distinct _mrn_norm) into :n_dmatch trimmed
+    from work._reach_norm
+    where _mrn_norm in (select ENCRYPTED_MRN from g.pecan_id_xwalk);
+  quit;
+
+  data _null_;
+    file "&_rpt." mod lrecl=250;
+    n_total = &n_total; n_match = &n_match; n_dist = &n_dist; n_dmatch = &n_dmatch;
+    if n_total > 0 then pct_row  = n_match  / n_total * 100;
+    if n_dist  > 0 then pct_dist = n_dmatch / n_dist  * 100;
+    put "  Row match:          " n_match 8. " / " n_total 8. "  (" pct_row 6.1 " %)";
+    put "  Distinct MRN match: " n_dmatch 8. " / " n_dist 8. "  (" pct_dist 6.1 " %)";
+    %if %length(&r_label) > 0 %then %do;
+      if n_dmatch > 0 then yn = 'YES'; else yn = 'NO ';
+      put "  Links on MRN (PCM-D-16 test): " yn "  distinct-MRN rate: " pct_dist 6.1 " %";
+    %end;
     put " ";
   run;
 
-  %put NOTE: [20] PID-07 &fn -- rows &_n_total matched &_n_match -- dist MRNs &_n_dist_total matched &_n_dist_match;
-%mend process_one_reach_target;
+  %put NOTE: [20] PID-07 row &row -- rows &n_total matched &n_match -- distinct MRNs &n_dist matched &n_dmatch;
+%mend reach_one;
 
-/* Emit one CALL EXECUTE per target row */
-data _null_;
-  set work._enc_mrn_targets;
-  call execute(
-    '%process_one_reach_target(src_file=' || strip(source_file) ||
-    ', sheet=' || strip(sheet_name) ||
-    ', col=' || strip(var_name) ||
-    ', fn=' || strip(filename) ||
-    ', ext=' || strip(ext) || ')'
-  );
-run;
+%macro reach_all;
+  %local n_targets row n_untested;
+  %let n_targets = 0;
+  proc sql noprint;
+    select count(*) into :n_targets trimmed from work._enc_mrn_targets;
+  quit;
+  %put NOTE: [20] PID-07 char ENCRYPTED_MRN targets to process: &n_targets;
 
-/* Close reach report */
+  %do row = 1 %to &n_targets;
+    %reach_one(row=&row);
+  %end;
+
+  /* r7/r8/r9 files with no char ENCRYPTED_MRN column still get an explicit line */
+  proc sql noprint;
+    create table work._r789_untested as
+    select r.r_label, r.r_filename
+    from work.r789 as r
+    where upcase(r.r_filename) not in
+          (select upcase(filename) from work._enc_mrn_targets)
+    order by r.r_label;
+    select count(*) into :n_untested trimmed from work._r789_untested;
+  quit;
+  %if &n_untested > 0 %then %do;
+    data _null_;
+      set work._r789_untested;
+      file "&_rpt." mod lrecl=250;
+      if _n_ = 1 then do;
+        put "--------------------------------------------------------------------------";
+        put "r7/r8/r9 FILES WITHOUT A CHAR ENCRYPTED_MRN COLUMN";
+        put "--------------------------------------------------------------------------";
+      end;
+      put "  " r_filename " (" r_label ")";
+      put "  Links on MRN (PCM-D-16 test): NOT TESTED (no char ENCRYPTED_MRN column -- see exclusions or type-mismatch blocks above)";
+    run;
+    data _null_;
+      file "&_rpt." mod lrecl=250;
+      put " ";
+    run;
+  %end;
+%mend reach_all;
+%reach_all;
+
 data _null_;
-  file "&qc_path.\20_linkage_reach.txt" mod lrecl=200;
+  file "&_rpt." mod lrecl=250;
   put "==========================================================================";
   put "END OF PID-07 LINKAGE REACH REPORT";
   put "==========================================================================";
@@ -899,9 +846,8 @@ run;
 
 
 /* ============================================================
-   SECTION 10 -- PID-08: DECISIONS.md entries noted
-   The actual edits to docs/DECISIONS.md are made in Task 4 (text file edit,
-   not a SAS write) per the plan.
+   SECTION 10 -- PID-08: DECISIONS.md entries are a text edit
+   (Plan 20-01 Task 4), not a SAS write.
    ============================================================ */
 
 %put NOTE: [20] PID-08 -- PCM-D-17 and PCM-D-18 are recorded in docs/DECISIONS.md;

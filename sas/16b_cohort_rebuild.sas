@@ -383,7 +383,7 @@ run;
 %mend verify_promotion;
 %verify_promotion;
 
-/* Verify column count is exactly 174 (full pass-through) */
+/* Verify column count is exactly 175 (174 original + pecan_ID from 10b amendment) */
 %macro verify_cohort_cols;
   %global n_cohort_cols;
   proc sql noprint;
@@ -391,11 +391,46 @@ run;
     from dictionary.columns
     where libname='G' and upcase(memname)='ANALYTIC_COHORT';
   quit;
-  %if &n_cohort_cols ne 174 %then
-    %fail_out(msg=g.analytic_cohort has &n_cohort_cols columns%str(,) expected 174 (full pass-through).);
-  %put NOTE: COH -- g.analytic_cohort has &n_cohort_cols columns (174 confirmed).;
+  %if &n_cohort_cols ne 175 %then
+    %fail_out(msg=g.analytic_cohort has &n_cohort_cols columns%str(,) expected 175 (174 original + pecan_ID).);
+  %put NOTE: COH -- g.analytic_cohort has &n_cohort_cols columns (175 confirmed).;
 %mend verify_cohort_cols;
 %verify_cohort_cols;
+
+
+/* =========================================================================
+   SECTION 5c: PID-05 attachment assertions on g.analytic_cohort
+   pecan_ID flows through via full SET in SECTION 2 (from g.master_data_harmonized
+   which was amended by 10b to carry pecan_ID -- no second join needed in 16b).
+   ========================================================================= */
+
+%macro assert_pecan_attach_cohort;
+  %local n_blank_pid n_dup_pid;
+  proc sql noprint;
+    select count(*) into :n_blank_pid trimmed
+    from g.analytic_cohort
+    where pecan_ID is missing
+      and not missing(ENCRYPTED_MRN)
+      and strip(upcase(ENCRYPTED_MRN)) ne 'NULL';
+    select count(*) into :n_dup_pid trimmed
+    from (
+      select PRECEDE_STUDY_ID, count(distinct pecan_ID) as n_pid
+      from g.analytic_cohort
+      group by PRECEDE_STUDY_ID
+      having calculated n_pid > 1
+    );
+  quit;
+  %put NOTE: [16b] PID-05 blank pecan_ID where MRN non-blank/non-NULL: &n_blank_pid;
+  %put NOTE: [16b] PID-05 PRECEDEs with more than one pecan_ID: &n_dup_pid;
+  %if &n_blank_pid > 0 %then %do;
+    %fail_out(msg=PID-05 ABORT -- &n_blank_pid cohort rows have blank pecan_ID with non-blank non-NULL ENCRYPTED_MRN);
+  %end;
+  %if &n_dup_pid > 0 %then %do;
+    %fail_out(msg=PID-05 ABORT -- &n_dup_pid PRECEDE_STUDY_IDs in cohort have more than one distinct pecan_ID);
+  %end;
+  %put NOTE: [16b] PID-05 all cohort attachment assertions passed;
+%mend assert_pecan_attach_cohort;
+%assert_pecan_attach_cohort;
 
 
 /* =========================================================================
@@ -416,9 +451,9 @@ run;
     select count(*) into :n_rows trimmed
     from g.master_data_harmonized;
   quit;
-  %if &n_cols ne 174 or &n_rows ne 41150 %then
-    %fail_out(msg=g.master_data_harmonized changed: &n_cols cols and &n_rows rows -- expected 174 and 41150);
-  %put NOTE: g.master_data_harmonized confirmed post-run -- 174 columns and 41150 rows -- unmodified;
+  %if &n_cols ne 175 or &n_rows ne 41150 %then
+    %fail_out(msg=g.master_data_harmonized changed: &n_cols cols and &n_rows rows -- expected 175 and 41150);
+  %put NOTE: g.master_data_harmonized confirmed post-run -- 175 columns and 41150 rows -- unmodified;
 %mend assert_harmonized_unchanged;
 %assert_harmonized_unchanged;
 
@@ -444,6 +479,102 @@ run;
   %end;
 %mend measure_h_cols;
 %measure_h_cols;
+
+
+/* =========================================================================
+   SECTION 6b: PID-06 pecan_ID counts for both datasets (D-17, D-18, D-19)
+   Output to qc/16b_pecan_id_counts.txt (fresh write, not appended to missingness).
+   Reports side by side for g.master_data_harmonized (41,150) and g.analytic_cohort (13,890).
+   ========================================================================= */
+
+%put NOTE: ==== SECTION 6b -- PID-06 pecan_ID counts ====;
+
+%macro write_pecan_id_counts;
+  %local no_pecan_h n_dist_h n1enc_h n2enc_h n3plus_h;
+  %local no_pecan_c n_dist_c n1enc_c n2enc_c n3plus_c;
+
+  /* --- g.master_data_harmonized counts --- */
+  proc sql noprint;
+    select count(*) into :no_pecan_h trimmed
+    from g.master_data_harmonized where pecan_ID is missing;
+
+    select count(distinct pecan_ID) into :n_dist_h trimmed
+    from g.master_data_harmonized where pecan_ID is not missing;
+
+    select count(*) into :n1enc_h trimmed
+    from (select pecan_ID, count(*) as n_enc
+          from g.master_data_harmonized where pecan_ID is not missing
+          group by pecan_ID having n_enc = 1);
+
+    select count(*) into :n2enc_h trimmed
+    from (select pecan_ID, count(*) as n_enc
+          from g.master_data_harmonized where pecan_ID is not missing
+          group by pecan_ID having n_enc = 2);
+
+    select count(*) into :n3plus_h trimmed
+    from (select pecan_ID, count(*) as n_enc
+          from g.master_data_harmonized where pecan_ID is not missing
+          group by pecan_ID having n_enc >= 3);
+  quit;
+
+  /* --- g.analytic_cohort counts --- */
+  proc sql noprint;
+    select count(*) into :no_pecan_c trimmed
+    from g.analytic_cohort where pecan_ID is missing;
+
+    select count(distinct pecan_ID) into :n_dist_c trimmed
+    from g.analytic_cohort where pecan_ID is not missing;
+
+    select count(*) into :n1enc_c trimmed
+    from (select pecan_ID, count(*) as n_enc
+          from g.analytic_cohort where pecan_ID is not missing
+          group by pecan_ID having n_enc = 1);
+
+    select count(*) into :n2enc_c trimmed
+    from (select pecan_ID, count(*) as n_enc
+          from g.analytic_cohort where pecan_ID is not missing
+          group by pecan_ID having n_enc = 2);
+
+    select count(*) into :n3plus_c trimmed
+    from (select pecan_ID, count(*) as n_enc
+          from g.analytic_cohort where pecan_ID is not missing
+          group by pecan_ID having n_enc >= 3);
+  quit;
+
+  /* Write to fresh file (not mod -- this is the first and only write to this file) */
+  data _null_;
+    file "&qc_path.\16b_pecan_id_counts.txt" lrecl=200;
+    put "==========================================================================";
+    put "Phase 20 -- PID-06 pecan_ID Counts";
+    put "Generated: %sysfunc(datetime(), datetime20.)";
+    put "==========================================================================";
+    put " ";
+    put "g.master_data_harmonized (41150 rows)";
+    put "--------------------------------------";
+    put "no_pecan_id_harmonized=&no_pecan_h";
+    put "distinct_pecan_id_harmonized=&n_dist_h";
+    put "pecan_id_1enc_harmonized=&n1enc_h";
+    put "pecan_id_2enc_harmonized=&n2enc_h";
+    put "pecan_id_3plus_enc_harmonized=&n3plus_h";
+    put " ";
+    put "g.analytic_cohort (13890 rows)";
+    put "--------------------------------------";
+    put "no_pecan_id_cohort=&no_pecan_c";
+    put "distinct_pecan_id_cohort=&n_dist_c";
+    put "pecan_id_1enc_cohort=&n1enc_c";
+    put "pecan_id_2enc_cohort=&n2enc_c";
+    put "pecan_id_3plus_enc_cohort=&n3plus_c";
+    put " ";
+    put "NOTE: no_pecan_id + 1enc_patients + 2enc_patients + 3plus_enc_patients";
+    put "      should equal distinct_pecan_id for each dataset";
+    put "==========================================================================";
+  run;
+
+  %put NOTE: [16b] PID-06 harmonized: no_pecan=&no_pecan_h dist=&n_dist_h 1enc=&n1enc_h 2enc=&n2enc_h 3plus=&n3plus_h;
+  %put NOTE: [16b] PID-06 cohort: no_pecan=&no_pecan_c dist=&n_dist_c 1enc=&n1enc_c 2enc=&n2enc_c 3plus=&n3plus_c;
+  %put NOTE: [16b] PID-06 counts written to qc/16b_pecan_id_counts.txt;
+%mend write_pecan_id_counts;
+%write_pecan_id_counts;
 
 
 /* =========================================================================

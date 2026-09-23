@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: pecan_ID + Raw Directory Inventory
-status: roadmap_ready
-last_updated: "2026-09-23T00:00:00Z"
+status: executing
+last_updated: "2026-09-23T16:36:24.554Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 50
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 **Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Phase 19 — Raw Directory Inventory. Run `/gsd:plan-phase 19` to begin.
+**Current focus:** Phase 19 — raw-directory-inventory
 
 ---
 
 ## Current Position
 
-Phase: Not started (roadmap defined; ready to plan Phase 19)
-Plan: —
-Status: Roadmap ready
-Last activity: 2026-09-23 — v2.0 roadmap created (3 phases, 17 requirements)
+Phase: 19 (raw-directory-inventory) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-23
 
 ### v2.0 Phase Status
 
@@ -44,7 +44,7 @@ Last activity: 2026-09-23 — v2.0 roadmap created (3 phases, 17 requirements)
 | 20 | pecan_ID Derivation | Not started |
 | 21 | Runner Wiring & D3 Fix | Not started |
 
-**Progress:** [░░░░░░░░░░] 0%
+**Progress:** [█████░░░░░] 50%
 
 ### v1.0 Position (preserved)
 
@@ -106,11 +106,13 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 ### Roadmap Evolution
 
 **v2.0 (2026-09-23):**
+
 - Phase 19 added: Raw Directory Inventory (INV-01 through INV-07)
 - Phase 20 added: pecan_ID Derivation (PID-01 through PID-08); depends on Phase 19 (INV-01 checksum, INV-04 key-column flags)
 - Phase 21 added: Runner Wiring & D3 Fix (RUN-01, FIX-01); must follow Phases 19 and 20 to include programs 19 and 20 in 99_run_all.sas
 
 **v1.0 (archived):**
+
 - Phase 5 added: Merge QC (QC-01 through QC-05)
 - AMENDMENT-01 raised 2026-08-26: adds PREP-08, PREP-09 (Phase 3) and QC-06 (Phase 5)
 - Phase 17 added: summary-stats-by-domain

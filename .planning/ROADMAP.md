@@ -35,7 +35,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Raw Directory Inventory | 0/2 | Not started | - |
+| 19. Raw Directory Inventory | 1/2 | In Progress|  |
 | 20. pecan_ID Derivation | 0/? | Not started | - |
 | 21. Runner Wiring & D3 Fix | 0/? | Not started | - |
 
@@ -63,7 +63,7 @@
   5. User can see which files are known (md1-md8 or Phase 18 supplemental set) and which are flagged NEW, and can confirm total files = profiled + listed-not-profiled + read-failed with zero unknowns
 **Plans**: 2 plans
 Plans:
-- [ ] 19-01-PLAN.md — Update REQUIREMENTS.md INV-07 + write complete sas/19_raw_dir_inventory.sas (all 14 sections)
+- [x] 19-01-PLAN.md — Update REQUIREMENTS.md INV-07 + write complete sas/19_raw_dir_inventory.sas (all 14 sections)
 - [ ] 19-02-PLAN.md — Run program, fix errors, human-verify workbook (KEY leftmost, 7 sheets, UF blue) and CSV handoff
 
 ### Phase 20: pecan_ID Derivation

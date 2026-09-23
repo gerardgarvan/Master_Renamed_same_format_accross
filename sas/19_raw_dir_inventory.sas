@@ -30,7 +30,8 @@
     containing ampersands, percent signs or commas cannot break macro code.
 
   Author  : GSD Phase 19 Plan 01
-  Revised : 2026-09-23 (review round 3 -- implementation fixes)
+  Revised : 2026-09-23 (review round 4 -- per-sheet status, exact raw\master match,
+            single-type tables)
 ==========================================================================*/
 
 /* ============================================================
@@ -152,7 +153,8 @@ ALL_AIM2_MASTER_DATASET_20210917.xlsx
     from work.required_files r
     left join work.files_meta f
       on upcase(f.filename) = upcase(r.req_filename)
-     and index(upcase(f.full_path), '\MASTER\') > 0
+     and upcase(substr(f.full_path, 1, length(f.full_path) - length(f.filename) - 1))
+         = upcase("&raw_path.\master")
     group by r.req_filename;
     select count(*) into :n_bad trimmed
     from work._req_chk
@@ -207,7 +209,8 @@ data work.file_stats;
 run;
 
 data work.sheets_out;
-  length file_id 8 sheet_seq 8 sheet_name $200 sheet_ds $32 nobs 8 ncols 8;
+  length file_id 8 sheet_seq 8 sheet_name $200 sheet_ds $32 sheet_status $30
+         nobs 8 ncols 8;
   stop;
 run;
 
@@ -315,30 +318,37 @@ run;
             data work.&dsname._s&j;
               set _xlw."%superq(_sh&j)"n;
             run;
-            %if &syserr > 4 or %sysfunc(exist(work.&dsname._s&j)) = 0 %then
-              %let n_fail = %eval(&n_fail + 1);
+            %if &syserr > 4 %then %do;
+              /* Remove any partial copy so existence = success below */
+              proc datasets lib=work nolist nowarn; delete &dsname._s&j; quit;
+            %end;
             %else %if &syserr > 0 and %length(&fwarn) = 0 %then
               %let fwarn = %superq(syswarningtext);
+            %if %sysfunc(exist(work.&dsname._s&j)) = 0 %then
+              %let n_fail = %eval(&n_fail + 1);
           %end;
           %let syscc = 0;
 
+          /* Every sheet gets a SHEETS row with its own status; readable
+             sheets are profiled even when another sheet failed */
+          proc sql noprint;
+            create table work._sh_ as
+            select &i as file_id, s.sheet_seq, s.sheet_name, s.sheet_ds,
+                   case when t.memname is not missing then 'profiled'
+                        else 'read-failed' end as sheet_status length=30,
+                   t.nobs, t.nvar as ncols
+            from work._sheetlist s
+            left join dictionary.tables t
+              on t.libname = 'WORK' and t.memname = upcase(s.sheet_ds)
+            order by s.sheet_seq;
+          quit;
+          proc append base=work.sheets_out data=work._sh_ force; run;
+
           %if &n_fail > 0 %then %do;
             %let fstatus = read-failed;
-            %let freason = sheet copy failed for &n_fail of &nsheets sheets;
+            %let freason = sheet copy failed for &n_fail of &nsheets sheets -- readable sheets still profiled;
           %end;
-          %else %do;
-            %let fstatus = profiled;
-            proc sql noprint;
-              create table work._sh_ as
-              select &i as file_id, s.sheet_seq, s.sheet_name, s.sheet_ds,
-                     t.nobs, t.nvar as ncols
-              from work._sheetlist s
-              left join dictionary.tables t
-                on t.libname = 'WORK' and t.memname = upcase(s.sheet_ds)
-              order by s.sheet_seq;
-            quit;
-            proc append base=work.sheets_out data=work._sh_ force; run;
-          %end;
+          %else %let fstatus = profiled;
           proc datasets lib=work nolist nowarn;
             delete _sheetlist0 _sheetlist _sh_;
           quit;
@@ -427,6 +437,7 @@ proc sql noprint;
   union all
   select file_id, sheet_ds as ds length=32, sheet_name length=200
   from work.sheets_out
+  where sheet_status = 'profiled'
   order by file_id, ds;
 quit;
 
@@ -469,34 +480,54 @@ run;
        Temporary arrays sized explicitly (B-03). No STOP (B-04). */
     data work._miss_ (keep=_v_name _n_miss _n_sent);
       set work.&ds end=_eof;
-      array _num  {*} _numeric_;
-      array _char {*} _character_;
-      array _mn {%sysfunc(max(&n_num, 1))}  _temporary_;
-      array _sn {%sysfunc(max(&n_num, 1))}  _temporary_;
-      array _mc {%sysfunc(max(&n_char, 1))} _temporary_;
-      array _sc {%sysfunc(max(&n_char, 1))} _temporary_;
       length _v_name $32;
+      /* Arrays declared only for types the table has, so a char-only or
+         num-only table compiles cleanly (no zero-element array warning).
+         A zero-row table produces no rows here; VARIABLES still gets one
+         row per column from dictionary.columns with nobs = 0. */
+      %if &n_num > 0 %then %do;
+        array _num {*} _numeric_;
+        array _mn {&n_num} _temporary_;
+        array _sn {&n_num} _temporary_;
+      %end;
+      %if &n_char > 0 %then %do;
+        array _char {*} _character_;
+        array _mc {&n_char} _temporary_;
+        array _sc {&n_char} _temporary_;
+      %end;
       if _n_ = 1 then do;
-        do _i = 1 to dim(_mn); _mn{_i} = 0; _sn{_i} = 0; end;
-        do _i = 1 to dim(_mc); _mc{_i} = 0; _sc{_i} = 0; end;
+        %if &n_num > 0 %then %do;
+          do _i = 1 to &n_num; _mn{_i} = 0; _sn{_i} = 0; end;
+        %end;
+        %if &n_char > 0 %then %do;
+          do _i = 1 to &n_char; _mc{_i} = 0; _sc{_i} = 0; end;
+        %end;
       end;
-      do _i = 1 to dim(_num);
-        if missing(_num{_i})    then _mn{_i} + 1;
-        else if _num{_i} = -999 then _sn{_i} + 1;
-      end;
-      do _i = 1 to dim(_char);
-        if missing(_char{_i})                     then _mc{_i} + 1;
-        else if upcase(strip(_char{_i})) = 'NULL' then _sc{_i} + 1;
-      end;
+      %if &n_num > 0 %then %do;
+        do _i = 1 to &n_num;
+          if missing(_num{_i})    then _mn{_i} + 1;
+          else if _num{_i} = -999 then _sn{_i} + 1;
+        end;
+      %end;
+      %if &n_char > 0 %then %do;
+        do _i = 1 to &n_char;
+          if missing(_char{_i})                     then _mc{_i} + 1;
+          else if upcase(strip(_char{_i})) = 'NULL' then _sc{_i} + 1;
+        end;
+      %end;
       if _eof then do;
-        do _i = 1 to dim(_num);
-          _v_name = vname(_num{_i}); _n_miss = _mn{_i}; _n_sent = _sn{_i};
-          output;
-        end;
-        do _i = 1 to dim(_char);
-          _v_name = vname(_char{_i}); _n_miss = _mc{_i}; _n_sent = _sc{_i};
-          output;
-        end;
+        %if &n_num > 0 %then %do;
+          do _i = 1 to &n_num;
+            _v_name = vname(_num{_i}); _n_miss = _mn{_i}; _n_sent = _sn{_i};
+            output;
+          end;
+        %end;
+        %if &n_char > 0 %then %do;
+          do _i = 1 to &n_char;
+            _v_name = vname(_char{_i}); _n_miss = _mc{_i}; _n_sent = _sc{_i};
+            output;
+          end;
+        %end;
         /* B04-NOSTOP-VERIFIED */
       end;
     run;
@@ -765,7 +796,8 @@ quit;
     from work.required_files r
     left join work.files_out f
       on upcase(f.filename) = upcase(r.req_filename)
-     and index(upcase(f.full_path), '\MASTER\') > 0
+     and upcase(substr(f.full_path, 1, length(f.full_path) - length(f.filename) - 1))
+         = upcase("&raw_path.\master")
     where coalesce(f.status, '') ne 'profiled';
   quit;
   %if &n_bad > 0 %then %do;
@@ -792,7 +824,8 @@ run;
    ============================================================ */
 proc sql noprint;
   create table work.sheets_rpt as
-  select f.full_path, f.filename, s.sheet_seq, s.sheet_name, s.nobs, s.ncols
+  select f.full_path, f.filename, s.sheet_seq, s.sheet_name, s.sheet_status,
+         s.nobs, s.ncols
   from work.sheets_out s
   inner join work.files_meta f on s.file_id = f.file_id
   order by f.full_path, s.sheet_seq;
@@ -809,7 +842,7 @@ FILES|ext|File extension (lowercased)|
 FILES|fsize|File size in bytes|
 FILES|fdate|Last modified date from the OS|
 FILES|sha256|SHA-256 checksum from certutil|FAILED if certutil could not hash the file
-FILES|status|profiled / listed-not-profiled / read-failed|
+FILES|status|profiled / listed-not-profiled / read-failed|Workbooks: read-failed if any sheet failed -- see SHEETS
 FILES|nobs|Row count for CSV and SAS7BDAT files|Missing for workbooks -- see SHEETS for per-sheet counts
 FILES|ncols|Column count for CSV and SAS7BDAT files|Missing for workbooks -- see SHEETS
 FILES|fail_reason|Reason text if status=read-failed|
@@ -819,6 +852,7 @@ SHEETS|full_path|Full path of the parent workbook|
 SHEETS|filename|File name of the parent workbook|
 SHEETS|sheet_seq|Sheet position as reported by the XLSX engine|
 SHEETS|sheet_name|Sheet name|
+SHEETS|sheet_status|profiled or read-failed for this sheet|A workbook is read-failed if any sheet failed; its readable sheets are still profiled
 SHEETS|nobs|Row count for this sheet|
 SHEETS|ncols|Column count for this sheet|
 VARIABLES|source_file|Full path of the source file|

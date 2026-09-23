@@ -36,7 +36,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 19. Raw Directory Inventory | 2/2 | Complete | 2026-09-23 |
-| 20. pecan_ID Derivation | 0/? | Not started | - |
+| 20. pecan_ID Derivation | 0/2 | Planned | - |
 | 21. Runner Wiring & D3 Fix | 0/? | Not started | - |
 
 ---
@@ -76,7 +76,10 @@ Plans:
   3. User can confirm crosswalk `g.pecan_id_xwalk` is built per PCM-D-17 and is append-only (existing assignments are never renumbered on re-run)
   4. User can confirm pecan_ID is attached per PCM-D-18 without rewriting any existing dataset in place; row count unchanged in every file that receives pecan_ID; zero blank pecan_ID where ENCRYPTED_MRN is non-blank; zero patients gaining a second pecan_ID after attachment; column-count assertions and DATA_DICTIONARY.xlsx variable totals in every program PCM-D-18 touches are updated to reflect the added column
   5. User can see distinct pecan_ID counts and the encounter-per-patient distribution, and can see whether r7/r8/r9 raw files link on MRN where they previously failed on PRECEDE_STUDY_ID (PCM-D-16); pecan_ID appears in DATA_DICTIONARY.xlsx and PCM-D-17/D-18 are recorded in DECISIONS.md
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 20-01-PLAN.md — Amend program 19 (3 CSV handoffs) + 00_config backup path + write sas/20_pecan_id.sas (checksum, cross-check, cardinality, append-only crosswalk, linkage reach) + DECISIONS.md PCM-D-17/D-18 [Wave 1]
+- [ ] 20-02-PLAN.md — Attach pecan_ID in 10b (join + PID-05 + 175 cols) and 16b (pass-through + PID-05 + PID-06 counts + 175 cols); add explicit pecan_ID row to 08_dictionary.sas + regenerate DATA_DICTIONARY.xlsx [Wave 2]
 
 ### Phase 21: Runner Wiring & D3 Fix
 **Goal**: Users can run the entire pipeline end-to-end from a single file and regenerate the domain statistics workbook with the D3 cognitive domain correctly populated
@@ -85,4 +88,3 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can execute `99_run_all.sas` in a clean SAS session and have programs 1–8, 10b, 16b, 17, 18, 19, and 20 run as separate batch invocations per PCM-C-05, in the order determined by PCM-D-18, with exit code 3 on any abort
   2. User can regenerate `qc/17_summary_stats_by_domain.xlsx` and see a D3 sheet containing both COGNITIVE_SCORE and COGNITIVE_CATEGORY under the instrument stat_route, applied only when DOMAIN_MAP_APPROVED gate is set
-**Plans**: TBD

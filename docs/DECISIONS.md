@@ -609,8 +609,9 @@ v1 checkpoint-2 approval which was made when D3 was absent from the workbook.
 
 **Effect:** Sections 5-11 of program 17 are no longer blocked by the gate.
 
-**Result:** PENDING -- to be filled in at the Task 3 checkpoint after program 17 runs and the D3
-sheet is confirmed present and populated in qc/17_summary_stats_by_domain.xlsx.
+**Result:** CONFIRMED 2026-09-24 -- D3 (Cognitive) sheet present and populated in
+qc/17_summary_stats_by_domain.xlsx after full pipeline run. COGNITIVE_SCORE and
+COGNITIVE_CATEGORY appear on the D3 sheet under the instrument stat_route as intended.
 
 **Attribution:** Gerard, 2026-09-23
 
@@ -642,7 +643,14 @@ ENCRYPTED_MRN (see 21-01-SUMMARY for which mechanism applied).
 **Column check:** An in-program assertion confirms every variable program 17 reads by name exists
 in g.analytic_cohort; the base row-count expectation is updated to 13,890.
 
-**Population shift:** PENDING -- summarized at the Task 3 checkpoint from qc/17_pcm_d20_compare.txt.
+**Population shift:** Confirmed 2026-09-24 from qc/17_pcm_d20_compare.txt -- g.analysis_base
+(41,150 rows, 125 vars) vs g.analytic_cohort (13,890 rows, 175 vars). 27,260 rows present only
+in analysis_base (non-cohort patients); 0 rows present only in analytic_cohort. 125 variables in
+common; 50 additional in analytic_cohort (h_* harmonized columns, pecan_ID, QC flags, etc.).
+Of the 13,890 matched rows: 7,614 have all 125 common variables equal; 6,276 differ on
+Cognitive_Category (3,129 diffs), Frailty_Category (700), Cognitive_Score (3,117),
+Frailty_Score (3,481), ORAL_MORPHINE_EQUIV_mg_POD_DAY6 (2,700) -- all differences are
+missing-in-base / populated-in-cohort, consistent with gap-fill applied in Phase 15/16b.
 
 **Attribution:** Gerard, 2026-09-23
 

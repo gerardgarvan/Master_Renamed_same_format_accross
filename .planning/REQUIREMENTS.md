@@ -30,7 +30,7 @@
 ### Runner Wiring & D3 Fix (Phase 21)
 
 - [x] **RUN-01** — User can execute the full pipeline end-to-end via `99_run_all.sas`, covering programs 1–8, 10b, 16b, 17, 18, 19, and 20; each program is a separate batch invocation per PCM-C-05 (restart SAS between programs; exit code 3 on abort per PCM-D-12)
-- [ ] **FIX-01** — User can regenerate `qc/17_summary_stats_by_domain.xlsx` with COGNITIVE_SCORE and COGNITIVE_CATEGORY assigned to instrument stat_route in the domain lookup DATALINES, applied under the DOMAIN_MAP_APPROVED gate; the regenerated workbook contains a D3 sheet and both cognitive variables appear on it
+- [x] **FIX-01** — User can regenerate `qc/17_summary_stats_by_domain.xlsx` with COGNITIVE_SCORE and COGNITIVE_CATEGORY assigned to instrument stat_route in the domain lookup DATALINES, applied under the DOMAIN_MAP_APPROVED gate; the regenerated workbook contains a D3 sheet and both cognitive variables appear on it
 
 ---
 

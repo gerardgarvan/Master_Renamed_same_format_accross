@@ -593,3 +593,57 @@ One row; derivation note names both datasets that carry pecan_ID.
 **Attribution:** Gerard Garvan, 2026-09-23.
 
 **Resolved:** 2026-09-23 | Owner: Gerard | Phase 20 Plan 01
+
+---
+
+### PCM-D-19 -- DOMAIN_MAP_APPROVED Gate Approval (2026-09-23)
+
+**Status:** APPROVED
+
+**Decision:** Set DOMAIN_MAP_APPROVED = 1 in sas/17_summary_stats_by_domain.sas line 145.
+
+**Rationale:** The DATALINES rows for COGNITIVE_SCORE and COGNITIVE_CATEGORY (lines 1711-1712)
+were confirmed correct at domain=D3 assign_rule=instrument. The gate was previously held at 0
+pending Checkpoint 1 review (v1.0). That review is now complete. This approval supersedes the
+v1 checkpoint-2 approval which was made when D3 was absent from the workbook.
+
+**Effect:** Sections 5-11 of program 17 are no longer blocked by the gate.
+
+**Result:** PENDING -- to be filled in at the Task 3 checkpoint after program 17 runs and the D3
+sheet is confirmed present and populated in qc/17_summary_stats_by_domain.xlsx.
+
+**Attribution:** Gerard, 2026-09-23
+
+---
+
+### PCM-D-20 -- Program 17 Input Redirect: g.analysis_base -> g.analytic_cohort (2026-09-23)
+
+**Status:** APPROVED (Option B from D-07a discussion)
+
+**Decision:** Program 17 now reads g.analytic_cohort as its primary source instead of
+g.analysis_base. A keyed comparison (%pcm_d20_compare) writes rows, PRECEDE overlap in both
+directions and a PROC COMPARE by PRECEDE_STUDY_ID to qc/17_pcm_d20_compare.txt whenever
+g.analysis_base is present.
+
+**Rationale:** g.analysis_base is a P:-drive artifact not produced by any program in this repo.
+A clean end-to-end run per RUN-01 requires all inputs to be pipeline-produced. g.analytic_cohort
+(produced by 16b_cohort_rebuild.sas; INPATIENT+OBSERVATION per PCM-D-05; 175 columns including
+pecan_ID; 13,890 rows) is the pipeline-produced replacement. Whether it matches g.analysis_base
+is NOT assumed: the comparison file records the difference, and the Task 3 checkpoint summarizes
+it here.
+
+**Provenance of g.analysis_base:** unknown at the time of this decision (no program in the repo
+writes it). Gerard to add its origin here if recalled.
+
+**Reverses:** D-10. g.analytic_cohort carries pecan_ID (Phase 20 output), so pecan_ID is excluded
+from the statistics using the same mechanism program 17 applies to PRECEDE_STUDY_ID and
+ENCRYPTED_MRN (see 21-01-SUMMARY for which mechanism applied).
+
+**Column check:** An in-program assertion confirms every variable program 17 reads by name exists
+in g.analytic_cohort; the base row-count expectation is updated to 13,890.
+
+**Population shift:** PENDING -- summarized at the Task 3 checkpoint from qc/17_pcm_d20_compare.txt.
+
+**Attribution:** Gerard, 2026-09-23
+
+**Resolved:** 2026-09-23 | Owner: Gerard | Phase 20 Plan 01

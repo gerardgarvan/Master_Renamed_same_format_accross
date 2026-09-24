@@ -440,7 +440,7 @@ run;
    Confirms the promotion DATA step did not accidentally modify the source.
    ========================================================================= */
 
-%put NOTE: ==== SECTION 6 -- Verify source unchanged; measure h_* Ns ====;
+%put NOTE: ==== SECTION 6 -- Verify source unchanged -- measure h_* Ns ====;
 
 %macro assert_harmonized_unchanged;
   %local n_cols n_rows;
@@ -458,13 +458,14 @@ run;
 %assert_harmonized_unchanged;
 
 /* D-07: Measure 12 h_* column Ns within the admitted cohort (report only, no assertion).
-   Each column is queried and written to the missingness QC file. */
+   Each column is queried and written to the missingness QC file.
+   The loop bound is COUNTW of the list, so the list is the single source of truth. */
 %macro measure_h_cols;
   %local hvars i hvar hn;
   %let hvars = H_DEATH_YN H_DIABETES H_FRAILTY_ACTIVITY H_FRAILTY_EXHAUST H_FRAILTY_GRIP
                H_FRAILTY_WALKING H_FRAILTY_WEIGHT H_HYPERLIPIDEMIA H_HYPERTENSION
-               H_MOVEMENT_DISORDER H_SLEEP_APNEA;
-  %do i = 1 %to 11;
+               H_MOVEMENT_DISORDER H_SLEEP_APNEA H_SSDI_DEATH;
+  %do i = 1 %to %sysfunc(countw(&hvars, %str( )));
     %let hvar = %scan(&hvars, &i);
     proc sql noprint;
       select count(*) into :hn trimmed
@@ -575,9 +576,8 @@ run;
 
 %put NOTE: ==== SECTION 7 -- Writing QC summary ====;
 
-%local admitted_n_match bmi_rationale_line;
-%if &n_admitted = 13890 %then %let admitted_n_match = YES;
-%else %let admitted_n_match = NO;
+/* Open code: %LOCAL is not allowed and %IF requires %DO/%END, so use IFC */
+%let admitted_n_match = %sysfunc(ifc(%eval(&n_admitted = 13890), YES, NO));
 
 data _null_;
   file "&qc_path.\16b_cohort_missingness.txt" mod;

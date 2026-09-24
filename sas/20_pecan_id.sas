@@ -128,6 +128,11 @@ data work._sha_md3;
       sha256 = lowcase(compressed);
   end;
   if sha256 = 'FAILED' then put 'WARNING: SHA-256 FAILED for md3 source CSV';
+  /* One pass only: without OUTPUT/STOP the step iterates again after the pipe
+     is exhausted, resets sha256 to FAILED, prints a false WARNING and writes
+     a second FAILED row to work._sha_md3. */
+  output;
+  stop;
   keep sha256;
 run;
 

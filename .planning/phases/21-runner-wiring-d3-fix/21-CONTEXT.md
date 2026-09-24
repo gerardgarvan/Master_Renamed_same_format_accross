@@ -9,7 +9,7 @@
 Two independent deliverables:
 
 1. **RUN-01** -- Replace the `%include`-based `99_run_all.sas` with a `.cmd` batch driver that calls `sas.exe` separately for programs 1-8, 19, 20, 10b, 16b, 17, and 18 in that order, per PCM-C-05. The SAS file `99_run_all.sas` is retired or repurposed; the driver is a new `.cmd` file.
-2. **FIX-01** -- Set `DOMAIN_MAP_APPROVED=1` in `17_summary_stats_by_domain.sas` with attribution (Gerard, 2026-09-23, PCM-D-19), enabling the D3 cognitive domain sheet in `qc/17_summary_stats_by_domain.xlsx`. No structural code changes to the DATALINES or stat_route logic are needed.
+2. **FIX-01** -- Set `DOMAIN_MAP_APPROVED=1` in `17_summary_stats_by_domain.sas` with attribution (Gerard, 2026-09-23, PCM-D-19), enabling the D3 cognitive domain sheet in `qc/17_summary_stats_by_domain.xlsx`. No changes to the D3 DATALINES rows or stat_route logic are needed. Program 17 is also redirected from `g.analysis_base` to `g.analytic_cohort` (PCM-D-20, D-07a), which brings the pecan_ID exclusion and base-dataset expectation updates with it.
 
 </domain>
 
@@ -48,10 +48,11 @@ Two independent deliverables:
 
 - **D-07: Program order and exact file names.** The driver must enumerate file names explicitly (Phase 3 alone involves multiple prep programs). Take the exact list and order from `sas/99_run_all.sas` (the current %include-based runner). The sas.exe path varies by machine; define it as a variable at the top of the `.cmd` script. Programs 10 (`10_concept_profile.sas`) and 14 (`14_label_similarity.sas`) are human-gated prerequisites, not pipeline steps; they are NOT in the driver.
 
-- **D-07a: `g.analysis_base` provenance -- OPEN QUESTION requiring human input before plan execution.** Program 17 reads `g.analysis_base` as its primary source. No program in the repo writes this dataset -- it is a P: drive artifact of unknown provenance. If no runner program produces it, a clean end-to-end run per RUN-01 depends on a pre-existing file the pipeline cannot rebuild. Two resolution paths:
-  - **Option A (v2.0):** Identify what created `g.analysis_base` and confirm it is equivalent to `g.analytic_cohort` (what 16b now produces). If so, add an explicit step or alias before program 17.
-  - **Option B (v2.1):** Update program 17 to read `g.analytic_cohort` instead of `g.analysis_base`. Scope this as a v2.1 change and document the dependency explicitly in RUN-01's acceptance criteria.
-  **Gerard must decide Option A or B before the plan can finalize program 17's treatment.**
+- **D-07a: `g.analysis_base` -- RESOLVED: Option B in v2.0 (PCM-D-20, Gerard, 2026-09-23).** No program in the repo writes `g.analysis_base`, so a clean end-to-end run cannot depend on it. Program 17 is redirected to read `g.analytic_cohort` (produced by 16b). Conditions:
+  - A keyed comparison of `g.analysis_base` vs `g.analytic_cohort` (rows, PRECEDE overlap both ways, PROC COMPARE by PRECEDE_STUDY_ID) is written to `qc/17_pcm_d20_compare.txt` -- never to the SAS listing, which in batch lands in the git working tree -- and the population shift is recorded in PCM-D-20.
+  - Every hard-coded expectation about the base dataset in program 17 (existence check, row count, column list) is updated; an in-program assertion confirms each variable program 17 reads exists in `g.analytic_cohort`.
+  - D-10 is reversed (see below).
+  - Note: `g.analytic_cohort` is written by both 07_cohort.sas (v1 definition) and 16b (current definition). The runner order (07 before 16b, 16b before 17) guarantees 17 reads the 16b version.
 
 - **D-08: Human-gated programs run as-is.** Program 17 runs with whatever `DOMAIN_MAP_APPROVED` value is set in the source file. Program 18 runs with whatever `D15_APPROVED` value is set in `00_config.sas`. The driver does not inject gate values; those are set by the analyst before the run.
 
@@ -61,9 +62,9 @@ Two independent deliverables:
   1. Set the gate (`%let DOMAIN_MAP_APPROVED = 0` → 1) with a comment pointing to PCM-D-19 in DECISIONS.md; do not assert the result in the comment.
   2. Run program 17.
   3. Open the workbook and confirm the D3 sheet is present and populated.
-  4. Add PCM-D-19 to `docs/DECISIONS.md` alongside D-17 and D-18, stating that it supersedes the v1 checkpoint-2 approval (which was made when D3 was absent) and recording the confirmed result.
+  4. Add PCM-D-19 to `docs/DECISIONS.md` alongside D-17 and D-18, stating that it supersedes the v1 checkpoint-2 approval (which was made when D3 was absent). The entry may be drafted before the run, but its Result line is filled in only after step 3.
 
-- **D-10: No pecan_ID DATALINES row needed.** `pecan_ID` is not in `g.master_data_merged` (PCM-D-05: merged file is untouched). `g.analysis_base` predates Phase 20 and does not carry pecan_ID. Program 17's two inputs are both pecan_ID-free; Section 3b's identifier regex and GUARD 5 are not triggered. No DATALINES entry is required. (Note: if D-07a resolves to Option B and program 17 is redirected to read `g.analytic_cohort`, this decision must be revisited, since `g.analytic_cohort` does carry pecan_ID.)
+- **D-10: REVERSED by PCM-D-20.** Because program 17 now reads `g.analytic_cohort`, which carries pecan_ID, pecan_ID must be kept out of the statistics. Use the SAME mechanism program 17 already applies to PRECEDE_STUDY_ID and ENCRYPTED_MRN (Section 3b identifier regex / GUARD 5, or DATALINES rows with the identifier rows' exact domain and assign_rule values). Do not invent new domain or assign_rule values.
 
 - **D-11: Variable name case is not an issue.** The Section 4 join upcases both sides (`upcase(strip(ds.varname)) = dl.varname_u`), so `Cognitive_Score` from 16b matches `COGNITIVE_SCORE` in the lookup. No rename needed.
 
@@ -88,7 +89,7 @@ Two independent deliverables:
 
 ### Existing programs
 - `sas/99_run_all.sas` -- current %include-based runner being replaced; read for program order and log header text to reuse
-- `sas/00_config.sas` -- must add %sysget(RUN_ALL) check for in_pipeline flag (D-05)
+- `sas/00_config.sas` -- must add the envlen(RUN_ALL) check for the in_pipeline flag (D-05)
 - `sas/17_summary_stats_by_domain.sas` line 145 -- DOMAIN_MAP_APPROVED gate to change; lines 1711-1712 -- existing COGNITIVE_SCORE/COGNITIVE_CATEGORY DATALINES rows (correct, no change needed)
 
 </canonical_refs>
@@ -98,7 +99,7 @@ Two independent deliverables:
 
 ### Reusable Assets
 - `sas/99_run_all.sas` header comment block -- reuse program-order documentation and log path variables for the new driver's echo lines
-- `00_config.sas` `%_set_pipeline_default` (or equivalent) -- extend to check `%sysget(RUN_ALL)` rather than adding a new macro
+- `00_config.sas` `%_set_pipeline_default` -- extend with the envlen(RUN_ALL) check rather than adding a new macro
 
 ### Established Patterns
 - `start "" /wait sas.exe -sysin ... -log ... -nosplash -icon -sasuser WORK` is the correct Windows batch pattern for waiting on a GUI executable and capturing its exit code

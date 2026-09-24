@@ -8,6 +8,11 @@
 
 ## Q1: g.analysis_base Producer
 
+> **Resolved after research (2026-09-23):** Option B -- program 17 is redirected to g.analytic_cohort
+> (PCM-D-20). See 21-CONTEXT.md D-07a. Note that g.analytic_cohort is written by both 07_cohort.sas and
+> 16b_cohort_rebuild.sas; the runner order makes 16b's version the one program 17 reads. The Q5 statement
+> that no DATALINES row is needed for pecan_ID no longer holds -- see 21-CONTEXT.md D-10.
+
 **Finding:** No SAS program in the repo writes `g.analysis_base`. The current `99_run_all.sas` runs only programs 1-8 (via `%include` of `03_prep_all.sas` for Phase 3). `g.analysis_base` is not produced by any file under `sas/`.
 
 `17_summary_stats_by_domain.sas` line 22 declares: `Reads: g.analysis_base (read-only)`. Lines 234-274 assert its existence and check its row count at runtime. The program reads the dataset from the `g` libref (P: drive) — it is a P: drive artifact of unknown provenance.

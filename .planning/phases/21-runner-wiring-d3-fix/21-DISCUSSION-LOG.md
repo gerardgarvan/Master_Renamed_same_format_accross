@@ -62,6 +62,24 @@ Programs 10 (concept_profile) and 14 (label_similarity) are human-gated prerequi
 
 ---
 
+## g.analysis_base (D-07a) -- resolved after research
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| A -- treat as equivalent | Confirm g.analysis_base equals g.analytic_cohort; runner keeps reading it | |
+| B -- redirect 17 to g.analytic_cohort | Removes dependency on a file no program produces | (with conditions) |
+
+**User's choice:** Option B in v2.0, recorded as PCM-D-20, with conditions:
+- Keyed comparison of the two datasets written to qc/ and the population shift recorded
+- pecan_ID excluded using program 17's existing identifier mechanism (reverses D-10)
+- Every variable program 17 reads confirmed present in g.analytic_cohort; base row-count expectation updated
+
+**Notes:** Option A could not be confirmed from code, and even a current match would leave the runner
+depending on a dataset nothing rebuilds. Provenance of g.analysis_base is unknown; Gerard to add it to
+PCM-D-20 if recalled.
+
+---
+
 ## Claude's Discretion
 
 - Exact .cmd file name and location

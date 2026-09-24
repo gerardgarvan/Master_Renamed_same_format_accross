@@ -37,7 +37,7 @@
 |-------|----------------|--------|-----------|
 | 19. Raw Directory Inventory | 2/2 | Complete | 2026-09-23 |
 | 20. pecan_ID Derivation | 0/2 | Planned | - |
-| 21. Runner Wiring & D3 Fix | 0/? | Not started | - |
+| 21. Runner Wiring & D3 Fix | 0/2 | Planned | - |
 
 ---
 
@@ -45,7 +45,7 @@
 
 - [x] **Phase 19: Raw Directory Inventory** - Produce a complete, checksummed, variable-level inventory of every file under `raw`, output to `qc/19_raw_inventory.xlsx`
 - [ ] **Phase 20: pecan_ID Derivation** - Build the patient-level linkage key from ENCRYPTED_MRN, assert cardinality, attach to pipeline outputs, test r7/r8/r9 linkage reach, and document decisions
-- [ ] **Phase 21: Runner Wiring & D3 Fix** - Wire all programs into `99_run_all.sas` and fix the D3 cognitive domain in the Phase 17 workbook
+- [ ] **Phase 21: Runner Wiring & D3 Fix** - Wire all programs into `run_pipeline.cmd` and fix the D3 cognitive domain in the Phase 17 workbook
 
 ---
 
@@ -82,9 +82,13 @@ Plans:
 - [ ] 20-02-PLAN.md — Attach pecan_ID in 10b (join + PID-05 + 175 cols) and 16b (pass-through + PID-05 + PID-06 counts + 175 cols); add explicit pecan_ID row to 08_dictionary.sas + regenerate DATA_DICTIONARY.xlsx [Wave 2]
 
 ### Phase 21: Runner Wiring & D3 Fix
-**Goal**: Users can run the entire pipeline end-to-end from a single file and regenerate the domain statistics workbook with the D3 cognitive domain correctly populated
+**Goal**: Users can run the entire pipeline end-to-end from a single batch driver and regenerate the domain statistics workbook with the D3 cognitive domain correctly populated
 **Depends on**: RUN-01 depends on Phases 19 and 20 (programs 19 and 20 must exist before the runner can include them); FIX-01 depends only on Phase 17 (independent of Phases 19 and 20; can run earlier if needed)
 **Requirements**: RUN-01, FIX-01
 **Success Criteria** (what must be TRUE):
-  1. User can execute `99_run_all.sas` in a clean SAS session and have programs 1–8, 10b, 16b, 17, 18, 19, and 20 run as separate batch invocations per PCM-C-05, in the order determined by PCM-D-18, with exit code 3 on any abort
-  2. User can regenerate `qc/17_summary_stats_by_domain.xlsx` and see a D3 sheet containing both COGNITIVE_SCORE and COGNITIVE_CATEGORY under the instrument stat_route, applied only when DOMAIN_MAP_APPROVED gate is set
+  1. User can execute `run_pipeline.cmd` and have programs 1-8, 19, 20, 10b, 16b, 17, and 18 run as separate sas.exe invocations per PCM-C-05, in that order, stopping on exit code >= 2
+  2. User can regenerate `qc/17_summary_stats_by_domain.xlsx` and see a D3 sheet containing both COGNITIVE_SCORE and COGNITIVE_CATEGORY under the instrument stat_route, applied under the DOMAIN_MAP_APPROVED gate
+**Plans**: 2 plans
+Plans:
+- [ ] 21-01-PLAN.md — Flip DOMAIN_MAP_APPROVED gate, redirect input to g.analytic_cohort with PROC COMPARE audit, add PECAN_ID DATALINES row, record PCM-D-19 and PCM-D-20 in DECISIONS.md [Wave 1, FIX-01]
+- [ ] 21-02-PLAN.md — Extend 00_config.sas with envlen(RUN_ALL) check; create run_pipeline.cmd with all 14 programs; update 99_run_all.sas header; human-verify program order and paths [Wave 2, RUN-01]

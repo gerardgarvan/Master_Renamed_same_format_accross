@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: pecan_ID + Raw Directory Inventory
 status: unknown
-last_updated: "2026-09-24T01:07:55.666Z"
-last_activity: 2026-09-23 -- Phase 21 Plan 01 Task 3 checkpoint reached
+last_updated: "2026-09-24T15:14:06.673Z"
+last_activity: 2026-09-24 -- Phase 21 execution started
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 4
-  percent: 33
+  completed_plans: 6
+  percent: 100
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-09-23 | **Milestone:** v2.0 IN PROGRESS
+**Project:** PCM | **Last Updated:** 2026-09-24 | **Milestone:** v2.0 COMPLETE
 
 ---
 
@@ -23,17 +23,17 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
-**Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
+**Core value:** A single `run_pipeline.cmd` that runs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Phase 21 — runner-wiring-d3-fix
+**Current focus:** v2.0 milestone complete -- pecan_ID + Raw Directory Inventory + Runner Wiring
 
 ---
 
 ## Current Position
 
-Phase: 21 (runner-wiring-d3-fix) — EXECUTING
-Plan: 1 of 2
-Last activity: 2026-09-24 -- Phase 21 execution started
+Phase: 21 (runner-wiring-d3-fix) — COMPLETE
+Plan: 2 of 2
+Last activity: 2026-09-24 -- Phase 21 Plan 02 complete; full pipeline PASSED end-to-end
 
 ### v2.0 Phase Status
 
@@ -41,9 +41,9 @@ Last activity: 2026-09-24 -- Phase 21 execution started
 |-------|------|--------|
 | 19 | Raw Directory Inventory | Complete (2026-09-23) |
 | 20 | pecan_ID Derivation | Complete (2026-09-23) |
-| 21 | Runner Wiring & D3 Fix | In progress -- Plan 01 at Task 3 checkpoint |
+| 21 | Runner Wiring & D3 Fix | Complete (2026-09-24) |
 
-**Progress:** [███░░░░░░░] 33%
+**Progress:** [██████████] 100%
 
 ### v1.0 Position (preserved)
 
@@ -119,6 +119,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 
 ### Established Decisions
 
+- RUN-01 SATISFIED 2026-09-24: run_pipeline.cmd wires all 14 programs (01-08, 19, 20, 10b, 16b, 17, 18) as separate sas.exe sessions per PCM-C-05; full end-to-end run PASSED; stop-path verified; in_pipeline=1 confirmed via envlen(RUN_ALL) in 00_config.sas
 - PCM-D-19 APPROVED 2026-09-23: DOMAIN_MAP_APPROVED=1 in program 17; D3 DATALINES rows confirmed; supersedes v1 Checkpoint 1 hold
 - PCM-D-20 APPROVED 2026-09-23: program 17 redirected from g.analysis_base (no pipeline producer) to g.analytic_cohort (produced by 16b); keyed comparison writes qc/17_pcm_d20_compare.txt; pecan_ID excluded via existing regex mechanism (a)
 - md3 is the merge spine (complete superset, PCM-F-02); operation is 1:1 merge, not stack-dedup

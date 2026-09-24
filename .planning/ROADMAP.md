@@ -37,7 +37,7 @@
 |-------|----------------|--------|-----------|
 | 19. Raw Directory Inventory | 2/2 | Complete | 2026-09-23 |
 | 20. pecan_ID Derivation | 0/2 | Planned | - |
-| 21. Runner Wiring & D3 Fix | 0/2 | Planned | - |
+| 21. Runner Wiring & D3 Fix | 2/2 | Complete | 2026-09-24 |
 
 ---
 
@@ -45,7 +45,7 @@
 
 - [x] **Phase 19: Raw Directory Inventory** - Produce a complete, checksummed, variable-level inventory of every file under `raw`, output to `qc/19_raw_inventory.xlsx`
 - [ ] **Phase 20: pecan_ID Derivation** - Build the patient-level linkage key from ENCRYPTED_MRN, assert cardinality, attach to pipeline outputs, test r7/r8/r9 linkage reach, and document decisions
-- [ ] **Phase 21: Runner Wiring & D3 Fix** - Wire all programs into `run_pipeline.cmd` and fix the D3 cognitive domain in the Phase 17 workbook
+- [x] **Phase 21: Runner Wiring & D3 Fix** - Wire all programs into `run_pipeline.cmd` and fix the D3 cognitive domain in the Phase 17 workbook
 
 ---
 
@@ -91,4 +91,4 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [ ] 21-01-PLAN.md — Flip DOMAIN_MAP_APPROVED gate, redirect input to g.analytic_cohort with PROC COMPARE audit, add PECAN_ID DATALINES row, record PCM-D-19 and PCM-D-20 in DECISIONS.md [Wave 1, FIX-01]
-- [ ] 21-02-PLAN.md — Extend 00_config.sas with envlen(RUN_ALL) check; create run_pipeline.cmd with all 14 programs; update 99_run_all.sas header; human-verify program order and paths [Wave 2, RUN-01]
+- [x] 21-02-PLAN.md — Extend 00_config.sas with envlen(RUN_ALL) check; create run_pipeline.cmd with all 14 programs; update 99_run_all.sas header; human-verify program order and paths [Wave 2, RUN-01]

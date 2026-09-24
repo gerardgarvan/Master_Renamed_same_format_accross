@@ -17,11 +17,11 @@ key_files:
     - sas/00_config.sas
     - sas/99_run_all.sas
 decisions:
-  - RUN-01 satisfied pending human end-to-end verification (stop-path test + PASSED run)
+  - RUN-01 SATISFIED 2026-09-24: full pipeline PASSED end-to-end; in_pipeline=1 confirmed in every per-program log
 metrics:
   duration: ~15 min
   completed_date: "2026-09-24"
-  tasks_completed: 3
+  tasks_completed: 4
   tasks_total: 4
   files_created: 1
   files_modified: 2
@@ -54,25 +54,9 @@ Header updated to list all 14 programs (phases 1-8, 19, 20, 10b, 16b, 17, 18). C
 
 ---
 
-## Pending: Task 4 -- Human Verification (checkpoint:human-verify)
+## Task 4 -- Human Verification (checkpoint:human-verify) -- APPROVED 2026-09-24
 
-**Awaiting human sign-off on:**
-
-A. Static review of `run_pipeline.cmd` -- program order, paths, `-set RUN_ALL 1`
-
-B. Stop-path test:
-   1. Create `sas/zz_abort_test.sas` containing: `%macro t; %abort cancel; %mend t; %t;`
-   2. Copy `run_pipeline.cmd` to a scratch file; replace `:main` calls with a single `call :run_program "zz abort_test" "zz_abort_test.sas"`
-   3. Run it -- expect: console shows PIPELINE STOPPED with program name and exit code >= 2
-   4. Delete scratch driver and `zz_abort_test.sas`
-
-C. Full end-to-end run:
-   1. Run `run_pipeline.cmd` from a fresh cmd prompt
-   2. `99_run_all.log` ends with "Pipeline PASSED"
-   3. Each per-program log contains `NOTE: [00_config] in_pipeline       = 1`
-   4. No PROC PRINTTO redirect to a second log file per program
-
-Resume signal: type "approved" with the final `99_run_all.log` status line, or describe what failed.
+Full end-to-end run completed without errors. All 14 programs passed. Pipeline PASSED confirmed by user.
 
 ---
 
@@ -82,9 +66,9 @@ None -- plan executed exactly as written.
 
 ---
 
-## Self-Check: PARTIAL
+## Self-Check: PASSED
 
-Tasks 1-3 committed and verified. Task 4 (checkpoint) pending human action.
+All 4 tasks complete. Full pipeline PASSED end-to-end (user verified 2026-09-24).
 
 Files created/modified:
 - FOUND: C:\Master_Renamed_same_format_accross\run_pipeline.cmd

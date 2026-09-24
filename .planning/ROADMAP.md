@@ -37,7 +37,7 @@
 |-------|----------------|--------|-----------|
 | 19. Raw Directory Inventory | 2/2 | Complete | 2026-09-23 |
 | 20. pecan_ID Derivation | 0/2 | Planned | - |
-| 21. Runner Wiring & D3 Fix | 2/2 | Complete | 2026-09-24 |
+| 21. Runner Wiring & D3 Fix | 2/2 | Complete    | 2026-09-24 |
 
 ---
 

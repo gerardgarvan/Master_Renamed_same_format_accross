@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: pecan_ID + Raw Directory Inventory
-status: executing
-last_updated: "2026-09-23"
-last_activity: 2026-09-23
+status: unknown
+last_updated: "2026-09-24T01:07:55.666Z"
+last_activity: 2026-09-23 -- Phase 21 Plan 01 Task 3 checkpoint reached
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 4
   percent: 33
 ---
 
@@ -25,14 +25,15 @@ See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 **Core value:** A single `99_run_all.sas` that runs start-to-finish in a clean SAS session against read-only sources, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Phase 21 — Runner Wiring and D3 Fix (Phase 20 complete 2026-09-23)
+**Current focus:** Phase 21 — runner-wiring-d3-fix
 
 ---
 
 ## Current Position
 
-Phase: 20 (pecan_ID Derivation) — COMPLETE (both plans done 2026-09-23)
-Last activity: 2026-09-23
+Phase: 21 (runner-wiring-d3-fix) — EXECUTING
+Plan: 1 of 2
+Last activity: 2026-09-24 -- Phase 21 execution started
 
 ### v2.0 Phase Status
 
@@ -40,7 +41,7 @@ Last activity: 2026-09-23
 |-------|------|--------|
 | 19 | Raw Directory Inventory | Complete (2026-09-23) |
 | 20 | pecan_ID Derivation | Complete (2026-09-23) |
-| 21 | Runner Wiring & D3 Fix | Not started |
+| 21 | Runner Wiring & D3 Fix | In progress -- Plan 01 at Task 3 checkpoint |
 
 **Progress:** [███░░░░░░░] 33%
 
@@ -118,6 +119,8 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 
 ### Established Decisions
 
+- PCM-D-19 APPROVED 2026-09-23: DOMAIN_MAP_APPROVED=1 in program 17; D3 DATALINES rows confirmed; supersedes v1 Checkpoint 1 hold
+- PCM-D-20 APPROVED 2026-09-23: program 17 redirected from g.analysis_base (no pipeline producer) to g.analytic_cohort (produced by 16b); keyed comparison writes qc/17_pcm_d20_compare.txt; pecan_ID excluded via existing regex mechanism (a)
 - md3 is the merge spine (complete superset, PCM-F-02); operation is 1:1 merge, not stack-dedup
 - No PROC SQL UPDATE anywhere (silent truncation trap, PCM-T-01)
 - No `data X; set X;` patterns (destroys dataset, PCM-T-02)

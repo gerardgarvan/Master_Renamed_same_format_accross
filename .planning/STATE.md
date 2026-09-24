@@ -1,49 +1,58 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: pecan_ID + Raw Directory Inventory
-status: unknown
-last_updated: "2026-09-24T16:21:49.043Z"
+milestone: v2.1
+milestone_name: pcnr_ Clean Analysis Dataset
+status: planning
+last_updated: "2026-09-24T00:00:00.000Z"
 last_activity: 2026-09-24
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-09-24 | **Milestone:** v2.0 COMPLETE
+**Project:** PCM | **Last Updated:** 2026-09-24 | **Milestone:** v2.1 STARTED
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
+See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
 
 **Core value:** A single `run_pipeline.cmd` that runs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** v2.0 milestone complete -- pecan_ID + Raw Directory Inventory + Runner Wiring
+**Current focus:** v2.1 -- pcnr_ clean analysis dataset. Phase 22 first: the 2026-09-24 full run stopped at 16b (fixes written, not yet committed or re-run).
 
 ---
 
 ## Current Position
 
-Phase: 21
+Phase: 22 (Pipeline Green & Hardening)
 Plan: Not started
-Last activity: 2026-09-24
+Last activity: 2026-09-24 -- v2.1 defined (Phases 22-25, 22 requirements)
 
-### v2.0 Phase Status
+### v2.1 Phase Status
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 22 | Pipeline Green & Hardening | Not started |
+| 23 | Sentinel & Name Inventory | Not started |
+| 24 | Build g.pcnr_harmonized | Not started |
+| 25 | pcnr Cohort, Dictionary & Wiring | Not started |
+
+**Progress:** [░░░░░░░░░░] 0%
+
+### v2.0 Phase Status (shipped 2026-09-24)
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 19 | Raw Directory Inventory | Complete (2026-09-23) |
 | 20 | pecan_ID Derivation | Complete (2026-09-23) |
 | 21 | Runner Wiring & D3 Fix | Complete (2026-09-24) |
-
-**Progress:** [██████████] 100%
 
 ### v1.0 Position (preserved)
 
@@ -94,15 +103,26 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Within-cohort Cognitive | — | **7,252** (52.2%) | verified 2026-09-22 |
 | Within-cohort Frailty | — | **8,150** (58.7%) | verified 2026-09-22 |
 | g.analytic_cohort (harmonized) | — | **13,890 rows, 174 cols** | rebuilt 2026-09-22 from g.master_data_harmonized |
-| pecan_ID distinct count (merged) | TBD | — | Phase 20 |
-| pecan_ID distinct count (cohort) | TBD | — | Phase 20 |
-| r7/r8/r9 MRN linkage reach | TBD | — | Phase 20 (PID-07) |
+| pecan_ID distinct count (harmonized) | — | **33,031** | PID-02, 20_pecan_id.log 2026-09-24 |
+| pecan_ID distinct count (cohort) | — | pending | PID-06, needs clean 16b run (Phase 22) |
+| r7/r8/r9 MRN linkage reach | — | see report | qc/20_linkage_reach.txt |
+| pcnr recoded cells | reported | — | Phase 24 (PCNR-10) |
+| g.pcnr_harmonized | 41,150 rows | — | Phase 24 |
+| g.pcnr_analytic_cohort | 13,890 rows | — | Phase 25 |
 
 ---
 
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+**v2.1 (2026-09-24):**
+
+- Phase 22 added: Pipeline Green & Hardening (FIX-02, RUN-02, RUN-03, INV-07, DOC-05) -- first, because the 2026-09-24 run stopped at 16b
+- Phase 23 added: Sentinel & Name Inventory (PCNR-01..06); human checkpoint, PCNR_APPROVED gate
+- Phase 24 added: Build g.pcnr_harmonized (PCNR-07..11)
+- Phase 25 added: pcnr Cohort, Dictionary & Wiring (PCNR-12..17)
+- PCM-D-15 gap-fill and r7/r8/r9 linkage moved to v2.2 candidates
 
 **v2.0 (2026-09-23):**
 
@@ -143,16 +163,23 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 - PCM-D-16 DIAGNOSED: r7/r8/r9 2022 IDs match 0 base rows -- schema-change-era format change; documented, not fixed
 - PCM-T-12 (method): sweep ALL candidates, do not spot check -- Cognitive_Category and Frailty_Category were found only by full sweep
 
-### Open Decisions (v2.0 blockers)
+### Open Decisions (v2.1)
 
-- **PCM-D-17** -- pecan_ID derivation method + MRN retention: surrogate integer vs hash; whether raw ENCRYPTED_MRN is retained alongside pecan_ID. Must be resolved before Phase 20 plan executes.
-- **PCM-D-18** -- pecan_ID attach point: which datasets receive pecan_ID (merged only, or also harmonized and analytic cohort). Must be resolved before Phase 20 plan executes.
+PCM-D-17 and PCM-D-18 resolved 2026-09-23 (see PROJECT.md Key Decisions).
+
+- **PCM-D-21** -- which candidate values become missing, per variable (sentinel_decisions.csv). Before Phase 24.
+- **PCM-D-22** -- prefix scope (all non-key columns vs recoded-only) and which key columns stay unprefixed. Before Phase 23 name map.
+- **PCM-D-23** -- shortening rule for names over 27 characters. Before Phase 23 name map.
+- **PCM-D-24** -- whether any numeric sentinels are recoded. Before Phase 24.
+- **PCM-D-25** -- whether reason codes (Declined/Refused/Not applicable) are preserved. Before Phase 24.
+- **PCM-D-26** -- program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort. Before Phase 25.
 
 ### Pending Todos
 
 - Inform Price of PCM-D-05 resolution (decided by Gerard 2026-09-21; update attribution on Price's response)
 - Report to PeCAN data group: source system emits impossible operative timestamp combinations (9 rows) and negative intervals concentrated in percutaneous services
 - Decide whether `.planning/PROJECT.md` should restore the full PCM-T-01..T-11 trap list
+- Commit the 2026-09-24 fixes to 16b_cohort_rebuild.sas and 20_pecan_id.sas (FIX-02)
 - Copy `ownership_map.sas7bdat` to P: qc path if running Phase 5 on a machine that did not run Phase 2
 
 ### Blockers
@@ -180,4 +207,4 @@ To resume: read this file, then `.planning/ROADMAP.md`, then `.planning/REQUIREM
 **Do** restart the SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-23 — v2.0 roadmap created; 3 phases (19-21), 17 requirements mapped; ready for `/gsd:plan-phase 19`*
+*Last updated: 2026-09-24 — v2.1 roadmap created; 4 phases (22-25), 22 requirements mapped; ready for `/gsd:plan-phase 22`*

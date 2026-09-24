@@ -4,7 +4,7 @@
 **Owner:** Gerard Garvan (ggarvan)
 **Working folder:** `P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross`
 **Repo:** local disk (see PCM-C-04 -- do NOT put the git repo on the P: drive)
-**Status:** v2.0 SHIPPED 2026-09-24
+**Status:** v2.0 SHIPPED 2026-09-24; v2.1 IN PROGRESS
 **Supersedes:** all ad-hoc `master_data_*` merge/stack/dedup code written before this document
 
 ---
@@ -53,6 +53,22 @@ DECISIONS.md — with no manual steps.
 
 ---
 
+## Current Milestone: v2.1 pcnr_ Clean Analysis Dataset
+
+**Goal:** Add `g.pcnr_harmonized` and `g.pcnr_analytic_cohort`, fully derived from
+`g.master_data_harmonized`, with placeholder values (`?`, `Unknown`, ...) set to missing and
+every analysis variable renamed `pcnr_<original name>`. Source datasets are never modified.
+
+**Target features:**
+- Pipeline green first: 16b/20 fixes committed, runner warning count and `SAS_EXE` hardened
+- Sentinel inventory swept across every column, with a human decision per candidate value
+- Name map for the `pcnr_` prefix, including a rule for names over 27 characters
+- Build with exact accounting: missing after = missing before + recoded, every other cell unchanged
+- pcnr cohort (N = 13,890), pcnr dictionary, runner wiring, program 17 input decision
+- Carry-over: INV-07 workbook formatting, documentation drift
+
+---
+
 ## Requirements
 
 ### Validated (v1 milestone, shipped 2026-09-22)
@@ -76,11 +92,19 @@ DECISIONS.md — with no manual steps.
 - ✓ RUN-01 -- Full pipeline batch driver (`run_pipeline.cmd`): 14 programs, separate sas.exe per PCM-C-05, exit-code gating — v2.0
 - ✓ FIX-01 -- D3 cognitive domain fix: DOMAIN_MAP_APPROVED=1, COGNITIVE_SCORE/COGNITIVE_CATEGORY on D3 sheet — v2.0
 
-### Active (v2.1 candidates)
+### Active (v2.1 — see .planning/REQUIREMENTS.md)
 
-- [ ] INV-07 -- `qc/19_raw_inventory.xlsx` formatting: UF blue headers, KEY sheet legend, FAMILIES sheet, sheet order enforced
-- [ ] PCM-D-15 gap-fill wiring -- Integrate r1-r9 extension-column gap candidates into base file (approved 2026-09-22; wiring deferred pending PID-07 result)
+- [ ] FIX-02, RUN-02, RUN-03, INV-07, DOC-05 -- Pipeline green & hardening (Phase 22)
+- [ ] PCNR-01 through PCNR-06 -- Sentinel & name inventory, human decisions (Phase 23)
+- [ ] PCNR-07 through PCNR-11 -- Build g.pcnr_harmonized with exact recode accounting (Phase 24)
+- [ ] PCNR-12 through PCNR-17 -- pcnr cohort, dictionary, runner wiring, program 17 input (Phase 25)
+
+### Next (v2.2 candidates)
+
+- [ ] PCM-D-15 gap-fill wiring -- Integrate r1-r9 extension-column gap candidates into base file (approved 2026-09-22; pcnr datasets regenerate automatically once this lands)
 - [ ] r7/r8/r9 linkage resolution -- PID-07 report confirmed 2022 IDs fail on PRECEDE_STUDY_ID (PCM-D-16); follow-up depends on whether MRN linking is feasible
+- [ ] Type conversion of character columns that are entirely numeric after sentinel removal
+- [ ] Case/whitespace normalization of category values (reported in v2.1, not changed)
 
 ### Deferred (intentional)
 
@@ -111,6 +135,7 @@ DECISIONS.md — with no manual steps.
 | PCM-D-18 pecan_ID attach point | Attach in 10b (harmonized) and 16b (cohort); g.master_data_merged untouched | ✓ Resolved 2026-09-23 |
 | PCM-D-19 DOMAIN_MAP_APPROVED | D3 DATALINES rows confirmed; gate flipped to 1 | ✓ Approved 2026-09-23 |
 | PCM-D-20 Program 17 input redirect | g.analysis_base (no pipeline producer) → g.analytic_cohort (pipeline-produced) | ✓ Approved 2026-09-23; 27,260 non-cohort rows correctly excluded |
+| PCM-D-21..D-26 pcnr_ dataset | Sentinel list, prefix scope, long-name rule, numeric sentinels, reason codes, program 17 input | — Open (v2.1) |
 
 ---
 
@@ -142,6 +167,8 @@ DECISIONS.md — with no manual steps.
 - **PCM-T-05** -- Without single-ownership enforcement, MERGE produces silent last-wins overwrites
 - **PCM-T-12** -- Spot checks answer ownership questions wrong; enumerate every candidate
 - **PCM-T-13** -- `dictionary.columns.type` is CHARACTER ('char'/'num'), not numeric 1/2
+- **PCM-T-14** -- A semicolon inside `%put` text ends the statement; the rest runs as SAS code (ERROR 180-322), sets OBS=0, and every later assertion reports blank values. Use `--` or `%str(;)`. Root cause of the 2026-09-24 16b failure
+- **PCM-T-15** -- `%local` is invalid in open code, and open-code `%if` requires `%do`/`%end`; use `%sysfunc(ifc(%eval(...), A, B))` for a conditional `%let`
 
 ---
 
@@ -162,4 +189,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-09-24 — v2.0 milestone shipped (pecan_ID + Raw Directory Inventory)*
+*Last updated: 2026-09-24 — v2.1 milestone started (pcnr_ Clean Analysis Dataset)*

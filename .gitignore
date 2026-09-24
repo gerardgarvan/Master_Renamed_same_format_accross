@@ -19,3 +19,6 @@ qc/*.txt
 qc/*.sas7bdat
 qc/*.xlsx
 *.zip
+
+# Machine-local SAS path (RUN-03)
+config.local.cmd

@@ -126,4 +126,20 @@ new program (decided in the plan)
 
 ---
 
-*Next: `/gsd:discuss-phase 22` (or `/gsd:plan-phase 22`)*
+## v2.1 Pipeline Green & Hardening (Phase 22) -- IN PROGRESS
+
+| Phase | Name | Plans Complete | Status | Completed |
+|-------|------|----------------|--------|-----------|
+| 22 | Pipeline Green & Hardening | 2/3 | In Progress | -- |
+
+### Phase 22 Plan Progress
+
+| Plan | Name | Status | Commit |
+|------|------|--------|--------|
+| 22-01 | Runner hardening + log scanner (RUN-02, RUN-03, D-11) | Complete | 24b853b, e9e5ddc, 24e9d3f |
+| 22-02 | INV-07 sheet order fix (FAMILIES to position 2) | Complete | 8ddb3d1 |
+| 22-03 | DOC-05 human verification run | Not started | -- |
+
+---
+
+*Next milestone: v2.1 pcnr_ Clean Analysis Dataset -- Phase 22 in progress*

@@ -1,0 +1,2 @@
+@echo off
+set "SAS_EXE=C:\Program Files\SASHome\SASFoundation\9.4\sas.exe"

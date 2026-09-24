@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
 
 ## Current Position
 
-Phase: 22 (Pipeline Green & Hardening)
-Plan: Not started
-Last activity: 2026-09-24 -- v2.1 defined (Phases 22-25, 22 requirements)
+Phase: 22 (pipeline-green-hardening) -- EXECUTING
+Plan: 2 of 3 -- COMPLETE (22-01 runner hardening + log scanner; 22-02 INV-07 sheet order fix)
+Last activity: 2026-09-24 -- 22-02 complete (INV-07 FAMILIES sheet moved to position 2)
 
 ### v2.1 Phase Status
 

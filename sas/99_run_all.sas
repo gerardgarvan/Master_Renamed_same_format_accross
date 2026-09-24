@@ -6,14 +6,20 @@
             failed.
 
   Pipeline
-    Phase 1  01_verify_sources.sas  -- source preconditions, checksums
-    Phase 2  02_ownership.sas       -- ownership map (qclib.ownership_map)
-    Phase 3  03_prep_all.sas        -- per-source normalization (md1..8)
-    Phase 4  04_merge.sas           -- ownership-governed merge
-    Phase 5  05_qc_merge.sas        -- QC assertions on merged file
-    Phase 6  06_reconcile.sas       -- variable reconciliation
-    Phase 7  07_cohort.sas          -- cohort definition & missingness
-    Phase 8  08_dictionary.sas      -- data dictionary (docs/DATA_DICTIONARY.xlsx)
+    Phase 1   01_verify_sources.sas      -- source preconditions, checksums
+    Phase 2   02_ownership.sas           -- ownership map (qclib.ownership_map)
+    Phase 3   03_prep_all.sas            -- per-source normalization (md1..8)
+    Phase 4   04_merge.sas               -- ownership-governed merge
+    Phase 5   05_qc_merge.sas            -- QC assertions on merged file
+    Phase 6   06_reconcile.sas           -- variable reconciliation
+    Phase 7   07_cohort.sas              -- cohort definition and missingness
+    Phase 8   08_dictionary.sas          -- data dictionary (docs/DATA_DICTIONARY.xlsx)
+    Phase 19  19_raw_dir_inventory.sas   -- raw directory inventory (qc/19_raw_inventory.xlsx)
+    Phase 20  20_pecan_id.sas            -- pecan_ID derivation and crosswalk
+    Phase 10b 10b_concept_harmonize.sas  -- concept harmonization pass
+    Phase 16b 16b_cohort_rebuild.sas     -- analytic cohort rebuild (g.analytic_cohort)
+    Phase 17  17_summary_stats_by_domain.sas -- domain summary statistics
+    Phase 18  18_supplemental_raw_gap.sas    -- supplemental raw gap analysis
 
   Expected final output
     g.master_data_merged   41,150 rows
@@ -22,9 +28,17 @@
     qc/                    all QC artifacts
     logs/                  all per-phase logs
 
-  Usage (batch)
+  Usage (batch -- CANONICAL)
+    run_pipeline.cmd
+    Located at repo root. Invokes each program as a separate sas.exe session
+    per PCM-C-05. Captures exit codes; stops on code >= 2.
+    See run_pipeline.cmd header for machine-specific path variables.
+
+  Usage (batch -- legacy single-session, NOT recommended for full pipeline)
     sas -sysin "C:\Master_Renamed_same_format_accross\sas\99_run_all.sas" ^
-        -log   "P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs\99_run_all.log"
+        -log   "P:\PeCAN Master Data\Gerard\...\merge\logs\99_run_all.log"
+    NOTE: This file currently only covers programs 1-8. For the full v2.0
+    pipeline (programs 1-8, 19, 20, 10b, 16b, 17, 18) use run_pipeline.cmd.
 
     Code is on C: (in git); logs and data are on P: (outside git). The -sysin path
     is the only hardcoded path outside 00_config.sas.

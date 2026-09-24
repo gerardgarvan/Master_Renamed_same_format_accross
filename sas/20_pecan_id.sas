@@ -265,14 +265,14 @@ run;
     set g.master_data_merged(keep=PRECEDE_STUDY_ID) end=_eof;
     retain _nf 0;
     if not missing(PRECEDE_STUDY_ID)
-       and missing(input(strip(PRECEDE_STUDY_ID), ?? best32.)) then _nf + 1;
+       and missing(input(substr(strip(PRECEDE_STUDY_ID), 8), ?? best32.)) then _nf + 1;
     if _eof then call symputx('n_fail', _nf, 'L');
   run;
   %if %length(&n_fail) = 0 %then %let n_fail = 0;
   %if &n_fail > 0 %then %do;
-    %fail_out(msg=D-01 ABORT -- &n_fail PRECEDE_STUDY_ID values in g.master_data_merged are not numeric -- cannot order or join numerically);
+    %fail_out(msg=D-01 ABORT -- &n_fail PRECEDE_STUDY_ID values in g.master_data_merged cannot be parsed after stripping the Precede prefix -- cannot order or join numerically);
   %end;
-  %put NOTE: [20] Merged PRECEDE_STUDY_ID converts to numeric for every row;
+  %put NOTE: [20] Merged PRECEDE_STUDY_ID numeric conversion passed after stripping Precede prefix;
 %mend assert_merged_pid_numeric;
 %assert_merged_pid_numeric;
 
@@ -416,7 +416,7 @@ quit;
   proc sql noprint;
     create table work.&out as
     select ENCRYPTED_MRN,
-           min(input(strip(PRECEDE_STUDY_ID), best32.)) as _min_pid_num
+           min(input(substr(strip(PRECEDE_STUDY_ID), 8), best32.)) as _min_pid_num
     from g.master_data_merged
     where not missing(ENCRYPTED_MRN)
       and strip(upcase(ENCRYPTED_MRN)) ne 'NULL'

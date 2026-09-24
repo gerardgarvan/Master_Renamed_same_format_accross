@@ -975,6 +975,9 @@ ods excel file="&qc_path.\19_raw_inventory.xlsx"
 ods excel options(sheet_name='KEY');
 proc print data=work.key_legend noobs; run;
 
+ods excel options(sheet_name='FAMILIES');
+proc print data=work.families noobs; run;
+
 ods excel options(sheet_name='FILES');
 proc print data=work.files_out noobs; run;
 
@@ -989,9 +992,6 @@ proc print data=work.key_columns noobs; run;
 
 ods excel options(sheet_name='RECONCILIATION');
 proc print data=work.reconciliation noobs; run;
-
-ods excel options(sheet_name='FAMILIES');
-proc print data=work.families noobs; run;
 
 ods excel close;
 ods listing;

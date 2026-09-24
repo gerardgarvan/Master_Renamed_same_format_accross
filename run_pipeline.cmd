@@ -21,8 +21,7 @@ REM  Usage: run_pipeline.cmd
 REM  Log:   see LOGS_PATH\99_run_all.log for per-program summary
 REM ============================================================
 
-REM ---- Machine-specific paths (edit if SASHome location differs) ----
-set SAS_EXE=C:\Program Files\SAS94\SASFoundation\9.4\sas.exe
+REM ---- Machine-specific paths ----
 set SAS_PATH=C:\Master_Renamed_same_format_accross\sas
 set LOGS_PATH=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs
 set MASTER_LOG=%LOGS_PATH%\99_run_all.log
@@ -51,9 +50,9 @@ goto :main
 
   set _EC=!ERRORLEVEL!
 
-  REM Count WARNING: lines in the program log (summary only -- does not stop run)
+  REM Count WARNING lines in the program log (line-start match, RUN-02)
   set _WARNS=0
-  for /f %%W in ('findstr /c:"WARNING:" "%_LOG_FILE%" 2^>nul ^| find /c /v ""') do set _WARNS=%%W
+  for /f %%W in ('findstr /b /c:"WARNING" "%_LOG_FILE%" 2^>nul ^| find /c /v ""') do set _WARNS=%%W
 
   echo %DATE% %TIME%  [%_LABEL%]  exit=%_EC%  warnings=%_WARNS% >> "%MASTER_LOG%"
 
@@ -67,6 +66,15 @@ goto :main
   exit /b 0
 
 :main
+
+REM ---- Machine-specific SAS_EXE override (RUN-03) ----
+if exist "%~dp0config.local.cmd" call "%~dp0config.local.cmd"
+if not defined SAS_EXE set "SAS_EXE=C:\Program Files\SAS94\SASFoundation\9.4\sas.exe"
+if not exist "%SAS_EXE%" (
+  echo SAS_EXE not found: "%SAS_EXE%"
+  echo SAS_EXE not found: "%SAS_EXE%" >> "%MASTER_LOG%"
+  goto :fail
+)
 
 REM ---- Programs 1-8: core pipeline ----
 call :run_program "01 verify_sources"   "01_verify_sources.sas"
@@ -114,6 +122,9 @@ if !ERRORLEVEL! NEQ 0 goto :fail
 REM ---- Program 18: supplemental raw gap (D15_APPROVED gate must be 1) ----
 call :run_program "18 supplemental_raw" "18_supplemental_raw_gap.sas"
 if !ERRORLEVEL! NEQ 0 goto :fail
+
+REM ---- Reproducible log scan (D-11) ----
+powershell -ExecutionPolicy Bypass -File "%~dp0scan_pipeline_logs.ps1"
 
 REM ---- All programs complete ----
 echo ============================================================ >> "%MASTER_LOG%"

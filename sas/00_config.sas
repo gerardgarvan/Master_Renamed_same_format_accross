@@ -49,9 +49,15 @@
    definition the bare form is fine. This bit once: an open-code version here made
    99_run_all.sas execute nothing at all.                                        */
 %macro _set_pipeline_default;
+  /* If in_pipeline was already set (e.g. by an older %include chain), do not overwrite. */
   %if not %symexist(in_pipeline) %then %do;
     %global in_pipeline;
     %let in_pipeline = 0;
+  %end;
+  /* Detect batch driver: -set RUN_ALL 1 sets an OS env var readable by envlen/sysget. */
+  /* envlen returns -1 silently when absent -- safer than %sysget which logs a WARNING. */
+  %if %sysfunc(envlen(RUN_ALL)) > 0 %then %do;
+    %if %sysget(RUN_ALL) = 1 %then %let in_pipeline = 1;
   %end;
 %mend _set_pipeline_default;
 %_set_pipeline_default;
@@ -65,3 +71,4 @@
 %put NOTE: [00_config] raw_path          = &raw_path;
 %put NOTE: [00_config] xwalk_backup_path = &xwalk_backup_path;
 %put NOTE: [00_config] D15_APPROVED      = &D15_APPROVED;
+%put NOTE: [00_config] in_pipeline       = &in_pipeline;

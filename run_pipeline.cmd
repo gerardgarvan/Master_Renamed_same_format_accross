@@ -22,7 +22,7 @@ REM  Log:   see LOGS_PATH\99_run_all.log for per-program summary
 REM ============================================================
 
 REM ---- Machine-specific paths (edit if SASHome location differs) ----
-set SAS_EXE=C:\Program Files\SASHome\SASFoundation\9.4\sas.exe
+set SAS_EXE=C:\Program Files\SAS94\SASFoundation\9.4\sas.exe
 set SAS_PATH=C:\Master_Renamed_same_format_accross\sas
 set LOGS_PATH=P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs
 set MASTER_LOG=%LOGS_PATH%\99_run_all.log

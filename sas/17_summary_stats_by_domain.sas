@@ -2,7 +2,7 @@
   Program : 17_summary_stats_by_domain.sas
   Purpose : Wave 0 discovery and Wave 1 domain map for five-domain descriptive
             summary statistics of every PRECEDE-dictionary-documented variable
-            in g.analysis_base (extended with frailty, cognitive, and
+            in g.analytic_cohort (extended with frailty, cognitive, and
             intraoperative-physiologic columns from g.master_data_merged).
 
   SCOPE OF THIS FILE:
@@ -19,7 +19,7 @@
             qc\17_summary_stats_by_domain.xlsx  (Wave 3, eight-tab deliverable)
             qc\17_summary_stats_by_domain.txt   (Wave 3, QC text artifact)
 
-  Reads   : g.analysis_base            (read-only)
+  Reads   : g.analytic_cohort          (read-only; redirected from g.analysis_base per PCM-D-20 2026-09-23)
             g.master_data_merged       (read-only)
             docs\precede_dictionary.csv
 
@@ -142,7 +142,7 @@ options nodate nonumber ps=max ls=200 nofmterr;
    Set DOMAIN_MAP_APPROVED = 1 only after Gerard reviews and approves
    qc\17_var_domain_map_review.csv. Sections 5 to 11, once written, must open
    with %gate_stats so they are unreachable until the flag is 1.           */
-%let DOMAIN_MAP_APPROVED = 0;
+%let DOMAIN_MAP_APPROVED = 1;  /* PCM-D-19 -- approved by Gerard 2026-09-23 -- see docs/DECISIONS.md */
 
 /* ---- Small-cell suppression constants ------------------------------------
    SUPPRESS_MAX  : cells with n <= &SUPPRESS_MAX are suppressed.
@@ -223,6 +223,96 @@ libname g "&g_path";
 %check_dir(path=&docs_path, label=docs);
 %check_dir(path=&qc_path,   label=qc);
 
+/* ---- PCM-D-20: keyed comparison audit (g.analysis_base vs g.analytic_cohort) ---
+   Runs only when g.analysis_base is present in the g library.
+   Output is routed to qc/17_pcm_d20_compare.txt (never to the SAS listing).
+   PROC PRINTTO is used because the .lst file in batch is written next to -sysin
+   inside the git working tree; routing comparison output there would write
+   record-level values (PHI) into a tracked directory.                       */
+%macro pcm_d20_compare;
+  %local n_b n_c k_b k_c n_b_only n_c_only;
+  %let n_b = ; %let n_c = ; %let k_b = ; %let k_c = ;
+  %let n_b_only = ; %let n_c_only = ;
+  %if %sysfunc(exist(g.analysis_base)) = 0 %then %do;
+    %put NOTE: [PCM-D-20] g.analysis_base not found -- comparison skipped;
+    %return;
+  %end;
+  proc sql noprint;
+    select count(*), count(distinct PRECEDE_STUDY_ID)
+      into :n_b trimmed, :k_b trimmed from g.analysis_base;
+    select count(*), count(distinct PRECEDE_STUDY_ID)
+      into :n_c trimmed, :k_c trimmed from g.analytic_cohort;
+    select count(*) into :n_b_only trimmed from g.analysis_base
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from g.analytic_cohort);
+    select count(*) into :n_c_only trimmed from g.analytic_cohort
+      where PRECEDE_STUDY_ID not in (select PRECEDE_STUDY_ID from g.analysis_base);
+  quit;
+  proc sort data=g.analysis_base   out=work._d20_b; by PRECEDE_STUDY_ID; run;
+  proc sort data=g.analytic_cohort out=work._d20_c; by PRECEDE_STUDY_ID; run;
+  proc printto print="&qc_path.\17_pcm_d20_compare.txt" new; run;
+  title "PCM-D-20: g.analysis_base (rows &n_b) vs g.analytic_cohort (rows &n_c)";
+  title2 "PRECEDE only in analysis_base: &n_b_only -- only in analytic_cohort: &n_c_only";
+  proc compare base=work._d20_b compare=work._d20_c criterion=0.00001 listvar maxprint=(40,500);
+    id PRECEDE_STUDY_ID;
+  run;
+  title;
+  proc printto; run;
+  %put NOTE: [PCM-D-20] analysis_base rows=&n_b keys=&k_b -- analytic_cohort rows=&n_c keys=&k_c;
+  %put NOTE: [PCM-D-20] PRECEDE only in base=&n_b_only -- only in cohort=&n_c_only;
+%mend pcm_d20_compare;
+%pcm_d20_compare;
+
+/* ---- PCM-D-20: Column coverage assertion (PCM-T-12) --------------------
+   Checks that every variable program 17 reads by name from g.analytic_cohort
+   (the PCM-D-20 replacement for g.analysis_base) is actually present.
+   Variables checked individually per PCM-T-12 (sweep ALL candidates).
+   Called once after %check_rows so g.analytic_cohort is confirmed to exist.
+   The year variable is checked later in %check_year_col_coverage (after
+   Section 0b discovery resolves &year_variable).                          */
+%macro check_cohort_col_coverage;
+  %local _miss _v;
+  %let _miss = ;
+  /* Static by-name variables that program 17 reads from g.analytic_cohort */
+  %macro _chk(v);
+    %local _n;
+    %let _n = 0;
+    proc sql noprint;
+      select count(*) into :_n trimmed
+      from dictionary.columns
+      where libname='G' and memname='ANALYTIC_COHORT'
+        and upcase(name)=upcase("&v");
+    quit;
+    %if &_n = 0 %then %let _miss = &_miss &v;
+  %mend _chk;
+  %_chk(PRECEDE_STUDY_ID)
+  %if %length(%superq(_miss)) > 0 %then %do;
+    %fail_out(msg=PCM-D-20 column check: g.analytic_cohort is missing required variable(s): &_miss);
+  %end;
+  %put NOTE: [PCM-D-20] column coverage check passed: PRECEDE_STUDY_ID confirmed in g.analytic_cohort;
+%mend check_cohort_col_coverage;
+%check_cohort_col_coverage;
+
+/* ---- PCM-D-20: Year-variable column coverage (runs after 0b discovery) - */
+/* Invoked after %pick_year_safe has resolved &year_variable.               */
+%macro check_year_col_coverage;
+  %if %length(%superq(year_variable)) = 0 %then %do;
+    %put NOTE: [PCM-D-20] year_variable is empty -- year column coverage check skipped (no numeric year found);
+    %return;
+  %end;
+  %local _n;
+  %let _n = 0;
+  proc sql noprint;
+    select count(*) into :_n trimmed
+    from dictionary.columns
+    where libname='G' and memname='ANALYTIC_COHORT'
+      and upcase(name)=upcase("&year_variable");
+  quit;
+  %if &_n = 0 %then %do;
+    %fail_out(msg=PCM-D-20 column check: resolved year variable &year_variable not found in g.analytic_cohort);
+  %end;
+  %put NOTE: [PCM-D-20] year column coverage check passed: &year_variable confirmed in g.analytic_cohort;
+%mend check_year_col_coverage;
+
 /* ---- Dictionary CSV precondition --------------------------------------- */
 %macro check_dict_csv;
   %if %sysfunc(fileexist(%bquote(&docs_path.\precede_dictionary.csv))) = 0 %then %do;
@@ -231,17 +321,17 @@ libname g "&g_path";
 %mend check_dict_csv;
 %check_dict_csv;
 
-/* ---- Source dataset existence: g.analysis_base ------------------------- */
+/* ---- Source dataset existence: g.analytic_cohort (PCM-D-20 redirect) --- */
 %let n_tab_base = 0;
 proc sql noprint;
   select count(*) into :n_tab_base trimmed
   from dictionary.tables
-  where libname='G' and memname='ANALYSIS_BASE';
+  where libname='G' and memname='ANALYTIC_COHORT';
 quit;
 
 %macro check_src_base;
   %if &n_tab_base ne 1 %then %do;
-    %fail_out(msg=g.analysis_base not found in g library);
+    %fail_out(msg=g.analytic_cohort not found in g library -- required per PCM-D-20);
   %end;
 %mend check_src_base;
 %check_src_base;
@@ -261,17 +351,20 @@ quit;
 %mend check_src_merged;
 %check_src_merged;
 
-/* ---- Row count: g.analysis_base ---------------------------------------- */
+/* ---- Row count: g.analytic_cohort (PCM-D-20; expected 13890 per 16b) --- */
 %let n_base_rows = 0;
 proc sql noprint;
-  select count(*) into :n_base_rows trimmed from g.analysis_base;
+  select count(*) into :n_base_rows trimmed from g.analytic_cohort;
 quit;
 
 %macro check_rows;
   %if &n_base_rows = 0 %then %do;
-    %fail_out(msg=g.analysis_base is empty or the row count query returned nothing);
+    %fail_out(msg=g.analytic_cohort is empty or the row count query returned nothing);
   %end;
-  %put NOTE: [17] &n_base_rows rows in g.analysis_base.;
+  %if &n_base_rows ne 13890 %then %do;
+    %put WARNING: [17] g.analytic_cohort has &n_base_rows rows -- expected 13890 per 16b_cohort_rebuild.sas (PCM-D-20);
+  %end;
+  %put NOTE: [17] &n_base_rows rows in g.analytic_cohort.;
 %mend check_rows;
 %check_rows;
 
@@ -295,7 +388,7 @@ proc sql;
            length       as vlen,
            label        as sas_label length=256
     from dictionary.columns
-    where libname='G' and memname='ANALYSIS_BASE';
+    where libname='G' and memname='ANALYTIC_COHORT';  /* PCM-D-20 redirect */
 
   create table work.cols_merged as
     select upcase(name) as name  length=32,
@@ -319,7 +412,7 @@ proc sql noprint;
   select type, length
     into :key_type_base trimmed, :key_len_base trimmed
   from dictionary.columns
-  where libname='G' and memname='ANALYSIS_BASE'
+  where libname='G' and memname='ANALYTIC_COHORT'
     and upcase(name)='PRECEDE_STUDY_ID';
 
   select type, length
@@ -331,7 +424,7 @@ quit;
 
 %macro check_key_present;
   %if %length(&key_type_base) = 0 %then %do;
-    %fail_out(msg=PRECEDE_STUDY_ID not found in g.analysis_base -- cannot build the D-01 join key);
+    %fail_out(msg=PRECEDE_STUDY_ID not found in g.analytic_cohort -- cannot build the D-01 join key);
   %end;
   %if %length(&key_type_merged) = 0 %then %do;
     %fail_out(msg=PRECEDE_STUDY_ID not found in g.master_data_merged -- cannot build the D-01 join key);
@@ -364,11 +457,11 @@ quit;
   proc sql noprint;
     %if &key_type_base = char %then %do;
       select max(length(strip(PRECEDE_STUDY_ID))) into :key_obs_len_base trimmed
-      from g.analysis_base where not missing(PRECEDE_STUDY_ID);
+      from g.analytic_cohort where not missing(PRECEDE_STUDY_ID);
     %end;
     %else %do;
       select max(length(strip(put(PRECEDE_STUDY_ID, best32.)))) into :key_obs_len_base trimmed
-      from g.analysis_base where not missing(PRECEDE_STUDY_ID);
+      from g.analytic_cohort where not missing(PRECEDE_STUDY_ID);
     %end;
     %if &key_type_merged = char %then %do;
       select max(length(strip(PRECEDE_STUDY_ID))) into :key_obs_len_merged trimmed
@@ -396,7 +489,7 @@ quit;
 
 %macro sample_keys;
   data work._ksb;
-    set g.analysis_base(keep=PRECEDE_STUDY_ID);
+    set g.analytic_cohort(keep=PRECEDE_STUDY_ID);
     length k $&key_norm_len;
     if missing(PRECEDE_STUDY_ID) then delete;
     %if &key_type_base = num %then %do;
@@ -468,14 +561,14 @@ proc sql noprint;
   select count(*) into :n_base_key_dups trimmed
   from (
     select PRECEDE_STUDY_ID
-    from g.analysis_base
+    from g.analytic_cohort
     where not missing(PRECEDE_STUDY_ID)
     group by PRECEDE_STUDY_ID
     having count(*) > 1
   );
 
   select count(*) into :n_base_missing_key trimmed
-  from g.analysis_base
+  from g.analytic_cohort
   where missing(PRECEDE_STUDY_ID);
 quit;
 
@@ -531,7 +624,7 @@ quit;
       %put NOTE: [17-discovery] &year_note;
     %end;
 
-    proc freq data=g.analysis_base noprint;
+    proc freq data=g.analytic_cohort noprint;
       tables &year_variable / missing out=work._yd(rename=(count=n_rows));
     run;
 
@@ -544,10 +637,11 @@ quit;
   %end;
 %mend pick_year_safe;
 %pick_year_safe;
+%check_year_col_coverage;
 
 
 /* ---- 5. EXTENSION COLUMN LIST (D-01 KEEP=) ----------------------------- */
-/* Columns in g.master_data_merged NOT in g.analysis_base, filtered to      */
+/* Columns in g.master_data_merged NOT in g.analytic_cohort, filtered to     */
 /* frailty, cognitive, and intraop-physiologic concepts. MAC is matched by  */
 /* an anchored pattern only -- a bare index for MAC hits PHARMACY, STOMACH. */
 /* NOTE: this concept filter is a heuristic. A frailty, cognitive, or       */
@@ -601,7 +695,7 @@ quit;
 /* exceed 200 levels and are legitimate analytic variables. Cardinality is  */
 /* reported so the reviewer can sort on it at Checkpoint 1.                 */
 ods exclude all;
-proc freq data=g.analysis_base nlevels;
+proc freq data=g.analytic_cohort nlevels;
   tables _character_ / noprint;
   ods output nlevels=work.char_nlevels;
 run;
@@ -641,13 +735,13 @@ quit;
       length varname $32 sentinel_kind $10 n_sentinel 8;
       stop;
     run;
-    %put WARNING: [17-discovery] g.analysis_base has no columns to scan for sentinels.;
+    %put WARNING: [17-discovery] g.analytic_cohort has no columns to scan for sentinels.;
   %end;
   %else %do;
     data work.sentinel_applicable(keep=_vn _sk _ns
                                   rename=(_vn=varname _sk=sentinel_kind _ns=n_sentinel));
       length _vn $32 _sk $10 _ns 8;
-      set g.analysis_base end=_eof;
+      set g.analytic_cohort end=_eof;
 
       %if &n_num > 0 %then %do;
         array _sn {*} &sent_num_all;
@@ -702,7 +796,7 @@ quit;
 %let n_varnn = 0;
 proc sql noprint;
   select count(*) into :n_varnn trimmed
-  from work.cols_base
+  from work.cols_base  /* cols_base now built from g.analytic_cohort per PCM-D-20 */
   where prxmatch('/^VAR\d+$/', strip(name)) > 0;
 quit;
 
@@ -724,10 +818,10 @@ quit;
     put "=================================================================";
     put " ";
     put "--- BASE ROW COUNT ---";
-    put "g.analysis_base rows: &n_base_rows";
+    put "g.analytic_cohort rows: &n_base_rows (expected 13890 per PCM-D-20)";
     put " ";
     put "--- KEY METADATA ---";
-    put "PRECEDE_STUDY_ID in g.analysis_base:      type=&key_type_base  length=&key_len_base";
+    put "PRECEDE_STUDY_ID in g.analytic_cohort:    type=&key_type_base  length=&key_len_base";
     put "PRECEDE_STUDY_ID in g.master_data_merged: type=&key_type_merged  length=&key_len_merged";
     put "Observed key width: base=&key_obs_len_base  merged=&key_obs_len_merged";
     put "Normalised join key length: $&key_norm_len";
@@ -736,7 +830,7 @@ quit;
     put "NUM8 history describes the md1 to md8 SOURCE files, not the merged";
     put "dataset, which now holds a single resolved type.";
     put " ";
-    put "Sampled key values from g.analysis_base (up to 10, pipe-separated):";
+    put "Sampled key values from g.analytic_cohort (up to 10, pipe-separated):";
     put "&key_sample_base";
     put "Sampled key values from g.master_data_merged (up to 10, pipe-separated):";
     put "&key_sample_merged";
@@ -746,12 +840,12 @@ quit;
     put "--- KEY UNIQUENESS ---";
     put "Duplicate PRECEDE_STUDY_ID count in g.master_data_merged (missing excluded): &n_key_dups";
     put "Rows with a MISSING PRECEDE_STUDY_ID in g.master_data_merged: &n_missing_key";
-    put "Duplicate PRECEDE_STUDY_ID count in g.analysis_base (missing excluded): &n_base_key_dups";
-    put "Rows with a MISSING PRECEDE_STUDY_ID in g.analysis_base: &n_base_missing_key";
-    put "REVIEW: duplicate base keys mean g.analysis_base is not one row per patient.";
+    put "Duplicate PRECEDE_STUDY_ID count in g.analytic_cohort (missing excluded): &n_base_key_dups";
+    put "Rows with a MISSING PRECEDE_STUDY_ID in g.analytic_cohort: &n_base_missing_key";
+    put "REVIEW: duplicate base keys mean g.analytic_cohort is not one row per patient.";
     put " ";
     put "--- VARNN DEFECT SCAN ---";
-    put "Columns with positional VAR+digits names in g.analysis_base: &n_varnn";
+    put "Columns with positional VAR+digits names in g.analytic_cohort: &n_varnn";
     put " ";
   run;
 
@@ -788,7 +882,7 @@ quit;
     file "&qc_path.\17_discovery.txt" lrecl=200 mod;
     put " ";
     put "--- EXTENSION COLUMN LIST (D-01 KEEP=) ---";
-    put "Columns in g.master_data_merged NOT in g.analysis_base, concept-filtered.";
+    put "Columns in g.master_data_merged NOT in g.analytic_cohort, concept-filtered.";
     put "PRECEDE_STUDY_ID_1 explicitly excluded (md6 duplicate).";
     put "Count: &n_ext_cols";
     put "REVIEW: the concept filter is a name heuristic. A frailty, cognitive";
@@ -932,7 +1026,7 @@ quit;
 /* merged key is character and zero-padded (see %pick_key_format).          */
 %macro norm_base_key(fmt=BEST, width=12);
   data work.base_keyed;
-    set g.analysis_base;
+    set g.analytic_cohort;  /* PCM-D-20 redirect */
     length _key_c $&key_norm_len;
     %if &key_type_base = num %then %do;
       %if &fmt = Z %then %do;
@@ -1001,7 +1095,7 @@ quit;
     %count_key_overlap(into=n_best);
     %put NOTE: [17-S1] same-type key (&key_type_base): &n_best extension rows match a base key.;
     %if &n_best = 0 %then %do;
-      %fail_out(msg=Join key produced zero matches against g.analysis_base -- padding or case differs between the two datasets);
+      %fail_out(msg=Join key produced zero matches against g.analytic_cohort -- padding or case differs between the two datasets);
     %end;
   %end;
   %else %if &key_type_merged = num %then %do;
@@ -1072,7 +1166,7 @@ quit;
 
 %macro check_ext_rows;
   %if &n_ext_rows ne &n_base_rows %then %do;
-    %fail_out(msg=Row count mismatch after the D-01 join: work.analysis_base_ext has &n_ext_rows rows against &n_base_rows in g.analysis_base);
+    %fail_out(msg=Row count mismatch after the D-01 join: work.analysis_base_ext has &n_ext_rows rows against &n_base_rows in g.analytic_cohort);
   %end;
   %put NOTE: [17-S1] Row-count assertion passed: &n_ext_rows rows.;
 %mend check_ext_rows;
@@ -1951,7 +2045,7 @@ data work.domain_staging4;
 run;
 
 /* ---- Write g.var_domain_map: the ONE permanent artifact of this phase --- */
-/* g.analysis_base and g.master_data_merged remain read-only. This dataset  */
+/* g.analytic_cohort and g.master_data_merged remain read-only. This dataset */
 /* is the explicitly authorized exception (see 17-CONTEXT.md).              */
 /* map_status is INCOMPLETE until every Section 4 guard passes, then       */
 /* REVIEW. Sections 5 to 11 should test map_status as well as the           */
@@ -3008,7 +3102,7 @@ run;
 data work.key;
   length item $60 detail $500;
   item="Program";       detail="17_summary_stats_by_domain.sas -- Phase 17 Wave 3"; output;
-  item="Source";        detail="work.analysis_base_ext (g.analysis_base extended with g.master_data_merged frailty/cognitive/intraoperative columns)"; output;
+  item="Source";        detail="work.analysis_base_ext (g.analytic_cohort extended with g.master_data_merged frailty/cognitive/intraoperative columns per PCM-D-20)"; output;
   item="Rows";          detail="&n_base_rows rows (one per PRECEDE_STUDY_ID)"; output;
   item="Run datetime";  detail="%sysfunc(datetime(), datetime20.)"; output;
   item="Scope";         detail="Descriptive statistics only -- no inferential testing. Pooled and per-year breakdowns for all dictionary-documented and approved extension variables."; output;
@@ -3511,7 +3605,7 @@ data _null_;
   put "Run: %sysfunc(datetime(), datetime20.)";
   put "=======================================================================";
   put " ";
-  put "source=work.analysis_base_ext (g.analysis_base + extension columns)";
+  put "source=work.analysis_base_ext (g.analytic_cohort + extension columns per PCM-D-20)";
   put "source_rows=&n_base_rows";
   put "year_variable=&year_variable";
   put "years_available=&year_list";

@@ -47,4 +47,20 @@
 
 ---
 
-*Next milestone: `/gsd:new-milestone` to define v2.1 scope*
+## v2.1 Pipeline Green & Hardening (Phase 22) -- IN PROGRESS
+
+| Phase | Name | Plans Complete | Status | Completed |
+|-------|------|----------------|--------|-----------|
+| 22 | Pipeline Green & Hardening | 1/3 | In Progress | -- |
+
+### Phase 22 Plan Progress
+
+| Plan | Name | Status | Commit |
+|------|------|--------|--------|
+| 22-01 | Runner hardening + log scanner (RUN-02, RUN-03, D-11) | Complete | 24b853b, e9e5ddc, 24e9d3f |
+| 22-02 | INV-07 workbook formatting | Not started | -- |
+| 22-03 | DOC-05 documentation drift | Not started | -- |
+
+---
+
+*Next milestone: v2.1 pcnr_ Clean Analysis Dataset -- Phase 22 in progress*

@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-09-23 after v2.0 roadmap created)
 
 ## Current Position
 
-Phase: 21
-Plan: Not started
-Last activity: 2026-09-24
+Phase: 22 (pipeline-green-hardening) -- EXECUTING
+Plan: 1 of 3 -- COMPLETE (22-01 runner hardening + log scanner)
+Last activity: 2026-09-24 -- 22-01 complete (RUN-02, RUN-03, scan wire)
 
 ### v2.0 Phase Status
 

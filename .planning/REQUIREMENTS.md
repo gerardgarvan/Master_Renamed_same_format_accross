@@ -18,14 +18,14 @@
 
 ### pecan_ID Derivation (Phase 20)
 
-- [ ] **PID-01** — User can confirm the pecan_ID source file (CSV in raw\master vs xlsx copy; brief names `2018_2022_X_MASTER_DATASET_20240402`) is identified, checksummed, and its checksum verified against the INV-01 record before Phase 20 reads it; ENCRYPTED_MRN is read as CHARACTER regardless of source typing
-- [ ] **PID-02** — User can view a source audit: count of blank or placeholder MRNs, count of distinct MRNs, count of distinct PRECEDE_STUDY_IDs, and both-direction cardinalities (PRECEDE→MRN and MRN→PRECEDE)
-- [ ] **PID-03** — User can confirm that every PRECEDE_STUDY_ID maps to exactly one ENCRYPTED_MRN (program aborts otherwise); MRN→many PRECEDE is expected and reported, not asserted
-- [ ] **PID-04** — User can confirm crosswalk `g.pecan_id_xwalk` (ENCRYPTED_MRN, pecan_ID) is built per PCM-D-17; if surrogate derivation is chosen, the crosswalk is append-only and existing assignments are never renumbered
-- [ ] **PID-05** — User can confirm attachment per PCM-D-18, with assertions: row count unchanged in every file that receives pecan_ID (41,150 merged or harmonized per PCM-D-18; 13,890 analytic cohort), zero blank pecan_ID among rows with a non-blank ENCRYPTED_MRN, zero PRECEDE_STUDY_IDs gaining a second pecan_ID after attachment
-- [ ] **PID-06** — User can see distinct pecan_ID counts in the merged file and the analytic cohort, and the distribution of encounters per pecan_ID (how many patients have 1, 2, 3+ encounters)
-- [ ] **PID-07** — User can see which raw files carry ENCRYPTED_MRN (from INV-04 key-column flags) and their match rate to `g.pecan_id_xwalk`; output explicitly tests whether r7/r8/r9 (2022 files) link on MRN where they failed on PRECEDE_STUDY_ID (PCM-D-16)
-- [ ] **PID-08** — User can find pecan_ID with a derivation note in `DATA_DICTIONARY.xlsx`; PCM-D-17 and PCM-D-18 are recorded, attributed, and dated in `DECISIONS.md`
+- [x] **PID-01** — User can confirm the pecan_ID source file (CSV in raw\master vs xlsx copy; brief names `2018_2022_X_MASTER_DATASET_20240402`) is identified, checksummed, and its checksum verified against the INV-01 record before Phase 20 reads it; ENCRYPTED_MRN is read as CHARACTER regardless of source typing
+- [x] **PID-02** — User can view a source audit: count of blank or placeholder MRNs, count of distinct MRNs, count of distinct PRECEDE_STUDY_IDs, and both-direction cardinalities (PRECEDE→MRN and MRN→PRECEDE)
+- [x] **PID-03** — User can confirm that every PRECEDE_STUDY_ID maps to exactly one ENCRYPTED_MRN (program aborts otherwise); MRN→many PRECEDE is expected and reported, not asserted
+- [x] **PID-04** — User can confirm crosswalk `g.pecan_id_xwalk` (ENCRYPTED_MRN, pecan_ID) is built per PCM-D-17; if surrogate derivation is chosen, the crosswalk is append-only and existing assignments are never renumbered
+- [x] **PID-05** — User can confirm attachment per PCM-D-18, with assertions: row count unchanged in every file that receives pecan_ID (41,150 merged or harmonized per PCM-D-18; 13,890 analytic cohort), zero blank pecan_ID among rows with a non-blank ENCRYPTED_MRN, zero PRECEDE_STUDY_IDs gaining a second pecan_ID after attachment
+- [x] **PID-06** — User can see distinct pecan_ID counts in the merged file and the analytic cohort, and the distribution of encounters per pecan_ID (how many patients have 1, 2, 3+ encounters)
+- [x] **PID-07** — User can see which raw files carry ENCRYPTED_MRN (from INV-04 key-column flags) and their match rate to `g.pecan_id_xwalk`; output explicitly tests whether r7/r8/r9 (2022 files) link on MRN where they failed on PRECEDE_STUDY_ID (PCM-D-16)
+- [x] **PID-08** — User can find pecan_ID with a derivation note in `DATA_DICTIONARY.xlsx`; PCM-D-17 and PCM-D-18 are recorded, attributed, and dated in `DECISIONS.md`
 
 ### Runner Wiring & D3 Fix (Phase 21)
 

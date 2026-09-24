@@ -292,7 +292,7 @@ run;
     full join g.master_data_merged as m
     %if &_precede_is_num = 1 %then %do;
       on  c.PRECEDE_STUDY_ID is not missing
-      and c.PRECEDE_STUDY_ID = input(strip(m.PRECEDE_STUDY_ID), best32.)
+      and c.PRECEDE_STUDY_ID = input(substr(strip(m.PRECEDE_STUDY_ID), 8), best32.)
     %end;
     %else %do;
       on  strip(c.PRECEDE_STUDY_ID) ne ''

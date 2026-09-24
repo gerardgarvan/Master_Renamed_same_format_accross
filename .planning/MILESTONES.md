@@ -1,5 +1,20 @@
 # MILESTONES.md — PeCAN Master Dataset Integration
 
+## v2.0 pecan_ID + Raw Directory Inventory (Shipped: 2026-09-24)
+
+**Phases completed:** 3 phases, 6 plans, 15 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- R3-B-01
+- Program 20 checksums md3 source CSV via certutil, cross-checks it against g.master_data_merged, asserts one-MRN cardinality, builds append-only g.pecan_id_xwalk with ISO-dated backup on P:, writes PID-07 linkage reach report for all ENCRYPTED_MRN-carrying raw files including r7/r8/r9 PCM-D-16 YES/NO, and program 19 now emits three additional CSV handoffs (key_columns, sheets, variables_md3) that PID-07 and D-11 consume
+- pecan_ID attached to g.master_data_harmonized (10b) and g.analytic_cohort (16b) via crosswalk join + WORK-promote; both datasets go 174->175 columns; PID-05 asserts in both producers; PID-06 encounter distribution written to qc/16b_pecan_id_counts.txt; 08_dictionary adds explicit pecan_ID row and _gate5 updated to n_dict_meta+1
+- DOMAIN_MAP_APPROVED flipped to 1 (PCM-D-19) and program 17 redirected from P:-drive g.analysis_base to pipeline-produced g.analytic_cohort (PCM-D-20) with keyed audit comparison and column coverage assertions
+- One-liner:
+
+---
+
 ---
 
 ## v1 — PeCAN Master Dataset Integration Pipeline

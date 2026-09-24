@@ -60,8 +60,62 @@
 
 ---
 
+## Milestone: v2.0 -- pecan_ID + Raw Directory Inventory
+
+**Shipped:** 2026-09-24
+**Phases:** 3 (19, 20, 21) | **Plans:** 6 | **Tasks:** 15
+
+### What Was Built
+
+- Complete raw directory inventory: recursive file listing with SHA-256 checksums, variable-level profiling (pct_missing, pct_sentinel), key-column flags (PRECEDE_STUDY_ID/ENCRYPTED_MRN/ENCRYPTED_ENCOUNTER), reconciliation against known sources (Phase 19)
+- pecan_ID derivation: source audit, append-only crosswalk (g.pecan_id_xwalk) per PCM-D-17, cardinality assertions, PID-07 linkage reach report for all MRN-carrying raw files including r7/r8/r9 (Phase 20)
+- pecan_ID attached to g.master_data_harmonized and g.analytic_cohort (10b, 16b) with PID-05/PID-06 assertions; pecan_ID explicit row added to DATA_DICTIONARY.xlsx (Phase 20)
+- D3 cognitive domain fix: DOMAIN_MAP_APPROVED=1 (PCM-D-19), program 17 redirected from P:-drive g.analysis_base to pipeline-produced g.analytic_cohort (PCM-D-20) (Phase 21)
+- run_pipeline.cmd batch driver: 14 separate sas.exe invocations in order, exit-code gating (>=2 = STOP), in_pipeline=1 auto-detection via envlen(RUN_ALL) in 00_config.sas (Phase 21)
+- Full end-to-end pipeline run on second machine confirmed PASSED (Phase 21 acceptance test)
+
+### What Worked
+
+- **certutil pipe pattern reuse:** The SHA-256 checksum method from Phase 19 was reused without modification in Phase 20 (PID-01). Establishing the pattern in one phase and citing it in the next eliminated design time.
+- **PCM-D-17/D-18 resolved before execution:** Both open decisions were resolved at discussion time, not discovered mid-plan. Plans could be written with concrete crosswalk build and attachment logic rather than placeholders.
+- **WORK-then-promote join pattern (10b):** Attaching pecan_ID in 10b required working around an opaque macro (%build_harmonized). The WORK-then-promote fallback (create work.harmonized_with_pid, then DATA g.master_data_harmonized; set work.harmonized_with_pid) was correct and well-documented.
+- **run_pipeline.cmd stop-path test design:** The verification checkpoint asked for a stop-path test (scratch copy with single abort program) before the full run. This would have caught ERRORLEVEL handling failures early without needing to run 14 programs.
+- **Cross-machine testing exposed the SAS_EXE path gap:** Running on a second machine immediately found the SASHome vs SAS94 install path difference. The fix was trivial once found; testing on the target machine before sign-off is now the pattern.
+
+### What Was Inefficient
+
+- **REQUIREMENTS.md not updated incrementally during Phase 20:** PID-01 through PID-08 were completed across Phase 20 Plans 01 and 02, but the checkboxes were never ticked in REQUIREMENTS.md. The milestone pre-flight had to reconcile 8 stale unchecked entries against SUMMARY.md evidence. Per-plan checkbox pass at plan completion would prevent this.
+- **SAS_EXE hardcoded to SASHome in run_pipeline.cmd:** The batch driver was written and committed against the dev machine path. A cross-machine test immediately required a fix commit. Parameterizing SAS_EXE via an environment variable or prompting at first run would eliminate this fragility.
+- **OBS=0 error in 16b cascaded from open-code %local/%if:** The root cause (invalid open-code macro statement setting OBS=0) produced a cascade of confusing secondary errors (%put ERROR 180-322, blank assert values) that looked unrelated. The pattern is now in the trap list: %LOCAL and %IF in open code are not valid in SAS; use %SYSFUNC(IFC()) instead.
+
+### Patterns Established
+
+- `certutil -hashfile INFILE SHA256 | PIPE | FILENAME fileref PIPE` pattern for in-SAS checksum via OS command
+- `PROC APPEND` with two-way NOT EXISTS guard for append-only crosswalk (prevents duplicate assignment on re-run)
+- ISO-dated backup naming with `%sysfunc(datetime(), B8601DT15.)` for chronologically sortable SAS dataset names
+- `CALL EXECUTE` loop for per-file linkage reach processing when file count is dynamic
+- `envlen(RUN_ALL)` check in 00_config.sas for automatic in_pipeline detection from batch driver
+- `setlocal EnableDelayedExpansion` + `!ERRORLEVEL!` (not `%ERRORLEVEL%`) for reliable exit-code capture in Windows batch
+- WORK-then-promote for joining into datasets produced by opaque macros (avoids the DATA step re-entry problem)
+
+### Key Lessons
+
+1. **Tick requirement checkboxes at plan completion, not milestone end.** REQUIREMENTS.md staleness created reconciliation work at milestone close. The executor should check the relevant requirement IDs from the plan frontmatter at SUMMARY.md creation time.
+2. **Machine-specific paths belong in an env var, not in the committed file.** SAS_EXE in run_pipeline.cmd should be overridable without a code edit. A `set SAS_EXE` at the top with a comment ("edit if different") is not enough — a first-run prompt or `%~dp0config.cmd` include would be better.
+3. **OBS=0 cascades hide the root cause.** When SAS sets OBS=0 due to an error, all subsequent errors are symptoms. Always search for the FIRST error in the log, not the most visible one.
+4. **Test on the target machine before the checkpoint.** run_pipeline.cmd worked on the dev machine. The first cross-machine run found the path problem immediately. The checkpoint should have included "run on all target machines" as an explicit step.
+
+### Cost Observations
+
+- Model: Claude Sonnet (claude-sonnet-4-6) throughout
+- Sessions: ~4 sessions over 2 days (2026-09-23 to 2026-09-24)
+- Notable: v2.0 was substantially smaller than v1 (3 phases vs 13); the main complexity was the cross-machine batch driver verification and the 16b OBS=0 debug cycle
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Duration | Key Pattern |
 |-----------|--------|-------|----------|-------------|
 | v1 | 13 | 23 | 28 days | Assertion-first design; amendment protocol for mid-project corrections |
+| v2.0 | 3 | 6 | 2 days | certutil checksum reuse; cross-machine batch driver testing |

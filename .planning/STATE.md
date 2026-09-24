@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: pecan_ID + Raw Directory Inventory
 status: unknown
-last_updated: "2026-09-24T16:18:32.187Z"
+last_updated: "2026-09-24T16:21:49.043Z"
 last_activity: 2026-09-24
 progress:
   total_phases: 3

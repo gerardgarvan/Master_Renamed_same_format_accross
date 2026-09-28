@@ -534,20 +534,254 @@ run;
 
 
 /* ===== SECTION 3: apply rules -- work._recoded (Plan 24-02) ===== */
-/* Stub: Plan 24-02 fills this section.
-   data work._recoded;
-     set g.master_data_harmonized;
-     %include "&qc_path.\24_recode_rules_generated.sas";
-   run;
-*/
+
+data work._recoded;
+  set g.master_data_harmonized;
+  %include "&qc_path.\24_recode_rules_generated.sas";
+run;
+
+/* ---- Row count gate: must agree with source AND equal 41,150 before parallel-set compare ---- */
+/* (RESEARCH.md Pitfall 4: parallel SET silently truncates to the shorter dataset)              */
+proc sql noprint;
+  select count(*) into :n_recoded_rows trimmed from work._recoded;
+  select count(*) into :n_src_rows     trimmed from g.master_data_harmonized;
+quit;
+
+%macro _s3_rowcount_gate;
+  %if &n_recoded_rows ne &n_src_rows %then %do;
+    %fail_out(msg=work._recoded row count &n_recoded_rows ne source &n_src_rows);
+  %end;
+  %if &n_recoded_rows ne 41150 %then %do;
+    %fail_out(msg=work._recoded row count &n_recoded_rows ne expected 41150);
+  %end;
+%mend _s3_rowcount_gate;
+%_s3_rowcount_gate;
+
+%put NOTE: [24] SECTION 3 row count OK -- n_recoded_rows=&n_recoded_rows;
+
+/* ---- Compute n_recode_step_changes: sum(nmiss_after - nmiss_before) over recoded columns ---- */
+/* Drive column list from work._recode_rules so it stays in sync with generated file.           */
+/* Two PROC SQL passes (one per dataset) build comma-separated nmiss() expressions; a third     */
+/* pass computes the delta and sums across columns.                                             */
+
+/* Step 1: get distinct list of columns that have rules (any var_type) */
+proc sql noprint;
+  select distinct variable
+  into  :_recode_vars separated by ' '
+  from  work._recode_rules;
+  select count(distinct variable) into :_n_recode_vars trimmed
+  from  work._recode_rules;
+quit;
+
+/* Step 2: build nmiss() expression lists -- each column: nmiss(col) */
+%macro _s3_build_nmiss_exprs;
+  %local _i _col;
+  %let _src_expr  = ;
+  %let _rec_expr  = ;
+  %do _i = 1 %to &_n_recode_vars;
+    %let _col = %scan(&_recode_vars, &_i, %str( ));
+    %if &_i = 1 %then %do;
+      %let _src_expr = nmiss(&_col);
+      %let _rec_expr = nmiss(&_col);
+    %end;
+    %else %do;
+      %let _src_expr = &_src_expr + nmiss(&_col);
+      %let _rec_expr = &_rec_expr + nmiss(&_col);
+    %end;
+  %end;
+
+  /* Query source nmiss total */
+  proc sql noprint;
+    select &_src_expr into :_nmiss_src trimmed
+    from g.master_data_harmonized;
+  quit;
+
+  /* Query recoded nmiss total */
+  proc sql noprint;
+    select &_rec_expr into :_nmiss_rec trimmed
+    from work._recoded;
+  quit;
+
+  /* Delta = new missings introduced by recode step */
+  %let n_recode_step_changes = %eval(&_nmiss_rec - &_nmiss_src);
+%mend _s3_build_nmiss_exprs;
+%_s3_build_nmiss_exprs;
+
+%put NOTE: [24] recode-step changes = &n_recode_step_changes;
 
 
 /* ===== SECTION 4: full comparison -- work._compare_out (Plan 24-02) ===== */
-/* Stub: Plan 24-02 fills this section.
-   Parallel-set DATA step reads source and recoded by row position.
-   Separate char and numeric array pairs (SAS 9.4 constraint).
-   Authorized change: recoded cell is missing AND source hex key in work._recode_rules.
-*/
+
+/* ---- Step 4a: build column metadata macros from dictionary.columns ---- */
+/* (Pitfall 2: char and numeric CANNOT share one array -- build separate lists)  */
+/* column names ordered by varnum to guarantee positional alignment              */
+
+proc sql noprint;
+  /* Space-separated char column names (ordered by varnum) */
+  select name
+  into  :char_cols separated by ' '
+  from  dictionary.columns
+  where libname = 'G' and memname = 'MASTER_DATA_HARMONIZED' and type = 'char'
+  order by varnum;
+  select count(*) into :n_char trimmed
+  from  dictionary.columns
+  where libname = 'G' and memname = 'MASTER_DATA_HARMONIZED' and type = 'char';
+
+  /* Space-separated numeric column names (ordered by varnum) */
+  select name
+  into  :num_cols separated by ' '
+  from  dictionary.columns
+  where libname = 'G' and memname = 'MASTER_DATA_HARMONIZED' and type = 'num'
+  order by varnum;
+  select count(*) into :n_num trimmed
+  from  dictionary.columns
+  where libname = 'G' and memname = 'MASTER_DATA_HARMONIZED' and type = 'num';
+quit;
+
+%put NOTE: [24] SECTION 4 -- n_char=&n_char char cols, n_num=&n_num num cols;
+
+/* ---- Step 4b: build positional rename list and recoded array name lists ---- */
+/* Rename i-th char col -> _rc<i> (e.g. _rc1, _rc2, ...), j-th num -> _rn<i>  */
+/* Suffixing (<name>_r) is not possible: ten source names are already 32 chars  */
+
+%macro _s4_build_rename_lists;
+  %local _i _col _rec_rename _char_cols_r _num_cols_r;
+  %let _rec_rename   = ;
+  %let _char_cols_r  = ;
+  %let _num_cols_r   = ;
+
+  /* Char columns */
+  %do _i = 1 %to &n_char;
+    %let _col = %scan(&char_cols, &_i, %str( ));
+    %let _rec_rename  = &_rec_rename &_col=_rc&_i;
+    %let _char_cols_r = &_char_cols_r _rc&_i;
+  %end;
+
+  /* Numeric columns */
+  %do _i = 1 %to &n_num;
+    %let _col = %scan(&num_cols, &_i, %str( ));
+    %let _rec_rename  = &_rec_rename &_col=_rn&_i;
+    %let _num_cols_r  = &_num_cols_r _rn&_i;
+  %end;
+
+  %global rec_rename_list char_cols_r num_cols_r;
+  %let rec_rename_list = &_rec_rename;
+  %let char_cols_r     = &_char_cols_r;
+  %let num_cols_r      = &_num_cols_r;
+%mend _s4_build_rename_lists;
+%_s4_build_rename_lists;
+
+/* ---- Step 4c: parallel-set comparison DATA step ---- */
+/* keep= limits work._compare_out to five working columns only                  */
+/* Authorization: recoded cell must be missing (otherwise unauthorized)         */
+/* Hash authorization lookup (variable,raw_hex) against work._recode_rules      */
+/* is done post-step via PROC SQL join (cleaner than hash object in DATA step)  */
+
+data work._compare_out (keep=_n_row _chg_var _raw_value _raw_hex _authorized);
+  set g.master_data_harmonized;                           /* source, by position */
+  set work._recoded (rename=(&rec_rename_list));          /* recoded, positional _rc/_rn names */
+  length _chg_var $32 _raw_value $400 _raw_hex $800;
+  array _src_c{*} $ &char_cols;
+  array _rec_c{*} $ &char_cols_r;
+  array _src_n{*}   &num_cols;
+  array _rec_n{*}   &num_cols_r;
+  _n_row = _n_;
+
+  /* ---- char columns ---- */
+  do _i = 1 to dim(_src_c);
+    if _src_c{_i} ne _rec_c{_i} then do;
+      _authorized = (missing(_rec_c{_i}));    /* recoded cell must be missing */
+      _chg_var    = vname(_src_c{_i});
+      _raw_value  = _src_c{_i};
+      _raw_hex    = %hexkey(_src_c{_i});
+      output;
+    end;
+  end;
+
+  /* ---- numeric columns ---- */
+  do _j = 1 to dim(_src_n);
+    if _src_n{_j} ne _rec_n{_j} then do;
+      _authorized = (missing(_rec_n{_j}));
+      _chg_var    = vname(_src_n{_j});
+      _raw_value  = strip(put(_src_n{_j}, best32.));
+      _raw_hex    = %hexkey(strip(put(_src_n{_j}, best32.)));
+      output;
+    end;
+  end;
+
+  drop _i _j;
+run;
+
+/* ---- Step 4d: authorization check -- join compare_out to recode_rules ---- */
+/* Unauthorized = compare row where _authorized=0                              */
+/*              OR (_chg_var,_raw_hex) absent from work._recode_rules          */
+
+proc sql noprint;
+  /* Count of compare rows */
+  select count(*) into :n_compare_changes trimmed
+  from work._compare_out;
+
+  /* Count unauthorized rows */
+  select count(*) into :n_unauth trimmed
+  from work._compare_out c
+  where c._authorized = 0
+     or not exists (
+         select 1 from work._recode_rules r
+         where r.variable = c._chg_var
+           and r.raw_hex  = c._raw_hex
+     );
+quit;
+
+%macro _s4_unauth_gate;
+  %if &n_unauth > 0 %then %do;
+    %fail_out(msg=&n_unauth unauthorized cell changes found in work._compare_out);
+  %end;
+%mend _s4_unauth_gate;
+%_s4_unauth_gate;
+
+%put NOTE: [24] authorization check -- n_unauth=&n_unauth;
+
+/* ---- Step 4e: Cross-check 1: compare-step count must equal recode-step count ---- */
+
+%macro _s4_crosscheck1;
+  %if &n_compare_changes ne &n_recode_step_changes %then %do;
+    %fail_out(msg=Cross-check 1 failed -- n_compare_changes=&n_compare_changes ne n_recode_step_changes=&n_recode_step_changes);
+  %end;
+%mend _s4_crosscheck1;
+%_s4_crosscheck1;
+
+%put NOTE: [24] Cross-check 1 passed -- n_compare_changes=&n_compare_changes matches recode-step count;
+
+/* ---- Step 4f: Cross-check 2: per-rule actual count must equal n_expected ---- */
+/* n_expected comes from qc/23_sentinel_candidates.csv (loaded into work._recode_rules) */
+/* This catches source drift that slipped past the fingerprint check               */
+
+proc sql noprint;
+  create table work._rule_drift_check as
+  select r.variable, r.raw_hex, r.n_expected,
+         coalesce(a.n_actual, 0) as n_actual
+  from work._recode_rules r
+       left join (
+           select _chg_var as variable, _raw_hex as raw_hex, count(*) as n_actual
+           from work._compare_out
+           group by _chg_var, _raw_hex
+       ) a on a.variable = r.variable
+           and a.raw_hex  = r.raw_hex
+  where a.n_actual ne r.n_expected
+     or (a.variable is null and r.n_expected ne 0);
+
+  select count(*) into :n_drift trimmed
+  from work._rule_drift_check;
+quit;
+
+%macro _s4_crosscheck2;
+  %if &n_drift > 0 %then %do;
+    %fail_out(msg=Cross-check 2 failed -- &n_drift rules have actual count ne n_expected (source drift or rule mismatch));
+  %end;
+%mend _s4_crosscheck2;
+%_s4_crosscheck2;
+
+%put NOTE: [24] comparison OK -- &n_compare_changes authorized changes;
 
 
 /* ===== SECTION 5: rename + label + drop -- work.pcnr_harmonized (Plan 24-02) ===== */
@@ -581,5 +815,5 @@ run;
    type/length unchanged; source confirmed unchanged.
 */
 
-%put NOTE: ==== Program 24 pcnr_build SECTIONS 0-2 complete ====;
+%put NOTE: ==== Program 24 pcnr_build SECTIONS 0-4 complete ====;
 %restore_log;

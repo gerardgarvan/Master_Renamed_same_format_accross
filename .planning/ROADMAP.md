@@ -96,6 +96,11 @@ cannot take the prefix is enumerated and put in front of a human before any valu
 
 **Checkpoint:** human review of the candidate list and name map (Gerard; Price for D-21, D-24, D-25).
 
+**Plans:** 3 plans
+- [ ] 23-01-PLAN.md — Config gate flag + sentinel sweep (char/numeric/ambiguous) + case-variant report (Wave 1)
+- [ ] 23-02-PLAN.md — Name-map draft + sentinel-decisions draft (Wave 2)
+- [ ] 23-03-PLAN.md — Human review checkpoint, docs/ gate files + git add -f, PCM-D-21..25 in DECISIONS.md (Wave 3)
+
 #### Phase 24: Build g.pcnr_harmonized
 
 **Goal:** Apply exactly the approved decisions and prove nothing else changed.

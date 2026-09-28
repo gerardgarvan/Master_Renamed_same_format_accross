@@ -55,7 +55,7 @@ every recoded cell counted and traceable to an approved decision.
 
 | Phase | Name | Requirements | Depends on | Status |
 |-------|------|--------------|------------|--------|
-| 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | — | Complete (2026-09-28) |
+| 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | Complete    | 2026-09-28 |
 | 23 | Sentinel & Name Inventory | PCNR-01..06 | 22 (FIX-02) | Not started |
 | 24 | Build g.pcnr_harmonized | PCNR-07..11 | 23 + PCNR_APPROVED=1 | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | PCNR-12..17 | 24 | Not started |
@@ -74,7 +74,7 @@ run stopped at 16b, and every v2.1 program runs after 16b.
 
 **Note:** INV-07 is independent and can run in parallel with the rest of the phase.
 
-**Plans:** 3 plans in 2 waves
+**Plans:** 3/3 plans complete
 - [x] 22-01-PLAN.md — Runner hardening: RUN-02 line-start warning count, RUN-03 SAS_EXE override, log-scan script (Wave 1)
 - [x] 22-02-PLAN.md — INV-07 formatted workbook (19b) + FIX-02 commit verification (Wave 1)
 - [x] 22-03-PLAN.md — Human pipeline run gate + DOC-05 documentation updates (Wave 2)

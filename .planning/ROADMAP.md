@@ -56,7 +56,7 @@ every recoded cell counted and traceable to an approved decision.
 | Phase | Name | Requirements | Depends on | Status |
 |-------|------|--------------|------------|--------|
 | 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | Complete    | 2026-09-28 |
-| 23 | Sentinel & Name Inventory | 2/3 | In Progress|  |
+| 23 | Sentinel & Name Inventory | 3/3 | Complete   | 2026-09-28 |
 | 24 | Build g.pcnr_harmonized | PCNR-07..11 | 23 + PCNR_APPROVED=1 | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | PCNR-12..17 | 24 | Not started |
 
@@ -96,10 +96,10 @@ cannot take the prefix is enumerated and put in front of a human before any valu
 
 **Checkpoint:** human review of the candidate list and name map (Gerard; Price for D-21, D-24, D-25).
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 - [x] 23-01-PLAN.md — Config gate flag + sentinel sweep (char/numeric/ambiguous) + case-variant report (Wave 1)
 - [x] 23-02-PLAN.md — Name-map draft + sentinel-decisions draft (Wave 2)
-- [ ] 23-03-PLAN.md — Human review checkpoint, docs/ gate files + git add -f, PCM-D-21..25 in DECISIONS.md (Wave 3)
+- [x] 23-03-PLAN.md — Human review checkpoint, docs/ gate files + git add -f, PCM-D-21..25 in DECISIONS.md (Wave 3)
 
 #### Phase 24: Build g.pcnr_harmonized
 

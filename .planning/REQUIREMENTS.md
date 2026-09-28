@@ -33,8 +33,8 @@ at 16b, and the new programs run downstream of 16b.
 - [x] **PCNR-02**: Every numeric column is scanned for common numeric sentinels (-999, -99, -9, 99, 999, 9999, 99999, 777, 888) with counts reported, including the IS NOT MISSING guard (PCM-T-11). **Report only**; no numeric value is recoded unless PCM-D-24 approves it for that variable.
 - [x] **PCNR-03**: Ambiguous values are reported separately for human review and never auto-classified: `None`, `Not applicable`, `Declined`, `Refused`, `Other`, `0`. (`None` can be a real answer; `Not applicable` can be structurally meaningful.)
 - [x] **PCNR-04**: Case and whitespace variants of real categories (for example `Yes`/`YES`/`yes `) are reported in `qc/23_case_variants.csv`. **Report only**; they are not normalized in v2.1.
-- [ ] **PCNR-05**: Name map `docs/pcnr_name_map.csv` generated for every column: original name, pcnr name, original length, shortened flag. Names longer than 27 characters (32 minus the 5-character `pcnr_` prefix) are shortened by the PCM-D-23 rule. Asserted: every pcnr name is 32 characters or fewer, and names are unique case-insensitively.
-- [ ] **PCNR-06**: `docs/sentinel_decisions.csv` records a human decision for every candidate from PCNR-01..03: variable, raw value, action (`MISSING` / `KEEP`), rationale, decided_by, date. Gate `PCNR_APPROVED` in `00_config.sas`, default 0. Same pattern as `concept_decisions.csv`: the human confirms, the program applies exactly that, and it FAILS on any candidate with no decision.
+- [x] **PCNR-05**: Name map `docs/pcnr_name_map.csv` generated for every column: original name, pcnr name, original length, shortened flag. Names longer than 27 characters (32 minus the 5-character `pcnr_` prefix) are shortened by the PCM-D-23 rule. Asserted: every pcnr name is 32 characters or fewer, and names are unique case-insensitively.
+- [x] **PCNR-06**: `docs/sentinel_decisions.csv` records a human decision for every candidate from PCNR-01..03: variable, raw value, action (`MISSING` / `KEEP`), rationale, decided_by, date. Gate `PCNR_APPROVED` in `00_config.sas`, default 0. Same pattern as `concept_decisions.csv`: the human confirms, the program applies exactly that, and it FAILS on any candidate with no decision.
 
 ### Build g.pcnr_harmonized (Phase 24)
 
@@ -105,8 +105,8 @@ Per project practice, sign-off on analytic-facing decisions (D-21, D-24, D-25) g
 | PCNR-02 | 23 | Complete |
 | PCNR-03 | 23 | Complete |
 | PCNR-04 | 23 | Complete |
-| PCNR-05 | 23 | Pending |
-| PCNR-06 | 23 | Pending |
+| PCNR-05 | 23 | Complete |
+| PCNR-06 | 23 | Complete |
 | PCNR-07 | 24 | Pending |
 | PCNR-08 | 24 | Pending |
 | PCNR-09 | 24 | Pending |

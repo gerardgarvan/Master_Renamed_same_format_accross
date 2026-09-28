@@ -223,7 +223,8 @@ no `%include`, no `run;` inside the file itself. It is `%include`d inside an ope
 /* Requires: both datasets have identical row counts (asserted in PCNR-11 before this step) */
 data work._compare_out;
   set g.master_data_harmonized;         /* source — row by row */
-  set work._recoded (rename=(...));     /* all columns suffixed _r_ */
+  set work._recoded (rename=(...));     /* renamed positionally _rc1../_rn1.. -- a suffix
+                                           cannot fit: ten names are already 32 chars */
 
   /* Char arrays — separate from numeric (SAS 9.4 constraint) */
   array _src_c{*} $ <char columns in source>;
@@ -367,8 +368,9 @@ Total rows in file: 16 MISSING + many KEEP. MISSING decisions confirmed:
   Dischg_Disposition, Ethnicity, ICD10_Principal_Diagnosis, ICD10_Principal_Diagnosis_POA,
   Marital_Status, Patient_Type)
 - Numeric sentinels: none with action=MISSING (all reviewed numeric candidates are KEEP)
-- Wildcard row: `variable=*`, `raw_value=?`, `action=MISSING` — covers all char columns
-  for `?` placeholder
+- Wildcard row: `variable=*`, `raw_value` and `raw_hex` BLANK, `normalized_value=?`,
+  `action=MISSING` — matches on normalized_value across KEEP/KEY char columns. The per-variable
+  `?` rows above take precedence for their own (variable, raw_hex). (Corrected 2026-09-28.)
 
 The wildcard row is char-only (var_type=char) per D-04/Phase 23 D-06.
 
@@ -459,27 +461,11 @@ data work._decisions_raw;
         match_rule $ action $ rationale $ decided_by $ decided_date $;
 run;
 
-/* Expand wildcards: join wildcard rows against candidates for KEEP/KEY columns */
-proc sql noprint;
-  create table work._recode_rules as
-  select c.variable, c.raw_hex, d.action, d.raw_value, 'WILDCARD' as rule_source length=7,
-         c.n_rows as n_expected
-  from work._candidates_raw c
-  inner join work._decisions_raw d
-    on d.variable = '*' and d.raw_hex = c.raw_hex
-    and c.role in ('KEEP','KEY') and c.var_type = 'char'
-  where d.action = 'MISSING'
-
-  union
-
-  /* Per-variable MISSING rules (non-wildcard) */
-  select d.variable, d.raw_hex, d.action, d.raw_value, 'PER_VAR' as rule_source,
-         c.n_rows as n_expected
-  from work._decisions_raw d
-  inner join work._candidates_raw c
-    on d.variable = c.variable and d.raw_hex = c.raw_hex
-  where d.action = 'MISSING' and d.variable ne '*';
-quit;
+/* SUPERSEDED (2026-09-28). The earlier example here had four defects: it joined wildcards on
+   raw_hex (blank on the wildcard row, so it matched nothing), let a wildcard duplicate or
+   override a per-variable row, did not exclude AMBIGUOUS candidates, and used length=7 for
+   rule_source ('WILDCARD' is 8 characters). It also took role from the candidates file.
+   The corrected SQL is in 24-01-PLAN.md Task 3 (SECTION 1) and is authoritative. */
 ```
 
 ### Generated Recode File Format (character column)
@@ -508,12 +494,14 @@ run;
 
 ### Write CSV Outputs (PCM-T-16 compliant)
 ```sas
-data _null_;
+data _null_;                                   /* header, no dsd */
   file "&qc_path.\24_pcnr_recode_counts.csv" lrecl=32767;
   put "variable,final_name,raw_value,raw_hex,var_type,rule_source,n_expected,n_recoded";
+run;
+data _null_;                                   /* rows: dsd delimits, trims, and quotes */
+  file "&qc_path.\24_pcnr_recode_counts.csv" dsd mod lrecl=32767;
   set work._recode_counts_detail;
-  put variable ',' final_name ',' raw_value ',' raw_hex ',' var_type ','
-      rule_source ',' n_expected ',' n_recoded;
+  put variable final_name raw_value raw_hex var_type rule_source n_expected n_recoded;
 run;
 ```
 

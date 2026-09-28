@@ -18,7 +18,9 @@ Deliverables:
 - `qc/24_pcnr_recode_totals.csv` — per-variable total rows changed (0 for untouched columns)
 - All PCNR-11 assertions pass; `g.master_data_harmonized` confirmed unchanged
 
-Gate: `PCNR_APPROVED = 1` in `00_config.sas` must be set before program 24 runs.
+Gate: `PCNR_APPROVED = 1` in `00_config.sas` must be set before program 24 runs. It is set in
+the COMMITTED config (same pattern as `D15_APPROVED`): program 24 %includes 00_config.sas, so a
+value set only in the run session would be reset before the gate check.
 
 </domain>
 
@@ -43,6 +45,11 @@ Gate checks (all abort on failure):
 - No per-variable decision row references a `(variable, raw_hex)` absent from the candidates scan (stale per-variable)
 - No wildcard row's `normalized_value` appears in zero KEEP/KEY column scans (stale wildcard)
 - Every wildcard row has `var_type = char` (prevents wildcard from resolving numeric candidates)
+- Every decision row has `action` in (MISSING, KEEP); no duplicate decision keys
+
+Role (KEEP/KEY/DROP) comes only from `docs/pcnr_name_map.csv`; the candidates file's `role`
+column is display-only (Phase 23 D-04). Wildcard rows have blank `raw_value`/`raw_hex` and
+match on `upcase(normalized_value)`, never on `raw_hex`.
 
 Key lookup: `(variable, raw_hex)` — same hex encoding used by `%hexkey` macro in `00_config.sas`.
 
@@ -58,7 +65,10 @@ explicit row per KEEP/KEY column where that `normalized_value` appears. Result:
 `work._recode_rules` — one row per `(variable, raw_hex, action = MISSING)`.
 
 Skip DROP-role columns (they will be dropped later and are not recoded).
-Skip AMBIGUOUS candidates resolved only by wildcard (gate already aborted if any exist).
+Wildcard expansion skips AMBIGUOUS candidates and skips any `(variable, raw_hex)` that has a
+per-variable decision row, whatever that row's action -- the per-variable row always wins.
+`work._recode_rules` must be unique on `(variable, raw_hex)`; `rule_source` is length 8
+(`WILDCARD` is 8 characters).
 For numeric columns: include only rows where PCM-D-24 has approved action = MISSING
 (default is KEEP; no wildcard rows allowed for var_type = num per D-04 from Phase 23).
 
@@ -77,7 +87,7 @@ select (%hexkey(Race));
   otherwise;
 end;
 /* numeric: clock_variable (1 rule, PCM-D-24 approved) */
-if clock_variable = -999 and clock_variable is not missing then call missing(clock_variable);
+if clock_variable = -999 and not missing(clock_variable) then call missing(clock_variable);
 ```
 
 Include a comment per rule noting `raw_value` (display only) and whether it came from a
@@ -102,7 +112,7 @@ After the recode step, read source and recoded in parallel by row position:
 ```sas
 data work._compare_out;
   set g.master_data_harmonized;          /* source */
-  set work._recoded (rename=(...));      /* recoded, all columns prefixed _r_ */
+  set work._recoded (rename=(...));      /* recoded, columns renamed positionally _rc1.. / _rn1.. */
   array src{*}  <all 175 columns>;
   array rec{*}  <all 175 _r_ columns>;
   do _i = 1 to dim(src);
@@ -140,14 +150,16 @@ data work.pcnr_harmonized;
     drop   = <DROP-role columns>
     rename = (<source_name> = <final_name> for all KEEP rows)
   );
-  label <final_name> = '<source_name>'  /* original name as label for traceability */
-        ...;
+  %include "&qc_path.\24_label_stmts_generated.sas";
+  /* PCNR-09: keep the original label; a blank original label becomes the original name.
+     Labels are written to a generated file (single-quoted), not a macro variable, so
+     & or % in label text is never macro-resolved. */
 run;
 ```
 
-Generate the `drop=`, `rename=`, and `label` clauses from `docs/pcnr_name_map.csv` using
-macro variable lists. KEY columns stay with their original names (no rename). About 175
-pairs fits in one macro variable comfortably.
+Generate the `drop=` and `rename=` clauses from `docs/pcnr_name_map.csv` using macro variable
+lists, and the labels via the generated file above. KEY columns stay with their original names
+(no rename); their `final_name` is blank in the file, so use `coalescec(final_name, source_name)`.
 
 After rename, assert:
 - Variable set equals KEY names + KEEP `final_name` values exactly (nothing extra, nothing missing)

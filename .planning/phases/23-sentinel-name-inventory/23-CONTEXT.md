@@ -4,7 +4,8 @@
 **Status:** Ready for planning
 **Revised:** 2026-09-28 (11 corrections before planning — gate logic, keying, schema, name map rules, D-number assignments)
 **Revised:** 2026-09-28 (8 further corrections — draft/docs split, hex-key PROC IMPORT trap, wildcard/AMBIGUOUS wording, numeric keying, control-char tokens, truncation algorithm, gate placement, DROP scoping)
-**Revised:** 2026-09-28 (6 final corrections — overwrite guard removed, gate scan source defined with fingerprint, git/PHI clarified, role source disambiguation, numeric wildcard aborts, id_flag split from collision_flag)
+**Revised:** 2026-09-28 (6 corrections — overwrite guard removed, gate scan source + fingerprint, git/PHI, role disambiguation, numeric wildcard aborts, id_flag split)
+**Revised:** 2026-09-28 (6 final tidy-ups — DATA_DICTIONARY.xlsx refs removed, fingerprint adds modate, static check broadened, draft pre-fill rules stated, code-context count corrected, PHI scan step added)
 
 <domain>
 ## Phase Boundary
@@ -135,10 +136,10 @@ decided_by, decided_date
     (stale per-variable decision).
   - Abort if any wildcard row's `normalized_value` appears in no KEEP/KEY column's scan
     (stale wildcard — a `*` row matching zero columns always fails this check).
-  - Abort if any wildcard row has `var_type = num` (numeric approvals must be per-variable).
-  - Abort if any wildcard row lacks `var_type = char` (every wildcard row must be explicitly typed).
-  - Abort if any wildcard row's `normalized_value` matches only numeric candidates in the scan
-    (wildcard resolving a numeric candidate by its text representation bypasses PCM-D-24).
+  - Abort if any wildcard row lacks `var_type = char`. This single rule subsumes the prohibition
+    on `var_type = num` wildcards and prevents a wildcard from resolving a numeric candidate by
+    its text representation (which would bypass PCM-D-24). Every wildcard row must be explicitly
+    typed as character.
 - **Gate placement:** the gate check runs at the top of program 24, in a `%pcnr_gate_check`
   macro. Program 23 never runs the gate — it only generates drafts. This ensures the files
   are re-validated at the point of use, after any human edits to the `docs/` copies.
@@ -199,9 +200,24 @@ name_len, collision_flag, id_flag
 
 Program 23 must **never write to `docs/`**. No runtime guard for this — the protection is
 structural: program 23 simply has no `file=` or `outfile=` statement pointing at `docs/`.
-The plan's acceptance criteria must include a static check: `grep -n "file=" sas/23_pcnr_inventory.sas`
-must show no `docs/` paths. A runtime abort guard is not needed and would block every full
+The plan's acceptance criteria must include a static check:
+`grep -ni "docs" sas/23_pcnr_inventory.sas`
+must show only the `concept_decisions.csv` read, with no occurrence inside a `filename`,
+`file=`, `outfile=`, or `ods ... file=` statement. (`grep "file="` alone misses `outfile=`,
+`filename` filerefs, and ODS file assignments, and would also flag the legitimate read of
+`docs/concept_decisions.csv`.) A runtime abort guard is not needed and would block every full
 pipeline run after `PCNR_APPROVED = 1` is set.
+
+**Draft pre-fill rules for `qc/23_sentinel_decisions_DRAFT.csv`:**
+- Numeric rows (`var_type = num`): `action` pre-filled as `KEEP`. Safe default; Gerard changes
+  to `MISSING` only for variables where PCM-D-24 approves recoding.
+- Character rows (`var_type = char`): `action` left **blank**. An un-reviewed draft copied to
+  `docs/` as-is fails the gate (blank action = no decision), forcing human review before any
+  run of program 24 succeeds.
+- One `variable = *` wildcard row is proposed for each distinct AUTO `normalized_value` (e.g.,
+  one row for `UNKNOWN`, one for `?`, etc.), with `action` blank. This gives reviewers the
+  wildcard shortcut without requiring them to type the rows; they fill in `action` and
+  optionally narrow `variable` to a specific column.
 
 The human copies drafts to `docs/` and edits them there. From that point, the `docs/` files
 are human-owned.
@@ -212,10 +228,10 @@ reads `qc/23_sentinel_candidates.csv` from disk using a DATA step `infile` with 
 informats per PCM-T-16. This is the authoritative candidate list for coverage and stale checks.
 
 **Fingerprint:** Program 23 writes a one-line `qc/23_sentinel_fingerprint.txt` alongside the
-candidates CSV: source nobs, nvars, and run timestamp of `g.master_data_harmonized` (read
-from SASHELP.VTABLE or PROC CONTENTS). The gate aborts if the current `g.master_data_harmonized`
-nobs or nvars does not match the fingerprint. This prevents a stale candidates file from a
-prior run passing validation silently.
+candidates CSV: nobs, nvars, and `modate` (dataset modification datetime) of
+`g.master_data_harmonized`, read from `SASHELP.VTABLE`. The gate aborts if any of the three
+fields does not match the current dataset. Comparing only nobs and nvars would pass on a
+dataset refreshed with the same dimensions; `modate` catches that case.
 
 Other gate behaviors:
 - Program 23 can be rerun freely to refresh drafts after source data changes.
@@ -243,11 +259,17 @@ by `*.csv` in `.gitignore` and must not be force-added.
 **PHI mitigation for committed `docs/sentinel_decisions.csv`:** Restrict the contains rule
 (which generates REVIEW rows) to columns where free text is plausible. Either:
 - Exclude columns with SAS length > 50 from the contains rule (procedure/notes fields tend
-  to be long), or
+  to be long — treat as a heuristic, not a guarantee; a 40-character column can still hold
+  narrative text), or
 - Hardcode an exclusion list of known free-text columns in the program header.
 In either case, long-text columns are still swept by the exact-match AUTO rule (exact sentinel
 hits are short strings and safe to commit); only the contains sweep is restricted.
 Planner should propose the exclusion approach based on `qc/03_contents_all.txt` column lengths.
+
+**Pre-commit PHI scan:** Before running `git add -f docs/sentinel_decisions.csv`, scan the
+REVIEW rows' `raw_value` column in the draft for patient-identifiable text. The acceptance
+criteria must include this manual step; the plan should describe what to look for (names,
+dates of birth, MRN fragments, free-text narrative).
 
 **Canonical refs confirmed:**
 - `docs/concept_decisions.csv` — tracked in git (force-added before `*.csv` rule; confirmed via `git ls-files`)
@@ -276,9 +298,9 @@ To give the planner unambiguous targets for DECISIONS.md entries:
 
 The planner cannot run PROC CONTENTS against P:. The demographic and count/score column lists
 (PCM-D-25) are therefore proposed one of two ways:
-1. **Preferred:** extract candidate column names from `docs/DATA_DICTIONARY.xlsx` or
-   `qc/03_contents_all.txt` (both committed and readable). The planner reads those and proposes
-   a list; Gerard confirms before the gate is set.
+1. **Preferred:** extract candidate column names from `qc/03_contents_all.txt` (committed and
+   readable by the planner). The planner reads it and proposes a list; Gerard confirms before
+   the gate is set.
 2. **Fallback:** program 23 writes a first-run draft with `column_group` blank for all rows.
    Gerard fills in the lists manually in the draft before copying to `docs/`.
 
@@ -336,7 +358,7 @@ No external specs — requirements fully captured in decisions above and REQUIRE
 
 ### Reusable Assets
 - `sas/10_concept_profile.sas` — value-sweep pattern against harmonized dataset; starting point for the character column sweep in program 23
-- `sas/10b_concept_harmonize.sas` — gate abort pattern: reads decisions CSV, checks for missing decisions, aborts with `%fail_out`; replicate with three new checks (missing decision, stale per-variable, stale wildcard)
+- `sas/10b_concept_harmonize.sas` — gate abort pattern: reads decisions CSV, checks for missing decisions, aborts with `%fail_out`; replicate and extend with all gate checks listed in D-04
 - `sas/00_config.sas` `%fail_out` macro — standard abort path used across all gate checks
 
 ### Established Patterns
@@ -363,7 +385,7 @@ No external specs — requirements fully captured in decisions above and REQUIRE
 - **Stale wildcard detection:** a `*` row whose `normalized_value` appears in no KEEP/KEY column's scan is stale; gate aborts.
 - **DROP proposal from concept_decisions.csv:** program reads `docs/concept_decisions.csv`, extracts `varname` → `harmonized_name` pairs where `harmonized_name` starts with `h_`, and proposes `role = DROP` for those raw columns in the name map draft. Gerard confirms rather than hunts.
 - **PCM-D-23 truncation example:** planner should extract a real name > 27 characters from `qc/03_contents_all.txt` and show the algorithm's output for that name in the plan. The `pcnr_Long_Variable_Name_DATE` example used in discussion was 28 characters and would not trigger truncation — it is not a valid illustration.
-- **PCM-D-25 column lists:** planner proposes from `qc/03_contents_all.txt` or `docs/DATA_DICTIONARY.xlsx` (both committed). Gerard confirms before gate is set.
+- **PCM-D-25 column lists:** planner proposes from `qc/03_contents_all.txt` (committed; `docs/DATA_DICTIONARY.xlsx` is not tracked and cannot be read by the planner). Gerard confirms before gate is set.
 - **Draft/docs workflow:** program 23 → writes `qc/*_DRAFT.csv` + `qc/23_sentinel_fingerprint.txt` → human copies drafts to `docs/` and edits → `git add -f docs/sentinel_decisions.csv docs/pcnr_name_map.csv` → program 24 gate reads `docs/` files + fingerprint at runtime. No runtime guard in program 23; protection is structural (no `file=docs/` in program 23).
 
 </specifics>

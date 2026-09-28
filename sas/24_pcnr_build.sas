@@ -784,36 +784,514 @@ quit;
 %put NOTE: [24] comparison OK -- &n_compare_changes authorized changes;
 
 
-/* ===== SECTION 5: rename + label + drop -- work.pcnr_harmonized (Plan 24-02) ===== */
-/* Stub: Plan 24-02 fills this section.
-   data work.pcnr_harmonized;
-     set work._recoded (drop=<DROP-role> rename=(<KEEP renames>));
-     %include "&qc_path.\24_label_stmts_generated.sas";
-   run;
+/* ===== SECTION 5: rename + label + drop -- work.pcnr_harmonized (Plan 24-03 Task 1) ===== */
+
+/* Build rename_list and drop_list from work._name_map (already loaded in SECTION 0).
+   Do NOT read pcnr_name_map.csv a second time.
+   rename_list: source_name=final_name for role=KEEP (space-separated)
+   drop_list:   source_name for role=DROP (space-separated)
 */
+proc sql noprint;
+  select catx('=', source_name, final_name)
+  into  :rename_list separated by ' '
+  from  work._name_map
+  where role = 'KEEP';
+
+  select source_name
+  into  :drop_list separated by ' '
+  from  work._name_map
+  where role = 'DROP';
+quit;
+
+%put NOTE: [24] SECTION 5 -- rename_list and drop_list built from work._name_map;
+
+/* Write label statements to a generated file.
+   Single-quoted values: &/% inside a label would resolve if double-quoted.
+   Embedded apostrophes are doubled via tranwrd.
+   KEY rows: final_name is blank -- use coalescec(final_name, source_name) for output name.
+   Blank source_label rows: set label = original source_name (PCNR-09). */
+data _null_;
+  file "&qc_path.\24_label_stmts_generated.sas" lrecl=32767;
+  set work._name_map (where=(role in ('KEEP','KEY')));
+  length _out $32 _lab $256 _q $600;
+  _out = coalescec(final_name, source_name);      /* KEY final_name is blank */
+  _lab = coalescec(source_label, source_name);    /* blank label -> original name */
+  /* Single-quote the label text; double any embedded apostrophes */
+  _q = cats("'", tranwrd(strip(_lab), "'", "''"), "'");
+  put 'label ' _out +(-1) ' = ' _q +(-1) ';';
+run;
+
+%put NOTE: [24] SECTION 5 -- label statements written to qc/24_label_stmts_generated.sas;
+
+/* One DATA step: drop DROP columns, rename KEEP columns, apply labels.
+   Key columns keep original names (final_name blank -> not in rename_list).
+   Formats travel with the variable automatically via SET -- do not strip. */
+data work.pcnr_harmonized;
+  set work._recoded (drop = &drop_list rename = (&rename_list));
+  %include "&qc_path.\24_label_stmts_generated.sas";
+run;
+
+/* ---- Assert 5a: column count = 163 (159 KEEP + 4 KEY) ---- */
+proc sql noprint;
+  select count(*) into :n_pcnr_cols trimmed
+  from dictionary.columns
+  where libname = 'WORK' and memname = 'PCNR_HARMONIZED';
+quit;
+
+%macro _s5_colcount_gate;
+  %if &n_pcnr_cols ne 163 %then %do;
+    %fail_out(msg=SECTION 5 column count assertion failed -- work.pcnr_harmonized has &n_pcnr_cols cols, expected 163);
+  %end;
+%mend _s5_colcount_gate;
+%_s5_colcount_gate;
+
+%put NOTE: [24] SECTION 5 -- column count OK (&n_pcnr_cols cols);
+
+/* ---- Assert 5b: variable set equals KEY source_names + KEEP final_names exactly ---- */
+/* Expected names: KEY rows -> source_name; KEEP rows -> final_name */
+proc sql noprint;
+  /* Count names in expected set that are absent from work.pcnr_harmonized (missing) */
+  create table work._s5_expected as
+  select upcase(coalescec(final_name, source_name)) as expected_name
+  from work._name_map
+  where role in ('KEEP','KEY');
+
+  create table work._s5_actual as
+  select upcase(name) as actual_name
+  from dictionary.columns
+  where libname = 'WORK' and memname = 'PCNR_HARMONIZED';
+
+  select count(*) into :n_expected_missing trimmed
+  from work._s5_expected e
+  where not exists (
+      select 1 from work._s5_actual a
+      where a.actual_name = e.expected_name
+  );
+
+  select count(*) into :n_extra trimmed
+  from work._s5_actual a
+  where not exists (
+      select 1 from work._s5_expected e
+      where e.expected_name = a.actual_name
+  );
+
+  %let n_name_mismatch = %eval(&n_expected_missing + &n_extra);
+quit;
+
+%macro _s5_nameset_gate;
+  %if &n_name_mismatch > 0 %then %do;
+    %fail_out(msg=SECTION 5 variable-set assertion failed -- &n_expected_missing expected names missing and &n_extra extra names in work.pcnr_harmonized);
+  %end;
+%mend _s5_nameset_gate;
+%_s5_nameset_gate;
+
+%put NOTE: [24] SECTION 5 -- variable set OK (no extra or missing names);
+
+/* ---- Assert 5c: type and length of every output column = source column ---- */
+/* Map output column back to source via name map; compare type/length. */
+proc sql noprint;
+  create table work._s5_typelen_check as
+  select m.source_name, coalescec(m.final_name, m.source_name) as out_name,
+         src.type as src_type, src.length as src_len,
+         out.type as out_type, out.length as out_len
+  from work._name_map m
+       inner join (
+           select name, type, length
+           from dictionary.columns
+           where libname='G' and memname='MASTER_DATA_HARMONIZED'
+       ) src on src.name = m.source_name
+       inner join (
+           select name, type, length
+           from dictionary.columns
+           where libname='WORK' and memname='PCNR_HARMONIZED'
+       ) out on upcase(out.name) = upcase(coalescec(m.final_name, m.source_name))
+  where m.role in ('KEEP','KEY')
+    and (src.type ne out.type or src.length ne out.length);
+
+  select count(*) into :n_typelen_mismatch trimmed
+  from work._s5_typelen_check;
+quit;
+
+%macro _s5_typelen_gate;
+  %if &n_typelen_mismatch > 0 %then %do;
+    %fail_out(msg=SECTION 5 type/length assertion failed -- &n_typelen_mismatch columns have type or length change in work.pcnr_harmonized);
+  %end;
+%mend _s5_typelen_gate;
+%_s5_typelen_gate;
+
+%put NOTE: [24] SECTION 5 -- type/length unchanged for all output columns;
 
 
-/* ===== SECTION 6: WORK-then-promote -- g.pcnr_harmonized (Plan 24-02) ===== */
-/* Stub: Plan 24-02 fills this section.
-   data g.pcnr_harmonized;
-     set work.pcnr_harmonized;
-   run;
-*/
+/* ===== SECTION 6: WORK-then-promote -- g.pcnr_harmonized (Plan 24-03 Task 1) ===== */
+
+data g.pcnr_harmonized;
+  set work.pcnr_harmonized;
+run;
+
+%put NOTE: [24] promoted g.pcnr_harmonized (163 cols, 41150 rows);
 
 
-/* ===== SECTION 7: write recode counts CSVs (Plan 24-02) ===== */
-/* Stub: Plan 24-02 fills this section.
-   Outputs: qc/24_pcnr_recode_counts.csv  (detail: one row per rule)
-            qc/24_pcnr_recode_totals.csv  (per-variable total)
-*/
+/* ===== SECTION 7: write recode counts CSVs (Plan 24-03 Task 2) ===== */
+
+/* ---- Build detail dataset: left-join _recode_rules to per-rule actual counts + final_name ---- */
+/* n_recoded = actual rows changed for that (variable, raw_hex); 0 for zero-hit rules */
+proc sql;
+  create table work._recode_counts_detail as
+  select r.variable,
+         coalescec(m.final_name, r.variable) as final_name length=32,
+         r.raw_value,
+         r.raw_hex,
+         r.var_type,
+         r.rule_source,
+         r.n_expected,
+         coalesce(a.n_recoded, 0) as n_recoded
+  from work._recode_rules r
+       left join (
+           select _chg_var as variable, _raw_hex as raw_hex, count(*) as n_recoded
+           from work._compare_out
+           group by _chg_var, _raw_hex
+       ) a on a.variable = r.variable
+           and a.raw_hex  = r.raw_hex
+       left join work._name_map m on m.source_name = r.variable
+  order by r.variable, r.raw_hex;
+quit;
+
+/* Write detail CSV: header first (no dsd), then data rows (dsd for quoting/trimming) */
+data _null_;
+  file "&qc_path.\24_pcnr_recode_counts.csv" lrecl=32767;
+  put "variable,final_name,raw_value,raw_hex,var_type,rule_source,n_expected,n_recoded";
+run;
+
+data _null_;
+  file "&qc_path.\24_pcnr_recode_counts.csv" dsd mod lrecl=32767;
+  set work._recode_counts_detail;
+  put variable final_name raw_value raw_hex var_type rule_source n_expected n_recoded;
+run;
+
+%put NOTE: [24] wrote qc/24_pcnr_recode_counts.csv;
+
+/* ---- Build totals dataset: one row per KEEP and KEY column ---- */
+/* Sum n_recoded from detail (0 for columns with no MISSING rules) */
+proc sql;
+  create table work._recode_totals as
+  select m.source_name as variable,
+         coalescec(m.final_name, m.source_name) as final_name length=32,
+         coalesce(t.n_recoded_total, 0) as n_recoded_total
+  from work._name_map m
+       left join (
+           select variable, sum(n_recoded) as n_recoded_total
+           from work._recode_counts_detail
+           group by variable
+       ) t on t.variable = m.source_name
+  where m.role in ('KEEP','KEY')
+  order by m.source_name;
+quit;
+
+/* Write totals CSV: header first, then data rows */
+data _null_;
+  file "&qc_path.\24_pcnr_recode_totals.csv" lrecl=32767;
+  put "variable,final_name,n_recoded_total";
+run;
+
+data _null_;
+  file "&qc_path.\24_pcnr_recode_totals.csv" dsd mod lrecl=32767;
+  set work._recode_totals;
+  put variable final_name n_recoded_total;
+run;
+
+%put NOTE: [24] wrote qc/24_pcnr_recode_totals.csv;
 
 
-/* ===== SECTION 8: PCNR-11 assertions (Plan 24-02) ===== */
-/* Stub: Plan 24-02 fills this section.
-   Assertions: 41,150 rows; key identity; column count = source;
-   missing math; full comparison; zero remaining sentinels;
-   type/length unchanged; source confirmed unchanged.
-*/
+/* ===== SECTION 8: PCNR-11 assertion suite (Plan 24-03 Task 2) ===== */
 
-%put NOTE: ==== Program 24 pcnr_build SECTIONS 0-4 complete ====;
+/* ---- Check 1: Row count = 41,150 ---- */
+proc sql noprint;
+  select count(*) into :n_pcnr_rows trimmed
+  from g.pcnr_harmonized;
+quit;
+
+%macro _s8_rowcount;
+  %if &n_pcnr_rows ne 41150 %then %do;
+    %fail_out(msg=PCNR-11 Check 1 FAILED -- g.pcnr_harmonized has &n_pcnr_rows rows, expected 41150);
+  %end;
+%mend _s8_rowcount;
+%_s8_rowcount;
+
+%put NOTE: [24] PCNR-11 Check 1 -- row count OK (&n_pcnr_rows rows);
+
+/* ---- Check 2: Key identity -- PRECEDE_STUDY_ID unique and set-identical; pecan_ID row-identical ---- */
+proc sql noprint;
+  /* PRECEDE_STUDY_ID: distinct count in output = distinct count in source */
+  select count(distinct PRECEDE_STUDY_ID) into :n_sid_out trimmed
+  from g.pcnr_harmonized;
+
+  select count(distinct PRECEDE_STUDY_ID) into :n_sid_src trimmed
+  from g.master_data_harmonized;
+
+  /* Anti-join: IDs in output not in source */
+  select count(*) into :n_sid_anti1 trimmed
+  from g.pcnr_harmonized o
+  where not exists (
+      select 1 from g.master_data_harmonized s
+      where s.PRECEDE_STUDY_ID = o.PRECEDE_STUDY_ID
+  );
+
+  /* Anti-join: IDs in source not in output */
+  select count(*) into :n_sid_anti2 trimmed
+  from g.master_data_harmonized s
+  where not exists (
+      select 1 from g.pcnr_harmonized o
+      where o.PRECEDE_STUDY_ID = s.PRECEDE_STUDY_ID
+  );
+quit;
+
+%macro _s8_key_identity;
+  %if &n_sid_out ne &n_sid_src %then %do;
+    %fail_out(msg=PCNR-11 Check 2 FAILED -- PRECEDE_STUDY_ID distinct count mismatch: output=&n_sid_out source=&n_sid_src);
+  %end;
+  %if &n_sid_anti1 ne 0 or &n_sid_anti2 ne 0 %then %do;
+    %fail_out(msg=PCNR-11 Check 2 FAILED -- PRECEDE_STUDY_ID set mismatch: anti1=&n_sid_anti1 anti2=&n_sid_anti2);
+  %end;
+%mend _s8_key_identity;
+%_s8_key_identity;
+
+%put NOTE: [24] PCNR-11 Check 2a -- PRECEDE_STUDY_ID set-identical (distinct=&n_sid_out);
+
+/* pecan_ID: row-by-row identical (parallel SET comparison; row counts already asserted equal) */
+data work._s8_pid_diffs;
+  set g.master_data_harmonized (keep=pecan_ID);
+  set g.pcnr_harmonized        (keep=pecan_ID rename=(pecan_ID=pecan_ID_out));
+  if pecan_ID ne pecan_ID_out;
+run;
+
+proc sql noprint;
+  select count(*) into :n_pid_diffs trimmed from work._s8_pid_diffs;
+quit;
+
+%macro _s8_pecanid_check;
+  %if &n_pid_diffs ne 0 %then %do;
+    %fail_out(msg=PCNR-11 Check 2b FAILED -- &n_pid_diffs pecan_ID row mismatches between source and output);
+  %end;
+%mend _s8_pecanid_check;
+%_s8_pecanid_check;
+
+%put NOTE: [24] PCNR-11 Check 2b -- pecan_ID row-identical (diffs=&n_pid_diffs);
+
+/* ---- Check 3: Column count = 163 (= 175 source - 12 DROP) ---- */
+proc sql noprint;
+  select count(*) into :n_pcnr_colcount trimmed
+  from dictionary.columns
+  where libname='G' and memname='PCNR_HARMONIZED';
+quit;
+
+%macro _s8_colcount;
+  %if &n_pcnr_colcount ne 163 %then %do;
+    %fail_out(msg=PCNR-11 Check 3 FAILED -- g.pcnr_harmonized has &n_pcnr_colcount cols, expected 163);
+  %end;
+%mend _s8_colcount;
+%_s8_colcount;
+
+%put NOTE: [24] PCNR-11 Check 3 -- column count OK (&n_pcnr_colcount cols);
+
+/* ---- Check 4: Missing math per variable ---- */
+/* For every KEEP column: nmiss(final) = nmiss(source) + n_recoded_total */
+/* Build comparison dataset: nmiss before (from source), nmiss after (from output), n_recoded_total */
+
+/* nmiss before: query source for each KEEP column source_name */
+/* nmiss after:  query output for each KEEP column final_name */
+/* We loop by writing a dataset of variable pairs and joining. Use PROC SQL with a
+   generated expression list approach: build arrays via a generated DATA step approach. */
+
+/* Step 1: build nmiss expressions for source (source_name) and output (final_name) for KEEP columns */
+proc sql noprint;
+  select source_name
+  into  :_keep_src_names separated by ' '
+  from  work._name_map where role='KEEP';
+
+  select coalescec(final_name, source_name)
+  into  :_keep_out_names separated by ' '
+  from  work._name_map where role='KEEP';
+
+  select count(*) into :_n_keep trimmed
+  from  work._name_map where role='KEEP';
+quit;
+
+/* Step 2: compute nmiss(source) for each KEEP source_name into macro variables */
+%macro _s8_nmiss_src;
+  %local _i _col;
+  %do _i = 1 %to &_n_keep;
+    %let _col = %scan(&_keep_src_names, &_i, %str( ));
+    proc sql noprint;
+      select nmiss(&_col) into :_nmiss_src_&_i trimmed
+      from g.master_data_harmonized;
+    quit;
+  %end;
+%mend _s8_nmiss_src;
+%_s8_nmiss_src;
+
+/* Step 3: compute nmiss(output) for each KEEP final_name into macro variables */
+%macro _s8_nmiss_out;
+  %local _i _col;
+  %do _i = 1 %to &_n_keep;
+    %let _col = %scan(&_keep_out_names, &_i, %str( ));
+    proc sql noprint;
+      select nmiss(&_col) into :_nmiss_out_&_i trimmed
+      from g.pcnr_harmonized;
+    quit;
+  %end;
+%mend _s8_nmiss_out;
+%_s8_nmiss_out;
+
+/* Step 4: build comparison dataset and join to n_recoded_total */
+data work._s8_mmcheck;
+  length variable $32 final_name $32 nmiss_src 8 nmiss_out 8;
+  %local _i _src _out;
+  %do _i = 1 %to &_n_keep;
+    %let _src = %scan(&_keep_src_names, &_i, %str( ));
+    %let _out = %scan(&_keep_out_names, &_i, %str( ));
+    variable  = "&_src";
+    final_name = "&_out";
+    nmiss_src = &&_nmiss_src_&_i;
+    nmiss_out = &&_nmiss_out_&_i;
+    output;
+  %end;
+run;
+
+proc sql noprint;
+  create table work._s8_mmviolations as
+  select m.variable, m.final_name,
+         m.nmiss_src, m.nmiss_out,
+         coalesce(t.n_recoded_total, 0) as n_recoded_total,
+         m.nmiss_out - m.nmiss_src as delta,
+         (m.nmiss_out - m.nmiss_src) as delta_actual,
+         coalesce(t.n_recoded_total, 0) as delta_expected
+  from work._s8_mmcheck m
+       left join work._recode_totals t on t.variable = m.variable
+  where (m.nmiss_out - m.nmiss_src) ne coalesce(t.n_recoded_total, 0);
+
+  select count(*) into :n_mm_violations trimmed
+  from work._s8_mmviolations;
+quit;
+
+%macro _s8_missing_math;
+  %if &n_mm_violations > 0 %then %do;
+    %fail_out(msg=PCNR-11 Check 4 FAILED -- &n_mm_violations KEEP columns fail missing-math: nmiss_after ne nmiss_before plus n_recoded);
+  %end;
+%mend _s8_missing_math;
+%_s8_missing_math;
+
+%put NOTE: [24] PCNR-11 Check 4 -- missing math OK for all &_n_keep KEEP columns;
+
+/* ---- Check 5: Zero remaining sentinels in output ---- */
+/* For every MISSING rule, count cells in g.pcnr_harmonized (mapped to final_name)
+   whose %hexkey(value) equals the rule raw_hex. Total across all rules must = 0. */
+
+/* Build list of distinct (final_name, raw_hex) pairs from recode rules */
+proc sql noprint;
+  select count(*) into :_n_sentinel_rules trimmed
+  from work._recode_counts_detail;
+quit;
+
+/* Load each rule row's final_name, raw_hex, var_type into indexed macro variables */
+data _null_;
+  set work._recode_counts_detail;
+  call symputx(cats('_sent_fn_', _n_), final_name, 'G');
+  call symputx(cats('_sent_rh_', _n_), raw_hex,    'G');
+  call symputx(cats('_sent_vt_', _n_), var_type,   'G');
+  call symputx('_n_sentinel_rules2', _n_, 'G');
+run;
+
+%macro _s8_zero_sentinels;
+  %local _i _fn _rh _vt _cnt _total;
+  %let _total = 0;
+  %do _i = 1 %to &_n_sentinel_rules2;
+    %let _fn = &&_sent_fn_&_i;
+    %let _rh = &&_sent_rh_&_i;
+    %let _vt = &&_sent_vt_&_i;
+    proc sql noprint;
+      %if &_vt = char %then %do;
+        select count(*) into :_cnt trimmed
+        from g.pcnr_harmonized
+        where %hexkey(&_fn) = "&_rh";
+      %end;
+      %else %do;
+        /* numeric: sentinel was set to missing; any non-missing value that hex-encodes to raw_hex */
+        select count(*) into :_cnt trimmed
+        from g.pcnr_harmonized
+        where not missing(&_fn) and %hexkey(strip(put(&_fn, best32.))) = "&_rh";
+      %end;
+    quit;
+    %let _total = %eval(&_total + &_cnt);
+  %end;
+  %if &_total > 0 %then %do;
+    %fail_out(msg=PCNR-11 Check 5 FAILED -- &_total remaining sentinel values found in g.pcnr_harmonized after recode);
+  %end;
+%mend _s8_zero_sentinels;
+%_s8_zero_sentinels;
+
+%put NOTE: [24] PCNR-11 Check 5 -- zero remaining sentinels confirmed;
+
+/* ---- Check 6: Type and length unchanged ---- */
+/* Re-assert from dictionary.columns (same check as SECTION 5c, but on g.pcnr_harmonized) */
+proc sql noprint;
+  create table work._s8_typelen_check2 as
+  select m.source_name, coalescec(m.final_name, m.source_name) as out_name,
+         src.type as src_type, src.length as src_len,
+         out.type as out_type, out.length as out_len
+  from work._name_map m
+       inner join (
+           select name, type, length
+           from dictionary.columns
+           where libname='G' and memname='MASTER_DATA_HARMONIZED'
+       ) src on src.name = m.source_name
+       inner join (
+           select name, type, length
+           from dictionary.columns
+           where libname='G' and memname='PCNR_HARMONIZED'
+       ) out on upcase(out.name) = upcase(coalescec(m.final_name, m.source_name))
+  where m.role in ('KEEP','KEY')
+    and (src.type ne out.type or src.length ne out.length);
+
+  select count(*) into :n_typelen2 trimmed
+  from work._s8_typelen_check2;
+quit;
+
+%macro _s8_typelen;
+  %if &n_typelen2 > 0 %then %do;
+    %fail_out(msg=PCNR-11 Check 6 FAILED -- &n_typelen2 columns have type or length change in g.pcnr_harmonized);
+  %end;
+%mend _s8_typelen;
+%_s8_typelen;
+
+%put NOTE: [24] PCNR-11 Check 6 -- type/length unchanged for all output columns;
+
+/* ---- Check 7: Source unchanged -- compare to SECTION 0 fingerprint values ---- */
+/* Re-query dictionary.tables for g.master_data_harmonized nobs, nvar, modate */
+proc sql noprint;
+  select strip(put(nobs,  best32.))        into :post_nobs   trimmed
+  from dictionary.tables where libname='G' and memname='MASTER_DATA_HARMONIZED';
+  select strip(put(nvar,  best32.))        into :post_nvar   trimmed
+  from dictionary.tables where libname='G' and memname='MASTER_DATA_HARMONIZED';
+  select strip(put(modate, datetime20.))   into :post_modate trimmed
+  from dictionary.tables where libname='G' and memname='MASTER_DATA_HARMONIZED';
+quit;
+
+%macro _s8_source_unchanged;
+  %if &post_nobs ne &cur_nobs %then %do;
+    %fail_out(msg=PCNR-11 Check 7 FAILED -- g.master_data_harmonized nobs changed: was &cur_nobs now &post_nobs);
+  %end;
+  %if &post_nvar ne &cur_nvar %then %do;
+    %fail_out(msg=PCNR-11 Check 7 FAILED -- g.master_data_harmonized nvar changed: was &cur_nvar now &post_nvar);
+  %end;
+  %if &post_modate ne &cur_modate %then %do;
+    %fail_out(msg=PCNR-11 Check 7 FAILED -- g.master_data_harmonized modate changed: was &cur_modate now &post_modate);
+  %end;
+%mend _s8_source_unchanged;
+%_s8_source_unchanged;
+
+%put NOTE: [24] PCNR-11 Check 7 -- g.master_data_harmonized unchanged (nobs=&post_nobs nvar=&post_nvar);
+
+%put NOTE: [24] PCNR-11 PASS -- all assertions cleared;
+
+%put NOTE: ==== Program 24 pcnr_build complete ====;
 %restore_log;

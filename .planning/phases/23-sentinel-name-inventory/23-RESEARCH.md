@@ -251,11 +251,13 @@ run;
 ### Pattern 4: Hex Key Generation
 
 ```sas
-/* Character value */
-raw_hex = put(raw_value, $hex.);   /* exact bytes, survives CSV round-trip */
+/* Character value — MUST use $hex400. + length trim; bare $hex. encodes only first 2 bytes */
+raw_hex = substr(put(raw_value, $hex400.), 1, 2*length(raw_value));
+/* Define in 00_config.sas as: %macro hexkey(var) / substr(put(&var,$hex400.),1,2*length(&var)) %mend; */
+/* grep -n '\$hex\.' sas/*.sas must return nothing — any bare $hex. is the truncating form */
 
-/* Numeric sentinel */
-raw_hex = put(strip(put(x, best32.)), $hex.);  /* hex of the text representation */
+/* Numeric sentinel — same length-trim applied to text representation */
+raw_hex = substr(put(strip(put(x, best32.)), $hex400.), 1, 2*length(strip(put(x, best32.))));
 
 /* Control-character normalized tokens */
 if raw_value = '09'x then normalized_value = '<TAB>';
@@ -390,19 +392,33 @@ Variables at exactly 32 characters (SAS limit — already at limit, `pcnr_` pref
 - `Oral_Morphine_Equiv_Given__1_7_T` (32 chars)
 - `ISO_Exp_IntraOp_MAC_Minutes_Tota` (32 chars)
 
-**Worked truncation example for planner to verify algorithm:**
+**Correct truncation table — all 10 at-limit names (acceptance criteria for Plan 02 Task 1):**
 
+| Source name (32 chars) | Proposed name (32 chars) | Notes |
+|---|---|---|
+| rt_BLOCK_START_TO_BLOCK_END_mins | pcnr_rt_BLOCK_START_TO_BLOC_mins | head=22: `rt_BLOCK_START_TO_BLOC` |
+| fentaNYL_SUBLIMAZE_mg__1_7_Total | pcnr_fentaNYL_SUBLIMAZE_mg_Total | double-_ in source; head loses `_1_7` distinguisher — flag for `override_name` at checkpoint |
+| fentaNYL_SUBLIMAZE_mg_IntraOp_To | pcnr_fentaNYL_SUBLIMAZE_mg_In_To | already truncated at source |
+| Total_Phenylephrine_HCl_Pressors | pcnr_Total_Phenylephrin_Pressors | |
+| Total_Norepinephrine_Bitartrate_ | pcnr_Total_Norepinephrine_Bitar_ | trailing `_` in source → final_token is empty → fallback to tail truncation; result has trailing `_` which is stripped from head → `pcnr_Total_Norepinephrine_Bitar_` ⚠ empty final_token edge case — use tail truncation |
+| Total_EPHEDRINE_SULFATE_PRESSORS | pcnr_Total_EPHEDRINE_SU_PRESSORS | |
+| SEV_Exp_IntraOp_MAC_Minutes_Tota | pcnr_SEV_Exp_IntraOp_MAC_Mi_Tota | |
+| Oral_Morphine_Equiv_IntraOp_Tota | pcnr_Oral_Morphine_Equiv_In_Tota | |
+| Oral_Morphine_Equiv_Given__1_7_T | pcnr_Oral_Morphine_Equiv_Given_T | double-_ → `_1_7` lost, flag for checkpoint |
+| ISO_Exp_IntraOp_MAC_Minutes_Tota | pcnr_ISO_Exp_IntraOp_MAC_Mi_Tota | |
+
+No collisions in the table. `Total_Norepinephrine_Bitartrate_` exposes the empty-final-token edge case: trailing `_` in the source means the final token is an empty string — fall back to tail truncation. Strip trailing `_` from `head` before rejoining so a truncation that lands on an underscore cannot produce a double `__`.
+
+**Worked example (primary checkpoint example):**
 Name: `rt_BLOCK_START_TO_BLOCK_END_mins` (32 chars)
 After `pcnr_` prefix: `pcnr_rt_BLOCK_START_TO_BLOCK_END_mins` = 37 chars (exceeds 32)
+Algorithm:
+1. `final_token` = `mins` (4 chars)
+2. Budget: 32 − 5(`pcnr_`) − 1(`_`) − 4(`mins`) = **22 chars** for `head`
+3. `rt_BLOCK_START_TO_BLOCK_END` (27 chars) → trim to 22 = `rt_BLOCK_START_TO_BLOC`
+4. Result: `pcnr_rt_BLOCK_START_TO_BLOC_mins` = **32 chars** ✓
 
-Apply PCM-D-23 algorithm:
-1. `final_token` = last token after final `_` = `mins`
-2. Prefix + head + `_` + final_token must be exactly 32 chars
-   `pcnr_` (5) + `_` (1) + `mins` (4) = 10 chars consumed → `head` can be 22 chars
-   `rt_BLOCK_START_TO_BLOCK_END` (27 chars) → trim to 22 = `rt_BLOCK_START_TO_BLO`
-   Result: `pcnr_rt_BLOCK_START_TO_BLO_mins` = 31 chars (< 32, acceptable)
-
-**Confirm this algorithm output at the PCM-D-23 checkpoint before the name map draft is generated.**
+**Confirm this table at the PCM-D-23 checkpoint before the name map draft is generated.**
 
 Note: variables in `g.master_data_harmonized` that were already truncated at the source
 (e.g., `fentaNYL_SUBLIMAZE_mg_IntraOp_To` has already lost its trailing characters) cannot

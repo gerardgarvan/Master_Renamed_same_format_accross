@@ -93,8 +93,7 @@ unless PCM-D-24 explicitly approves it for that variable by changing the action 
 This gives Phase 24 a machine-readable source for any approved numeric recodes rather than
 requiring it to parse DECISIONS.md prose.
 
-**Numeric keying:** `raw_value = strip(put(x, best32.))`. `raw_hex` is the hex of that text
-string (i.e., `put(strip(put(x, best32.)), $hex.)`), not the float bytes of the numeric value.
+**Numeric keying:** `raw_value = strip(put(x, best32.))`. `raw_hex` is the length-trimmed hex of that text string via the `%hexkey` macro — not the float bytes of the numeric value.
 **Wildcards are not allowed for `var_type = num`.** PCM-D-24 approves per variable; a wildcard
 would bypass that per-variable requirement.
 
@@ -175,9 +174,13 @@ name_len, collision_flag, id_flag
      plain tail truncation to 32 characters total.
   4. `collision_flag = 1` if the resulting `final_name` matches any other row case-insensitively.
 
+  **Edge cases (mandatory — include in plan):**
+  - If `final_token` alone exceeds 12 characters, or the name has no underscore at all, use plain tail truncation to 32 chars (fallback).
+  - After computing `head`, strip any trailing `_` from `head` before rejoining. A truncation that lands on an underscore boundary would otherwise produce `pcnr_head__token` (double underscore) or `pcnr_head_` (empty token) — both are invalid.
+  - If `final_token` would produce an empty token after stripping (e.g., source name ends with `_`), fall back to tail truncation.
+
   The exact algorithm is confirmed at the PCM-D-23 checkpoint before the name map draft is
-  generated. The planner should include a real example from `g.master_data_harmonized` with a
-  name longer than 27 characters to verify the algorithm produces the expected result.
+  generated. The planner must use the full 10-name table below as acceptance criteria, not just one example.
 - **Final name:** `coalesce(override_name, proposed_name)` for KEEP rows; blank for KEY and DROP.
 - **Validation runs on `final_name` for KEEP rows:**
   - ≤ 32 characters and valid SAS V7 name
@@ -378,8 +381,8 @@ No external specs — requirements fully captured in decisions above and REQUIRE
 <specifics>
 ## Specific Ideas
 
-- **Hex key for character values:** `raw_hex = put(value, $hex.)`. Gate uses `raw_hex` for matching; `raw_value` is display only. Handles whitespace variants and non-ASCII in one mechanism. Never read gate files with PROC IMPORT (PCM-T-16).
-- **Hex key for numeric candidates:** `raw_hex = put(strip(put(x, best32.)), $hex.)` — hex of the text representation, not the float bytes.
+- **Hex key for character values:** `raw_hex = substr(put(raw_value, $hex400.), 1, 2*length(raw_value))`. `$hex.` (default width 4) encodes only the first 2 bytes — `UNKNOWN` and `UNK` both produce `554E`, defeating the key. `$hex400.` covers the full 200-char column width; `substr(..., 1, 2*length(raw_value))` strips trailing-blank hex padding so keys stay comparable. Define once as `%macro hexkey(var) / substr(put(&var, $hex400.), 1, 2*length(&var)) %mend;` in `00_config.sas`; program 23 and the Phase 24 gate must use the same macro for keys to match. Gate uses `raw_hex` for matching; `raw_value` is display only. Never read gate files with PROC IMPORT (PCM-T-16). Add acceptance check: `grep -n '\$hex\.' sas/*.sas` must return nothing (any bare `$hex.` is the truncating form).
+- **Hex key for numeric candidates:** `raw_hex = substr(put(strip(put(x, best32.)), $hex400.), 1, 2*length(strip(put(x, best32.))))` — hex of the text representation (not the float bytes), with the same length-trimming as above.
 - **Control-character normalized tokens:** tab → `<TAB>`, CR/LF → `<CRLF>`, NBSP (`'A0'x`) → `<NBSP>` in `normalized_value`. Allows wildcard targeting by token, not by empty string.
 - **Wildcard coalesce order:** gate resolves each KEEP/KEY candidate by looking for a per-variable row first (`variable = that_column`), then a wildcard row (`variable = *`). If neither → gate failure. AMBIGUOUS candidates must have a per-variable row or the gate fails even if a wildcard covers the `normalized_value`.
 - **Stale wildcard detection:** a `*` row whose `normalized_value` appears in no KEEP/KEY column's scan is stale; gate aborts.

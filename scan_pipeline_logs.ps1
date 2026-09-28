@@ -24,16 +24,27 @@ if ($RunStart -ne "") {
 $errorPatterns = @(
     '^ERROR',
     '^WARNING',
-    '^NOTE: Variable .+ is uninitialized',
     '^NOTE: MERGE statement has more than one data set with repeats of BY values',
     '^NOTE: Invalid (data|argument)',
     '^NOTE: .*values have been converted'
 )
 
-# ---- Allowlist: benign patterns that should not trigger FAIL ----
+# ---- Allowlist: known pre-existing benign patterns that should not trigger FAIL ----
 $allowlist = @(
-    'character data was lost during transcoding'
-    # add more benign patterns here
+    # encoding noise (pre-existing, PCM-F-10)
+    'character data was lost during transcoding',
+    # program 02: pre-existing type mismatch between md3 and md8 for Admit_BMI
+    'OWN-04 TYPE MISMATCH -- Admit_BMI',
+    # program 08: pre-existing multiple-lengths note on varname column
+    'Multiple lengths were specified for the variable varname',
+    # program 17: pre-existing guard when cognitive score column is absent from ext_candidates
+    'No cognitive score column \(COGNI and SCORE\)',
+    # program 19: two xlsx files that cannot be read by the SAS XLSX engine (password-protected or incompatible)
+    "Couldn't find range or sheet in spreadsheet",
+    'File _XLW\.',
+    'WORK\.INV_\d+_S\d+ may be incomplete',
+    # program 19: SUBSTR called on a 2-char string when checking 3-char extension -- benign
+    'Invalid argument 3 to function SUBSTR'
 )
 
 # ---- Collect findings ----

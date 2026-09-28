@@ -655,3 +655,185 @@ missing-in-base / populated-in-cohort, consistent with gap-fill applied in Phase
 **Attribution:** Gerard, 2026-09-23
 
 **Resolved:** 2026-09-23 | Owner: Gerard | Phase 20 Plan 01
+
+---
+
+## PCM-D-21 -- Sentinel Seed List and Matching Rules: RESOLVED
+
+**Decision:** The sentinel sweep uses the following exact-match seed list (after normalize:
+upcase, strip, compbl) as AUTO candidates:
+
+  ?, ??, -, --, ., UNKNOWN, UNK, N/A, NA, NULL, MISSING, NOT DOCUMENTED, NOT RECORDED
+
+Whitespace-only values detected explicitly:
+  09x (tab) -> normalized token <TAB>
+  0Dx/0Ax (CR/LF) -> normalized token <CRLF>
+  A0x (non-breaking space) -> normalized token <NBSP>
+
+Contains-match (compound forms such as UNKNOWN/NOT DOCUMENTED, OTHER/UNKNOWN) produces
+REVIEW class only, never AUTO. Exact-match-only for AUTO prevents false positives (NA
+catching NATIVE, NA+ lab text, etc.).
+
+Key is (variable, raw_hex) -- not (variable, raw_value). raw_hex uses the %hexkey macro
+(defined in 00_config.sas): substr(put(raw_value, $hex400.), 1, 2*length(raw_value)).
+This survives CSV round-trips and handles non-ASCII values. raw_value is display-only.
+
+Known artifacts included explicitly: the 2-byte encounter placeholder and literal NULL are
+listed even though already known, so sentinel_decisions.csv covers them on the record.
+
+Numeric candidates (-999, -99, -9, 99, 999, 777, 888, 9999, 99999) are always candidate_class
+= REVIEW, never AUTO. Numeric 0 in score columns is AMBIGUOUS (PCM-D-25 scope pending
+resolution; see PCM-D-25 conflict note).
+
+**Attribution:** Decided by Gerard, 2026-09-28. (D-21 does not require Price review; it
+governs the matching rules used in program 23, confirmed at the human-verify checkpoint.)
+
+**Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03
+
+---
+
+## PCM-D-22 -- Key Columns That Stay Unprefixed: RESOLVED
+
+**Decision:** The following four columns stay unprefixed in g.pcnr_harmonized and receive
+role = KEY in docs/pcnr_name_map.csv (final_name left blank in the name map):
+
+  pecan_ID, PRECEDE_STUDY_ID, ENCRYPTED_MRN, ENCRYPTED_ENCOUNTER
+
+All remaining non-DROP columns receive the pcnr_ prefix per the PCM-D-23 rule. A mix of
+prefixed and unprefixed columns would make untouched variables look like raw ones; KEY
+columns are excluded because they serve as join keys to other datasets and must retain
+their existing names for those joins to work unchanged.
+
+REQUIREMENTS.md phrasing (open-decisions table): "Prefix scope: all non-key columns, or
+only columns that had a value recoded?" -- resolved to all non-key columns; columns with
+no recode still get the prefix so the name signals dataset provenance.
+
+**Attribution:** Decided by Gerard, 2026-09-28. (Confirmed at the human-verify checkpoint.)
+
+**Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03
+
+---
+
+## PCM-D-23 -- pcnr_ Name Construction: h_ Stripping and Truncation Algorithm: RESOLVED
+
+**Decision:** Two rules combine to produce the final pcnr_ name for every KEEP-role column.
+
+RULE A -- h_ stripping:
+  KEEP-role columns beginning with h_ have the h_ prefix removed before pcnr_ is prepended.
+  The corresponding raw column (without h_) is assigned role = DROP.
+  The h_strip column in pcnr_name_map.csv records Y for stripped columns, N otherwise.
+
+RULE B -- Truncation algorithm (PCM-D-23):
+  Let name = source name after any h_ strip.
+  1. If length("pcnr_" || name) <= 32: no truncation needed.
+  2. Otherwise (middle-truncate with final-token preservation):
+     a. final_token = substring of name after the last underscore.
+     b. If final_token is empty (name ends with _) or length(final_token) > 12: go to step 3.
+     c. head_budget = 32 - 5 - 1 - length(final_token)   (5 for "pcnr_", 1 for separator "_")
+     d. head = substr(name, 1, head_budget)
+     e. Strip any trailing _ from head (avoids double-underscore and empty-token joins).
+     f. final_name = "pcnr_" || head || "_" || final_token
+  3. Fallback (step 2b triggered): plain tail truncation -- final_name = substr("pcnr_" || name, 1, 32)
+
+Confirmed 10-name truncation table (verified at the Task 1 checkpoint):
+  rt_BLOCK_START_TO_BLOCK_END_mins          -> pcnr_rt_BLOCK_START_TO_BLOC_mins
+  Total_Norepinephrine_Bitartrate_          -> pcnr_Total_Norepinephrine_Bitart
+  (additional names per qc/23_pcnr_name_map_DRAFT.csv; all 10 verified at checkpoint)
+
+REQUIREMENTS.md phrasing (open-decisions table): "Shortening rule for names over 27
+characters -- deterministic abbreviation list, human-approved in the name map; no silent
+truncation." Resolved to the middle-truncate algorithm above; all proposed names visible
+in docs/pcnr_name_map.csv for human confirmation; override_name available for any row.
+
+**Attribution:** Decided by Gerard, 2026-09-28. (Algorithm confirmed at the human-verify
+checkpoint before the name-map draft was generated.)
+
+**Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03
+
+---
+
+## PCM-D-24 -- Numeric Sentinel Approval Gate: RESOLVED
+
+**Decision:** No numeric sentinel value is recoded to missing by default. The sentinel
+scan (PCNR-02) reports counts only. A numeric value is recoded only if PCM-D-24
+explicitly approves it for a specific variable by setting action = MISSING in
+docs/sentinel_decisions.csv for that (variable, raw_hex) row.
+
+Numeric wildcards are not allowed (var_type = num rows cannot use variable = *). Each
+numeric recode must be approved per variable, with evidence from the PCNR-02 report.
+The default pre-filled action in the draft is KEEP; the human changes to MISSING only
+where Phase 23 evidence supports recoding.
+
+This gives Phase 24 a machine-readable source for any approved numeric recodes rather
+than requiring it to parse DECISIONS.md prose.
+
+At the time of the Phase 23 human-verify checkpoint, Gerard confirmed that no numeric
+candidate in the PCNR-02 report was approved for recoding; all numeric rows retain
+action = KEEP in docs/sentinel_decisions.csv.
+
+REQUIREMENTS.md phrasing (open-decisions table): "Are numeric sentinels in scope? -- Only
+per-variable, with evidence from PCNR-02; none by default." Consistent with this decision.
+
+**Attribution:** Decided by Gerard, 2026-09-28. (Confirmed at the human-verify checkpoint.
+REQUIREMENTS.md notes analytic-facing decisions go to Price; this decision defaults to KEEP
+for all numeric candidates and defers any future approval to the per-variable row mechanism.
+No Price review required for the default KEEP position.)
+
+**Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03
+
+---
+
+## PCM-D-25 -- Ambiguous-Value Column Scope: CONFLICT -- NOT YET RESOLVED
+
+**Status: CONFLICT -- see note below. Do NOT use this ID until the conflict is resolved.**
+
+CONTEXT.md (Phase 23) assigns PCM-D-25 to:
+  "Ambiguous-value column scope -- the hardcoded demographic and count/score column lists
+  (UNKNOWN in demographic columns is AMBIGUOUS; 0 in score/count columns is AMBIGUOUS)."
+
+REQUIREMENTS.md and STATE.md open-decisions table both assign PCM-D-25 to:
+  "Preserve the reason when Declined/Refused/Not applicable are set to missing?
+  (No companion columns in v2.1; qc/24_pcnr_recode_counts.csv keeps the per-value record.
+  Revisit if an analysis needs informative missingness.)"
+
+These are genuinely different questions. Per the D-number reconciliation rule in 23-03-PLAN.md,
+this entry is left unwritten until a human resolves which meaning holds for PCM-D-25 and
+which meaning (if any) receives a new ID.
+
+**Needed from human:**
+  Option A: PCM-D-25 = column scope (CONTEXT.md meaning); companion-column question gets PCM-D-26.
+            (PCM-D-26 is already used by REQUIREMENTS.md for "program 17 input redirect".)
+  Option B: PCM-D-25 = companion-column question (REQUIREMENTS.md meaning); column scope gets PCM-D-26.
+            (Same PCM-D-26 conflict noted.)
+  Option C: Reassign one question to a new ID (PCM-D-27 or higher) to avoid displacing either.
+
+Until resolved: the column scope decision (AMBIGUOUS classification for demographic UNKNOWN and
+score 0) is in effect in program 23 as implemented (hardcoded demog_cols and score_cols lists
+confirmed at the checkpoint), but it lacks an attributed DECISIONS.md entry.
+
+**Resolved:** PENDING -- human decision required before Phase 24 starts.
+
+---
+
+### PCM-T-16 -- Never PROC IMPORT a Gate File
+
+**Rule:** Do NOT use PROC IMPORT to read docs/sentinel_decisions.csv or docs/pcnr_name_map.csv
+(or any gate file keyed on raw_hex values).
+
+**Reason:** PROC IMPORT mis-types hex strings that look numeric -- column values like 30, 39,
+09 are read as integers instead of character strings. This breaks every key lookup in
+sentinel_decisions.csv and pcnr_name_map.csv, since the gate uses (variable, raw_hex) as its
+matching key.
+
+**Correct approach:** Read gate files with a DATA step infile statement using explicit $ informats
+for every column:
+
+  data work.decisions;
+    infile "docs/sentinel_decisions.csv" dsd firstobs=2 truncover;
+    input variable $ raw_value $ raw_hex $ ... ;
+  run;
+
+This trap applies to all future programs that consume gate files produced by program 23.
+Added alongside PCM-T-14 (no bare $hex.) and PCM-T-15.
+
+**Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03

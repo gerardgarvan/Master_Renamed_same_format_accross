@@ -37,7 +37,7 @@ existing SAS programs, committed QC outputs)
 - Candidates: `-999, -99, -9, 99, 999, 777, 888, 9999, 99999`; IS NOT MISSING guard on every scan
 - Numeric candidates go into `sentinel_decisions.csv` with `var_type = num`
 - Default pre-filled `action = KEEP`; changed to `MISSING` only when PCM-D-24 approves per-variable
-- Numeric keying: `raw_hex = put(strip(put(x, best32.)), $hex.)` — hex of the text string
+- Numeric keying: `raw_hex = %hexkey(strip(put(x, best32.)))` — hex of the text string
 - Wildcards NOT allowed for `var_type = num`
 
 **D-04: `sentinel_decisions.csv` Schema (locked)**
@@ -605,6 +605,7 @@ Must show only the `concept_decisions.csv` read with no `file=`, `outfile=`, `fi
      (length 60), `Admit_Source` (length 28-40), `Dischg_Disposition` (length 28-43),
      `Anesthesia_Type` (length 33). Planner should propose this as the exclusion list rather than
      the length heuristic, so the scope is explicit and auditable in the program header.
+   - **Resolved:** freetext_cols = Base_Procedure_1 only (locked per plan). Length-50 heuristic rejected.
 
 3. **`UNKNOWN` wildcard dual-class problem**
    - What we know: `UNKNOWN` is AUTO for non-demographic columns but AMBIGUOUS for demographic columns

@@ -4,6 +4,7 @@
 **Status:** Ready for planning
 **Revised:** 2026-09-28 (11 corrections before planning — gate logic, keying, schema, name map rules, D-number assignments)
 **Revised:** 2026-09-28 (8 further corrections — draft/docs split, hex-key PROC IMPORT trap, wildcard/AMBIGUOUS wording, numeric keying, control-char tokens, truncation algorithm, gate placement, DROP scoping)
+**Revised:** 2026-09-28 (6 final corrections — overwrite guard removed, gate scan source defined with fingerprint, git/PHI clarified, role source disambiguation, numeric wildcard aborts, id_flag split from collision_flag)
 
 <domain>
 ## Phase Boundary
@@ -113,8 +114,11 @@ decided_by, decided_date
 - **`non_ascii_flag`:** set when the raw value contains bytes outside `'20'x`–`'7E'x`. The
   hex representation is still written to `raw_hex`; `raw_value` may be blank or best-effort.
   `candidate_class` is unchanged — `non_ascii_flag` is a separate boolean column.
-- **`role` column:** carried into `sentinel_decisions.csv` from the name map draft. DROP rows
-  need no decision (those columns never reach `g.pcnr_harmonized`); the gate skips them.
+- **`role` column:** present in `sentinel_decisions.csv` as a display-only convenience column
+  carried from the candidates CSV. The gate reads `role` exclusively from `docs/pcnr_name_map.csv`
+  (the human-confirmed version) and ignores any `role` column in the decisions file. This prevents
+  the two sources from disagreeing silently. DROP rows in the decisions file are skipped by the
+  gate based on the name map's `role`, not the decisions file's.
 - **`action` values:** `MISSING` or `KEEP` only. No RECODE — value remapping is harmonization
   and 10b already handles it.
 - **`variable = *` wildcard rows:** A `*` row matches on `normalized_value` across all KEEP/KEY
@@ -131,6 +135,10 @@ decided_by, decided_date
     (stale per-variable decision).
   - Abort if any wildcard row's `normalized_value` appears in no KEEP/KEY column's scan
     (stale wildcard — a `*` row matching zero columns always fails this check).
+  - Abort if any wildcard row has `var_type = num` (numeric approvals must be per-variable).
+  - Abort if any wildcard row lacks `var_type = char` (every wildcard row must be explicitly typed).
+  - Abort if any wildcard row's `normalized_value` matches only numeric candidates in the scan
+    (wildcard resolving a numeric candidate by its text representation bypasses PCM-D-24).
 - **Gate placement:** the gate check runs at the top of program 24, in a `%pcnr_gate_check`
   macro. Program 23 never runs the gate — it only generates drafts. This ensures the files
   are re-validated at the point of use, after any human edits to the `docs/` copies.
@@ -140,7 +148,7 @@ decided_by, decided_date
 
 ```
 source_name, source_label, role, h_strip, proposed_name, override_name, final_name,
-name_len, collision_flag
+name_len, collision_flag, id_flag
 ```
 
 - **`role` values:** `KEY`, `KEEP`, or `DROP`.
@@ -176,10 +184,11 @@ name_len, collision_flag
   - No final name collides with a KEY name
   - Every source column appears exactly once in the map (completeness check)
   - DROP rows have a blank `final_name`
-- **ID-outside-KEY flag:** `collision_flag` is also set (or a separate `id_flag` column added)
-  for any KEEP row whose source name matches `*_ID`, `*STUDY_ID*`, or `ENCRYPTED_*` and is not
-  on the KEY list. Surfaces accidental omissions like `PRECEDE_Study_ID_1` before it gets a
-  `pcnr_` prefix.
+- **`collision_flag`:** set when `final_name` matches another row case-insensitively. Means only collision.
+- **`id_flag`:** separate column; set for any KEEP row whose source name matches `*_ID`,
+  `*STUDY_ID*`, or `ENCRYPTED_*` and is not on the KEY list. Surfaces accidental omissions like
+  `PRECEDE_Study_ID_1` before it gets a `pcnr_` prefix. Keeping it separate means validation
+  logic for collision and for ID leakage is independently readable and testable.
 - **Original name preserved as variable label** in the built dataset for traceability.
 
 ### D-06: Single PCNR_APPROVED Gate and Draft/Docs Split
@@ -188,19 +197,62 @@ name_len, collision_flag
 - `qc/23_sentinel_decisions_DRAFT.csv`
 - `qc/23_pcnr_name_map_DRAFT.csv`
 
-Program 23 must **never write to `docs/`** and should abort if `docs/sentinel_decisions.csv`
-or `docs/pcnr_name_map.csv` already exist and `PCNR_APPROVED = 1` (guard against overwriting
-human edits on rerun). The human copies drafts to `docs/` and edits them there. From that
-point, the `docs/` files are human-owned.
+Program 23 must **never write to `docs/`**. No runtime guard for this — the protection is
+structural: program 23 simply has no `file=` or `outfile=` statement pointing at `docs/`.
+The plan's acceptance criteria must include a static check: `grep -n "file=" sas/23_pcnr_inventory.sas`
+must show no `docs/` paths. A runtime abort guard is not needed and would block every full
+pipeline run after `PCNR_APPROVED = 1` is set.
+
+The human copies drafts to `docs/` and edits them there. From that point, the `docs/` files
+are human-owned.
 
 **Gate placement:** `%pcnr_gate_check` macro runs at the top of program 24. Program 23 does
-not run the gate. This means:
+not run the gate. Program 24's session has no access to program 23's WORK data, so the gate
+reads `qc/23_sentinel_candidates.csv` from disk using a DATA step `infile` with explicit `$`
+informats per PCM-T-16. This is the authoritative candidate list for coverage and stale checks.
+
+**Fingerprint:** Program 23 writes a one-line `qc/23_sentinel_fingerprint.txt` alongside the
+candidates CSV: source nobs, nvars, and run timestamp of `g.master_data_harmonized` (read
+from SASHELP.VTABLE or PROC CONTENTS). The gate aborts if the current `g.master_data_harmonized`
+nobs or nvars does not match the fingerprint. This prevents a stale candidates file from a
+prior run passing validation silently.
+
+Other gate behaviors:
 - Program 23 can be rerun freely to refresh drafts after source data changes.
-- The stale-decision check surfaces any drift between refreshed drafts and the human-edited
-  `docs/` files (since the gate re-reads `docs/` at program 24 runtime).
+- The stale-decision check surfaces drift between refreshed drafts and the human-edited
+  `docs/` files (gate re-reads `docs/` at program 24 runtime).
 
 **Gate flag:** `PCNR_APPROVED` in `00_config.sas`, default 0. Pattern: same as `D15_APPROVED`.
 One flag covers both files; two flags create a partial-approval state with no valid use.
+
+### D-09: Git Tracking and PHI Containment for Gate Files
+
+**`.gitignore` has `*.csv` globally.** The gate files (`docs/sentinel_decisions.csv`,
+`docs/pcnr_name_map.csv`) must be committed with `git add -f` — the same mechanism used
+for `docs/concept_decisions.csv`, which is already tracked despite the global rule. The
+plan must include explicit `git add -f` steps for both files.
+
+**`qc/` CSV drafts must NOT be committed.** `qc/23_sentinel_decisions_DRAFT.csv` and
+`qc/23_pcnr_name_map_DRAFT.csv` live on P: drive and stay there. They are already excluded
+by `*.csv` in `.gitignore` and must not be force-added.
+
+**`qc/23_sentinel_candidates.csv` must NOT be committed.** REVIEW rows from free-text columns
+(procedure descriptions, notes fields) may contain patient text verbatim in `raw_value` and
+`raw_hex`. This file lives on P: only.
+
+**PHI mitigation for committed `docs/sentinel_decisions.csv`:** Restrict the contains rule
+(which generates REVIEW rows) to columns where free text is plausible. Either:
+- Exclude columns with SAS length > 50 from the contains rule (procedure/notes fields tend
+  to be long), or
+- Hardcode an exclusion list of known free-text columns in the program header.
+In either case, long-text columns are still swept by the exact-match AUTO rule (exact sentinel
+hits are short strings and safe to commit); only the contains sweep is restricted.
+Planner should propose the exclusion approach based on `qc/03_contents_all.txt` column lengths.
+
+**Canonical refs confirmed:**
+- `docs/concept_decisions.csv` — tracked in git (force-added before `*.csv` rule; confirmed via `git ls-files`)
+- `qc/03_contents_all.txt` — tracked in git (confirmed via `git ls-files`); planner can read it
+- `docs/DATA_DICTIONARY.xlsx` — NOT tracked (`*.xlsx` ignored, lives on P: only); do not reference as a readable file in plans
 
 ### PCM-T-16: Never PROC IMPORT a Gate File
 
@@ -266,8 +318,8 @@ the skip reason is visible to reviewers.
 - `docs/concept_decisions_TEMPLATE.csv` — blank template showing expected headers
 
 ### Column inventory (for proposing PCM-D-25 lists without running PROC CONTENTS against P:)
-- `qc/03_contents_all.txt` — committed PROC CONTENTS export; planner uses this to propose demographic and count/score column lists
-- `docs/DATA_DICTIONARY.xlsx` — 175-variable dictionary; alternate source for column names and labels
+- `qc/03_contents_all.txt` — committed PROC CONTENTS export; planner uses this to propose demographic and count/score column lists, and to find names > 27 characters for truncation examples
+- `docs/DATA_DICTIONARY.xlsx` — NOT tracked in git (`*.xlsx` ignored; lives on P: only); do not reference as a readable file in plans
 
 ### Source dataset
 - `g.master_data_harmonized` — 41,150 rows, 175 columns (read-only; PCM-T-02 forbids writing to it)
@@ -312,7 +364,7 @@ No external specs — requirements fully captured in decisions above and REQUIRE
 - **DROP proposal from concept_decisions.csv:** program reads `docs/concept_decisions.csv`, extracts `varname` → `harmonized_name` pairs where `harmonized_name` starts with `h_`, and proposes `role = DROP` for those raw columns in the name map draft. Gerard confirms rather than hunts.
 - **PCM-D-23 truncation example:** planner should extract a real name > 27 characters from `qc/03_contents_all.txt` and show the algorithm's output for that name in the plan. The `pcnr_Long_Variable_Name_DATE` example used in discussion was 28 characters and would not trigger truncation — it is not a valid illustration.
 - **PCM-D-25 column lists:** planner proposes from `qc/03_contents_all.txt` or `docs/DATA_DICTIONARY.xlsx` (both committed). Gerard confirms before gate is set.
-- **Draft/docs workflow:** program 23 → writes `qc/*_DRAFT.csv` → human copies to `docs/` and edits → program 24 gate re-reads `docs/` files. Program 23 aborts if `docs/sentinel_decisions.csv` exists and `PCNR_APPROVED = 1`.
+- **Draft/docs workflow:** program 23 → writes `qc/*_DRAFT.csv` + `qc/23_sentinel_fingerprint.txt` → human copies drafts to `docs/` and edits → `git add -f docs/sentinel_decisions.csv docs/pcnr_name_map.csv` → program 24 gate reads `docs/` files + fingerprint at runtime. No runtime guard in program 23; protection is structural (no `file=docs/` in program 23).
 
 </specifics>
 

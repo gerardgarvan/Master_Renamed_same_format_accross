@@ -682,8 +682,7 @@ Known artifacts included explicitly: the 2-byte encounter placeholder and litera
 listed even though already known, so sentinel_decisions.csv covers them on the record.
 
 Numeric candidates (-999, -99, -9, 99, 999, 777, 888, 9999, 99999) are always candidate_class
-= REVIEW, never AUTO. Numeric 0 in score columns is AMBIGUOUS (PCM-D-25 scope pending
-resolution; see PCM-D-25 conflict note).
+= REVIEW, never AUTO. Numeric 0 in score columns is AMBIGUOUS (PCM-D-27 scope; confirmed by Gerard 2026-09-28).
 
 **Attribution:** Decided by Gerard, 2026-09-28. (D-21 does not require Price review; it
 governs the matching rules used in program 23, confirmed at the human-verify checkpoint.)
@@ -783,35 +782,54 @@ No Price review required for the default KEEP position.)
 
 ---
 
-## PCM-D-25 -- Ambiguous-Value Column Scope: CONFLICT -- NOT YET RESOLVED
+## PCM-D-25 -- Declined/Refused Companion-Column Reason Preservation
 
-**Status: CONFLICT -- see note below. Do NOT use this ID until the conflict is resolved.**
+**Date:** 2026-09-28
+**Decided by:** Gerard
+**Status:** RESOLVED
 
-CONTEXT.md (Phase 23) assigns PCM-D-25 to:
-  "Ambiguous-value column scope -- the hardcoded demographic and count/score column lists
-  (UNKNOWN in demographic columns is AMBIGUOUS; 0 in score/count columns is AMBIGUOUS)."
+**Question:** When a value such as "Declined", "Refused", or "Not applicable" is set to MISSING
+in g.pcnr_harmonized, should a companion column preserve the original reason code?
 
-REQUIREMENTS.md and STATE.md open-decisions table both assign PCM-D-25 to:
-  "Preserve the reason when Declined/Refused/Not applicable are set to missing?
-  (No companion columns in v2.1; qc/24_pcnr_recode_counts.csv keeps the per-value record.
-  Revisit if an analysis needs informative missingness.)"
+**Decision:** No companion reason column in v2.1. The dataset does not include a paired
+reason-code field for these values. Values classified AMBIGUOUS (Declined, Refused, Not
+applicable, etc.) become MISSING per the action column in docs/sentinel_decisions.csv.
+If a future milestone adds reason codes, this decision should be revisited.
 
-These are genuinely different questions. Per the D-number reconciliation rule in 23-03-PLAN.md,
-this entry is left unwritten until a human resolves which meaning holds for PCM-D-25 and
-which meaning (if any) receives a new ID.
+**Traceability:** PCNR-06 (sentinel decisions gate); docs/sentinel_decisions.csv (action column).
 
-**Needed from human:**
-  Option A: PCM-D-25 = column scope (CONTEXT.md meaning); companion-column question gets PCM-D-26.
-            (PCM-D-26 is already used by REQUIREMENTS.md for "program 17 input redirect".)
-  Option B: PCM-D-25 = companion-column question (REQUIREMENTS.md meaning); column scope gets PCM-D-26.
-            (Same PCM-D-26 conflict noted.)
-  Option C: Reassign one question to a new ID (PCM-D-27 or higher) to avoid displacing either.
+---
 
-Until resolved: the column scope decision (AMBIGUOUS classification for demographic UNKNOWN and
-score 0) is in effect in program 23 as implemented (hardcoded demog_cols and score_cols lists
-confirmed at the checkpoint), but it lacks an attributed DECISIONS.md entry.
+## PCM-D-27 -- Ambiguous-Value Column Scope
 
-**Resolved:** PENDING -- human decision required before Phase 24 starts.
+**Date:** 2026-09-28
+**Decided by:** Gerard
+**Status:** RESOLVED
+
+**Question:** Which columns receive special AMBIGUOUS treatment for values that are ambiguous
+in context (e.g., UNKNOWN in demographic columns, 0 in score/count columns)?
+
+**Decision:** Two hardcoded lists, confirmed at Phase 23 checkpoint:
+
+Demographic columns (UNKNOWN treated AMBIGUOUS, not AUTO):
+  Race, Ethnicity, Sex, Marital_Status, Education, EmployeeStatus, Patient_Type, Payer
+  (h_* survivors used in place of raw names where applicable)
+
+Score/count columns (numeric 0 treated AMBIGUOUS):
+  Feels_Exausted_Value, Low_Physical_Activity_Value, Slow_Walking_Speed_Value,
+  Unintended_Weight_Loss_Value, Week_Grip_Strength_Value, Braden_Activity,
+  Braden_Mobility, Braden_Sensory_Perception, Charlson_Comorbidity_Index,
+  Cognitive_Score, Frailty_Score, COMP10_T80..T88, complication_sum,
+  ABP_LESS_THAN_60_COUNT, ABP_LESS_THAN_70_COUNT, ABP_LESS_THAN_80_COUNT,
+  BIS_INDEX_LESS_30_COUNT, BIS_INDEX_LESS_40_COUNT, NIBP_LESS_60_COUNT,
+  NIBP_LESS_70_COUNT, NIBP_LESS_80_COUNT
+
+These lists are hardcoded in the sas/23_pcnr_inventory.sas program header (%let demog_cols,
+%let score_cols). Changes require a new phase-level decision.
+
+**Traceability:** PCNR-03 (ambiguous classification); sas/23_pcnr_inventory.sas SECTION 4.
+Note: previously referenced as PCM-D-25 in Phase 23 planning artifacts; renumbered to PCM-D-27
+because PCM-D-25 was already assigned to the companion-column question in REQUIREMENTS.md.
 
 ---
 

@@ -174,7 +174,8 @@ PCM-D-17 and PCM-D-18 resolved 2026-09-23 (see PROJECT.md Key Decisions).
 - **PCM-D-22** -- prefix scope (all non-key columns vs recoded-only) and which key columns stay unprefixed. Before Phase 23 name map.
 - **PCM-D-23** -- shortening rule for names over 27 characters. Before Phase 23 name map.
 - **PCM-D-24** -- whether any numeric sentinels are recoded. Before Phase 24.
-- **PCM-D-25** -- whether reason codes (Declined/Refused/Not applicable) are preserved. Before Phase 24.
+- **PCM-D-25** -- whether reason codes (Declined/Refused/Not applicable) are preserved. RESOLVED 2026-09-28: no companion columns in v2.1; values become MISSING per sentinel_decisions.csv. (Gerard)
+- **PCM-D-27** -- ambiguous-value column scope (demographic + score/count lists). RESOLVED 2026-09-28: lists hardcoded in sas/23_pcnr_inventory.sas header; confirmed at Phase 23 checkpoint. (Gerard)
 - **PCM-D-26** -- program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort. Before Phase 25.
 
 ### Pending Todos

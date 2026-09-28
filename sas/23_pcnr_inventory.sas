@@ -48,7 +48,7 @@ options mprint nofmterr nodate nonumber ps=max ls=200;
 
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
 
-/* ---- Column lists (PCM-D-25) -- hardcoded in program header -----------
+/* ---- Column lists (PCM-D-27) -- hardcoded in program header -----------
    If a raw name is absent from g.master_data_harmonized but its h_ survivor
    is present, the POST-h_-STRIP RULE (review item 5) substitutes h_name.
    Resolution happens in SECTION 2 via dictionary.columns lookup.

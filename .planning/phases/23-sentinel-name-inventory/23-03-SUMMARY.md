@@ -20,7 +20,8 @@ decisions:
   - "PCM-D-23 h_-strip + middle-truncate algorithm with 10-name table confirmed; Gerard, 2026-09-28"
   - "PCM-D-24 numeric gate defaults to KEEP; no approvals at checkpoint; Gerard, 2026-09-28"
   - "PCM-T-16 trap added: never PROC IMPORT a gate file -- use DATA step infile with explicit $ informats"
-  - "PCM-D-25 CONFLICT SURFACED: REQUIREMENTS.md+STATE.md assign to companion-column question; CONTEXT.md assigns to column-scope question; entry intentionally not written; human resolution required before Phase 24"
+  - "PCM-D-25 RESOLVED 2026-09-28: companion-column (reason-preservation) question; no companion columns in v2.1; Declined/Refused/Not applicable become MISSING per sentinel_decisions.csv"
+  - "PCM-D-27 RESOLVED 2026-09-28: column-scope (demographic + count/score lists for AMBIGUOUS treatment); Gerard, 2026-09-28; renumbered from planning-artifact D-25 to avoid conflict with REQUIREMENTS.md"
 metrics:
   duration: "~10 minutes"
   completed: "2026-09-28"
@@ -87,14 +88,15 @@ PCM-D-21 through PCM-D-24 and PCM-T-16 appended to docs/DECISIONS.md with Gerard
   (30, 39, 09) as integers, breaking key lookups
 - Added alongside PCM-T-14 and PCM-T-15
 
-**PCM-D-25 -- Conflict placeholder written in DECISIONS.md (not a decision entry)**
-- REQUIREMENTS.md + STATE.md: PCM-D-25 = "Preserve reason when Declined/Refused/Not
-  applicable set to missing?" (companion-column question)
-- CONTEXT.md: PCM-D-25 = "Ambiguous-value column scope -- hardcoded demographic +
-  count/score column lists"
-- Per plan conflict rule: entry NOT written; conflict documented with three resolution options
-- Column-scope behavior IS in effect in program 23 as implemented; it just lacks an
-  attributed DECISIONS.md entry until the ID is resolved
+**PCM-D-25 -- Declined/Refused Companion-Column Reason Preservation: RESOLVED**
+- Decision: No companion reason column in v2.1; values become MISSING per sentinel_decisions.csv
+- Gerard, 2026-09-28
+- Conflict with CONTEXT.md planning ID now resolved: column-scope question reassigned PCM-D-27
+
+**PCM-D-27 -- Ambiguous-Value Column Scope: RESOLVED**
+- Decision: Two hardcoded lists (demographic + score/count) confirmed at Phase 23 checkpoint
+- Gerard, 2026-09-28; renumbered from PCM-D-25 as used in Phase 23 planning artifacts
+- Lists hardcoded in sas/23_pcnr_inventory.sas header (%let demog_cols, %let score_cols)
 
 ---
 
@@ -106,29 +108,26 @@ PCM-D-21 through PCM-D-24 and PCM-T-16 appended to docs/DECISIONS.md with Gerard
 | PCM-D-22 | Absent | Same question (prefix scope / key columns) | KEY columns unprefixed | Same question, different wording -- WRITTEN |
 | PCM-D-23 | Absent | Same question (shortening rule) | h_-strip + truncation | Same question, different wording -- WRITTEN |
 | PCM-D-24 | Absent | Same question (numeric sentinels in scope) | Numeric approval gate | Same question, different wording -- WRITTEN |
-| PCM-D-25 | Absent | Companion-column question (Declined/Refused) | Column scope (demog + score lists) | DIFFERENT QUESTION -- NOT WRITTEN; conflict surfaced |
+| PCM-D-25 | Written | Companion-column question (Declined/Refused) | (planning artifact; D-25=companion per REQUIREMENTS.md) | RESOLVED 2026-09-28; Gerard |
+| PCM-D-27 | Written | N/A (new ID) | Column scope (demog + score lists) | RESOLVED 2026-09-28; Gerard; renumbered from planning D-25 |
 
 ---
 
 ## Deviations from Plan
 
-### PCM-D-25 Not Written (Plan Rule Applied -- Not a Deviation)
+### PCM-D-25 / PCM-D-27 Conflict Resolved (2026-09-28 -- Gerard)
 
-The plan explicitly states: "DIFFERENT question under the same ID -> STOP and surface the
-conflict for human resolution; do not write either entry."
+Option B selected: PCM-D-25 = companion-column question (REQUIREMENTS.md meaning, now RESOLVED
+as "no companion columns in v2.1"); PCM-D-27 = column-scope question (hardcoded demographic +
+score/count lists, RESOLVED and in effect in program 23).
 
-PCM-D-25 in REQUIREMENTS.md and STATE.md is the companion-column (reason-preservation)
-question. PCM-D-25 in CONTEXT.md is the ambiguous-value column-scope question. These are
-different questions. Per the plan's conflict rule, no PCM-D-25 entry was written.
+PCM-D-26 was already taken (program 17 input redirect in REQUIREMENTS.md), so column-scope
+was assigned PCM-D-27. DECISIONS.md conflict placeholder replaced with two proper entries.
+Phase 23 planning artifacts (CONTEXT.md, RESEARCH.md, 23-01-PLAN.md) updated to reference
+PCM-D-27 for column scope. REQUIREMENTS.md and STATE.md retain PCM-D-25 = companion-column.
 
-A placeholder section was added to DECISIONS.md with the conflict documented and three
-resolution options provided for human review.
-
-**Impact on Phase 24:** Phase 24 reads docs/sentinel_decisions.csv and docs/pcnr_name_map.csv.
-The column-scope behavior (AMBIGUOUS for demographic UNKNOWN and score 0) is implemented in
-program 23 and present in the candidates CSV. The absence of a DECISIONS.md entry for the
-column-scope decision does not block Phase 24 execution, but the PCM-D-25 ID conflict should
-be resolved before PCNR_APPROVED is flipped to 1.
+**Impact on Phase 24:** No block. Column-scope behavior (AMBIGUOUS for demographic UNKNOWN
+and score 0) was already implemented in program 23. Both IDs are now attributed in DECISIONS.md.
 
 ---
 

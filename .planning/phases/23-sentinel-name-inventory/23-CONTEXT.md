@@ -21,7 +21,7 @@ Deliverables:
 - `qc/23_pcnr_name_map_DRAFT.csv` — program-generated draft; human copies to `docs/` to create the authoritative gate file
 - `docs/sentinel_decisions.csv` — human-owned; never written by program 23
 - `docs/pcnr_name_map.csv` — human-owned; never written by program 23
-- PCM-D-21 through PCM-D-25 resolved and attributed in `docs/DECISIONS.md`
+- PCM-D-21 through PCM-D-25 and PCM-D-27 resolved and attributed in `docs/DECISIONS.md`
 
 No values are changed in this phase. The single `PCNR_APPROVED` gate (default 0 in `00_config.sas`) covers both files; Phase 24 cannot run until both are complete and the gate flips.
 
@@ -295,12 +295,12 @@ To give the planner unambiguous targets for DECISIONS.md entries:
 - **PCM-D-22:** Key columns that stay unprefixed (`pecan_ID`, `PRECEDE_STUDY_ID`, `ENCRYPTED_MRN`, `ENCRYPTED_ENCOUNTER`) — already implicit from v2.0; record it explicitly
 - **PCM-D-23:** `pcnr_` name construction rule: `h_` stripping (Y/N) and truncation algorithm (middle-truncate, preserve final token) — checkpoint before name map is generated
 - **PCM-D-24:** Numeric sentinel approval gate — any numeric `MISSING` action approved per-variable here; default is `KEEP`
-- **PCM-D-25:** Ambiguous-value column scope — the hardcoded demographic and count/score column lists; reviewable before gate flips
+- **PCM-D-27:** Ambiguous-value column scope — the hardcoded demographic and count/score column lists; reviewable before gate flips (renumbered from D-25; D-25 = companion-column question per REQUIREMENTS.md)
 
 ### D-07: Proposing Demographic and Count/Score Column Lists
 
 The planner cannot run PROC CONTENTS against P:. The demographic and count/score column lists
-(PCM-D-25) are therefore proposed one of two ways:
+(PCM-D-27) are therefore proposed one of two ways:
 1. **Preferred:** extract candidate column names from `qc/03_contents_all.txt` (committed and
    readable by the planner). The planner reads it and proposes a list; Gerard confirms before
    the gate is set.
@@ -342,7 +342,7 @@ the skip reason is visible to reviewers.
 - `docs/concept_decisions.csv` — columns: concept, varname, value_txt, n_rows, target_value, confirmed, harmonized_name, priority, reviewer, comment
 - `docs/concept_decisions_TEMPLATE.csv` — blank template showing expected headers
 
-### Column inventory (for proposing PCM-D-25 lists without running PROC CONTENTS against P:)
+### Column inventory (for proposing PCM-D-27 lists without running PROC CONTENTS against P:)
 - `qc/03_contents_all.txt` — committed PROC CONTENTS export; planner uses this to propose demographic and count/score column lists, and to find names > 27 characters for truncation examples
 - `docs/DATA_DICTIONARY.xlsx` — NOT tracked in git (`*.xlsx` ignored; lives on P: only); do not reference as a readable file in plans
 
@@ -388,7 +388,7 @@ No external specs — requirements fully captured in decisions above and REQUIRE
 - **Stale wildcard detection:** a `*` row whose `normalized_value` appears in no KEEP/KEY column's scan is stale; gate aborts.
 - **DROP proposal from concept_decisions.csv:** program reads `docs/concept_decisions.csv`, extracts `varname` → `harmonized_name` pairs where `harmonized_name` starts with `h_`, and proposes `role = DROP` for those raw columns in the name map draft. Gerard confirms rather than hunts.
 - **PCM-D-23 truncation example:** planner should extract a real name > 27 characters from `qc/03_contents_all.txt` and show the algorithm's output for that name in the plan. The `pcnr_Long_Variable_Name_DATE` example used in discussion was 28 characters and would not trigger truncation — it is not a valid illustration.
-- **PCM-D-25 column lists:** planner proposes from `qc/03_contents_all.txt` (committed; `docs/DATA_DICTIONARY.xlsx` is not tracked and cannot be read by the planner). Gerard confirms before gate is set.
+- **PCM-D-27 column lists:** planner proposes from `qc/03_contents_all.txt` (committed; `docs/DATA_DICTIONARY.xlsx` is not tracked and cannot be read by the planner). Gerard confirms before gate is set.
 - **Draft/docs workflow:** program 23 → writes `qc/*_DRAFT.csv` + `qc/23_sentinel_fingerprint.txt` → human copies drafts to `docs/` and edits → `git add -f docs/sentinel_decisions.csv docs/pcnr_name_map.csv` → program 24 gate reads `docs/` files + fingerprint at runtime. No runtime guard in program 23; protection is structural (no `file=docs/` in program 23).
 
 </specifics>

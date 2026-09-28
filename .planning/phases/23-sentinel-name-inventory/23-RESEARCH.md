@@ -22,7 +22,7 @@ existing SAS programs, committed QC outputs)
 - Contains matches → REVIEW class only, never AUTO
 - Known artifacts (2-byte encounter placeholder, literal NULL) included explicitly
 
-**D-02 / PCM-D-25: Ambiguous Value List**
+**D-02 / PCM-D-27: Ambiguous Value List**
 - AMBIGUOUS class — per-variable decision required; wildcards may NOT resolve AMBIGUOUS candidates
 - Base list: `None`, `Not applicable`, `Declined`, `Refused`, `Other`
 - Additional: `NOT ASSESSED`, `NOT PERFORMED`, `PENDING`, `UNABLE TO OBTAIN`,
@@ -84,7 +84,7 @@ name_len, collision_flag, id_flag
 - Gate (`%pcnr_gate_check`) runs at top of program 24; reads `qc/23_sentinel_candidates.csv`
   from disk with DATA step infile (PCM-T-16); aborts if fingerprint mismatches
 
-**D-07: PCM-D-25 Column Lists — Proposed from `qc/03_contents_all.txt`**
+**D-07: PCM-D-27 Column Lists — Proposed from `qc/03_contents_all.txt`**
 - Planner proposes demographic and count/score lists from the committed contents export
 - Final lists hardcoded in program header and echoed into `23_sentinel_candidates.csv` as `column_group`
 
@@ -161,7 +161,7 @@ This phase is pure SAS 9.4M8 against existing pipeline patterns. No new librarie
 
 ```
 sas/23_pcnr_inventory.sas
-  HEADER: hardcoded demographic + count/score column lists (PCM-D-25)
+  HEADER: hardcoded demographic + count/score column lists (PCM-D-27)
   SECTION 0: Preconditions
     - %include 00_config.sas
     - (No PCNR_APPROVED check: program 23 runs at any gate value and only writes drafts)
@@ -313,10 +313,10 @@ run;
 
 ---
 
-## PCM-D-25 Column Lists — Proposed from `qc/03_contents_all.txt`
+## PCM-D-27 Column Lists — Proposed from `qc/03_contents_all.txt`
 
 The planner has read the committed contents export. The following lists are proposed for
-Gerard's confirmation at the PCM-D-25 checkpoint.
+Gerard's confirmation at the PCM-D-27 checkpoint.
 
 ### Proposed Demographic Columns
 These are columns where `UNKNOWN` should be treated as AMBIGUOUS (not AUTO):
@@ -372,7 +372,7 @@ placeholder sentinel.
 Note: `ASA__Anesth_Record_` is numeric in most sources and not on the count list, though
 a 0 there would be clinically implausible — the planner recommends Gerard consider adding it.
 
-**Confirm at PCM-D-25 checkpoint before the gate flips.**
+**Confirm at PCM-D-27 checkpoint before the gate flips.**
 
 ---
 
@@ -630,7 +630,7 @@ Must show only the `concept_decisions.csv` read with no `file=`, `outfile=`, `fi
 **Confidence breakdown:**
 - Standard stack: HIGH — all patterns from existing committed programs
 - Architecture: HIGH — program structure derived directly from locked CONTEXT.md decisions
-- PCM-D-25 column lists: MEDIUM — proposed from contents export; Gerard must confirm
+- PCM-D-27 column lists: MEDIUM — proposed from contents export; Gerard must confirm
 - Truncation examples: HIGH — computed from actual variable names in `qc/03_contents_all.txt`
 - Pitfalls: HIGH — each derived from an explicitly named trap in CONTEXT.md or project history
 

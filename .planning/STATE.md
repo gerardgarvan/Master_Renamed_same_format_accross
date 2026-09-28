@@ -104,7 +104,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Within-cohort Frailty | — | **8,150** (58.7%) | verified 2026-09-22 |
 | g.analytic_cohort (harmonized) | — | **13,890 rows, 174 cols** | rebuilt 2026-09-22 from g.master_data_harmonized |
 | pecan_ID distinct count (harmonized) | — | **33,031** | PID-02, 20_pecan_id.log 2026-09-24 |
-| pecan_ID distinct count (cohort) | — | pending | PID-06, needs clean 16b run (Phase 22) |
+| pecan_ID distinct count (cohort) | — | see 16b_pecan_id_counts.txt | PID-06, 16b_pecan_id_counts.txt, Phase 22 run 2026-09-28 (pipeline PASSED; count in P: qc file, not committed) |
 | r7/r8/r9 MRN linkage reach | — | see report | qc/20_linkage_reach.txt |
 | pcnr recoded cells | reported | — | Phase 24 (PCNR-10) |
 | g.pcnr_harmonized | 41,150 rows | — | Phase 24 |
@@ -207,4 +207,4 @@ To resume: read this file, then `.planning/ROADMAP.md`, then `.planning/REQUIREM
 **Do** restart the SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-24 — v2.1 roadmap created; 4 phases (22-25), 22 requirements mapped; ready for `/gsd:plan-phase 22`*
+*Last updated: 2026-09-28 — Phase 22 pipeline green; full run_pipeline.cmd PASSED; scanner operational (pre-existing xlsx-read findings noted as known); Phase 22 complete*

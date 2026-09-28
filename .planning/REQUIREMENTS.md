@@ -21,11 +21,11 @@ at 16b, and the new programs run downstream of 16b.
 
 ### Pipeline Green & Hardening (Phase 22)
 
-- [ ] **FIX-02**: 16b and 20 fixes from 2026-09-24 committed: `%put` semicolon (16b line 443), open-code `%local`/`%if` in 16b SECTION 7 replaced with `%sysfunc(ifc())`, `H_SSDI_DEATH` added to `%measure_h_cols` (loop bound from `countw`), `output; stop;` in the program 20 certutil step. Full `run_pipeline.cmd` run exits clean with `qc/16b_pecan_id_counts.txt` written.
-- [ ] **RUN-02**: `run_pipeline.cmd` warning count matches only log lines that BEGIN with `WARNING` (echoed source lines no longer counted). Verified: 10b reports 0.
-- [ ] **RUN-03**: `SAS_EXE` overridable without editing the committed file (environment variable or `%~dp0config.cmd` include), per the v2.0 retrospective lesson 2.
-- [ ] **INV-07**: `qc/19_raw_inventory.xlsx` formatting: UF blue (#0021A5) headers, KEY sheet leftmost with legend, FAMILIES sheet, sheet order enforced. (Carried from v2.0.)
-- [ ] **DOC-05**: Documentation drift closed: MILESTONES.md v2.0 "One-liner:" placeholders filled; STATE.md pecan_ID metrics populated from the PID-06 run; PROJECT.md trap list gains PCM-T-14 and PCM-T-15.
+- [x] **FIX-02**: 16b and 20 fixes from 2026-09-24 committed: `%put` semicolon (16b line 443), open-code `%local`/`%if` in 16b SECTION 7 replaced with `%sysfunc(ifc())`, `H_SSDI_DEATH` added to `%measure_h_cols` (loop bound from `countw`), `output; stop;` in the program 20 certutil step. Full `run_pipeline.cmd` run exits clean with `qc/16b_pecan_id_counts.txt` written.
+- [x] **RUN-02**: `run_pipeline.cmd` warning count matches only log lines that BEGIN with `WARNING` (echoed source lines no longer counted). Verified: 10b reports 0.
+- [x] **RUN-03**: `SAS_EXE` overridable without editing the committed file (environment variable or `%~dp0config.cmd` include), per the v2.0 retrospective lesson 2.
+- [x] **INV-07**: `qc/19_raw_inventory.xlsx` formatting: UF blue (#0021A5) headers, KEY sheet leftmost with legend, FAMILIES sheet, sheet order enforced. (Carried from v2.0.)
+- [x] **DOC-05**: Documentation drift closed: MILESTONES.md v2.0 "One-liner:" placeholders filled; STATE.md pecan_ID metrics populated from the PID-06 run; PROJECT.md trap list gains PCM-T-14 and PCM-T-15.
 
 ### Sentinel & Name Inventory (Phase 23)
 
@@ -96,11 +96,11 @@ Per project practice, sign-off on analytic-facing decisions (D-21, D-24, D-25) g
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-02 | 22 | Pending |
-| RUN-02 | 22 | Pending |
-| RUN-03 | 22 | Pending |
-| INV-07 | 22 | Pending |
-| DOC-05 | 22 | Pending |
+| FIX-02 | 22 | Complete |
+| RUN-02 | 22 | Complete |
+| RUN-03 | 22 | Complete |
+| INV-07 | 22 | Complete |
+| DOC-05 | 22 | Complete |
 | PCNR-01 | 23 | Pending |
 | PCNR-02 | 23 | Pending |
 | PCNR-03 | 23 | Pending |

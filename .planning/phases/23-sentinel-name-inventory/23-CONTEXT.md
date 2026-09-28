@@ -3,6 +3,7 @@
 **Gathered:** 2026-09-28
 **Status:** Ready for planning
 **Revised:** 2026-09-28 (11 corrections before planning — gate logic, keying, schema, name map rules, D-number assignments)
+**Revised:** 2026-09-28 (8 further corrections — draft/docs split, hex-key PROC IMPORT trap, wildcard/AMBIGUOUS wording, numeric keying, control-char tokens, truncation algorithm, gate placement, DROP scoping)
 
 <domain>
 ## Phase Boundary
@@ -12,10 +13,12 @@ Enumerate every candidate placeholder value and every column name that cannot ac
 Program `sas/23_pcnr_inventory.sas` reads `g.master_data_harmonized` read-only.
 
 Deliverables:
-- `qc/23_sentinel_candidates.csv` — every character column swept; `candidate_class` column (AUTO / REVIEW / AMBIGUOUS); sorted AMBIGUOUS first, then REVIEW, then AUTO
+- `qc/23_sentinel_candidates.csv` — every character column swept; `candidate_class` column (AUTO / REVIEW / AMBIGUOUS); `role` column (KEEP/KEY/DROP) carried through; sorted AMBIGUOUS first, then REVIEW, then AUTO; DROP rows need no decision
 - `qc/23_case_variants.csv` — case and whitespace variant report (report only, no recoding)
-- `docs/sentinel_decisions.csv` — human decision for **every** candidate (AUTO, REVIEW, and AMBIGUOUS); gate reads this
-- `docs/pcnr_name_map.csv` — proposed and final pcnr names for every column
+- `qc/23_sentinel_decisions_DRAFT.csv` — program-generated draft; human copies to `docs/` to create the authoritative gate file
+- `qc/23_pcnr_name_map_DRAFT.csv` — program-generated draft; human copies to `docs/` to create the authoritative gate file
+- `docs/sentinel_decisions.csv` — human-owned; never written by program 23
+- `docs/pcnr_name_map.csv` — human-owned; never written by program 23
 - PCM-D-21 through PCM-D-25 resolved and attributed in `docs/DECISIONS.md`
 
 No values are changed in this phase. The single `PCNR_APPROVED` gate (default 0 in `00_config.sas`) covers both files; Phase 24 cannot run until both are complete and the gate flips.
@@ -40,7 +43,9 @@ survives the CSV round-trip intact and also handles non-ASCII values (see D-04).
 
 **Whitespace-only values:** the relevant cases are tab (`'09'x`), carriage return / line feed
 (`'0D'x`/`'0A'x`), and non-breaking space (`'A0'x`). Scan for these explicitly; plain all-blank
-character values are already SAS missing and need no further treatment.
+character values are already SAS missing and need no further treatment. Control characters
+receive a normalized token in the `normalized_value` column rather than a blank — `<TAB>`,
+`<CRLF>`, `<NBSP>` — so a wildcard row can target them by name, not by empty string.
 
 **Contains matches → REVIEW class only, never AUTO.** Compound forms like
 `UNKNOWN/NOT DOCUMENTED` and `OTHER/UNKNOWN` are flagged REVIEW by a contains rule.
@@ -86,6 +91,11 @@ unless PCM-D-24 explicitly approves it for that variable by changing the action 
 This gives Phase 24 a machine-readable source for any approved numeric recodes rather than
 requiring it to parse DECISIONS.md prose.
 
+**Numeric keying:** `raw_value = strip(put(x, best32.))`. `raw_hex` is the hex of that text
+string (i.e., `put(strip(put(x, best32.)), $hex.)`), not the float bytes of the numeric value.
+**Wildcards are not allowed for `var_type = num`.** PCM-D-24 approves per variable; a wildcard
+would bypass that per-variable requirement.
+
 ### D-04: `sentinel_decisions.csv` Schema
 
 ```
@@ -95,27 +105,36 @@ decided_by, decided_date
 ```
 
 - **Key is `(variable, raw_hex)`.** `raw_value` is display-only; `raw_hex` is what the gate
-  uses for matching. This survives CSV round-trips that strip whitespace.
+  uses for matching. This survives CSV round-trips. Do NOT use PROC IMPORT to read either gate
+  file — hex values like `30`, `39`, `09` look numeric and will be mis-typed, breaking every
+  key lookup. Read both files with a DATA step `infile` using explicit `$` informats for every
+  column. (Add to PCM traps: "never PROC IMPORT a gate file — use DATA step infile with $
+  informats" — PCM-T-16.)
 - **`non_ascii_flag`:** set when the raw value contains bytes outside `'20'x`–`'7E'x`. The
-  hex-only representation is written to `raw_hex`; `raw_value` may be blank or truncated.
-  `candidate_class` is unchanged.
+  hex representation is still written to `raw_hex`; `raw_value` may be blank or best-effort.
+  `candidate_class` is unchanged — `non_ascii_flag` is a separate boolean column.
+- **`role` column:** carried into `sentinel_decisions.csv` from the name map draft. DROP rows
+  need no decision (those columns never reach `g.pcnr_harmonized`); the gate skips them.
 - **`action` values:** `MISSING` or `KEEP` only. No RECODE — value remapping is harmonization
   and 10b already handles it.
-- **`variable = *` wildcard rows:** A `*` row matches on `normalized_value` across all columns.
-  Per-variable rows (keyed on `raw_hex`) override it.
-  - **Wildcard rows may resolve AUTO and REVIEW candidates only.**
-  - **Every AMBIGUOUS candidate requires a per-variable row.** The gate enforces this: a
-    wildcard decision against a candidate whose `candidate_class = AMBIGUOUS` is a gate failure.
+- **`variable = *` wildcard rows:** A `*` row matches on `normalized_value` across all KEEP/KEY
+  columns. Per-variable rows (keyed on `raw_hex`) override it.
+  - **Wildcard rows may resolve AUTO and REVIEW candidates only. Wildcards are not eligible
+    to resolve AMBIGUOUS candidates.** The gate fails if any AMBIGUOUS candidate in a KEEP or
+    KEY column lacks a per-variable decision row — regardless of whether a wildcard would
+    otherwise cover its `normalized_value`.
+  - **Wildcards are not allowed for `var_type = num`** (see D-03).
 - **Gate checks both directions:**
-  - Abort if any current candidate has no decision.
+  - Abort if any KEEP/KEY candidate has no decision (missing per-variable or wildcard coverage).
+  - Abort if any AMBIGUOUS KEEP/KEY candidate lacks a per-variable row.
   - Abort if any per-variable decision row's `(variable, raw_hex)` is absent from the scan
     (stale per-variable decision).
-  - Abort if any wildcard row's `normalized_value` appears in no column's scan (stale wildcard).
-  - A wildcard row that matches zero columns is always stale; the stale check prevents this from
-    silently passing.
+  - Abort if any wildcard row's `normalized_value` appears in no KEEP/KEY column's scan
+    (stale wildcard — a `*` row matching zero columns always fails this check).
+- **Gate placement:** the gate check runs at the top of program 24, in a `%pcnr_gate_check`
+  macro. Program 23 never runs the gate — it only generates drafts. This ensures the files
+  are re-validated at the point of use, after any human edits to the `docs/` copies.
 - **No confirmed flag.** A non-blank `action` serves as confirmation; one signal is enough.
-  (Prior note about following `concept_decisions.csv`'s confirmed flag was incorrect — that
-  column does not exist in the schema above.)
 
 ### D-05: `pcnr_name_map.csv` Schema
 
@@ -138,27 +157,58 @@ name_len, collision_flag
   PCM-D-23.
 - **Proposed name:** `pcnr_` + source name (after `h_` strip), truncated to 32 characters by
   the PCM-D-23 rule.
-- **Truncation rule (PCM-D-23):** **Truncate the middle, preserve the final token.** Plain
-  tail truncation collapses names that differ only by suffix (`_1`, `_2`, `_DATE`) into
-  collisions. The middle-truncation approach preserves the trailing token (the part after the
-  last `_`) while cutting characters from the interior. `collision_flag` catches any collisions
-  that survive. Exact algorithm to be proposed in the plan and confirmed by Gerard at the
-  checkpoint before the name map is generated; this is the recommended approach.
+- **Truncation rule (PCM-D-23):** Algorithm:
+  1. If `length("pcnr_" || name) <= 32`, no truncation needed — leave it alone.
+  2. Otherwise: `final = "pcnr_" || head || "_" || final_token`, where `final_token` is the
+     substring after the last `_` in the (possibly `h_`-stripped) source name, and `head` is
+     the source name (minus `final_token` and its `_`) trimmed so the total is exactly 32 chars.
+  3. **Fallback** (no underscore in the name, or `final_token` alone is > 12 characters):
+     plain tail truncation to 32 characters total.
+  4. `collision_flag = 1` if the resulting `final_name` matches any other row case-insensitively.
+
+  The exact algorithm is confirmed at the PCM-D-23 checkpoint before the name map draft is
+  generated. The planner should include a real example from `g.master_data_harmonized` with a
+  name longer than 27 characters to verify the algorithm produces the expected result.
 - **Final name:** `coalesce(override_name, proposed_name)` for KEEP rows; blank for KEY and DROP.
 - **Validation runs on `final_name` for KEEP rows:**
   - ≤ 32 characters and valid SAS V7 name
   - Unique case-insensitively across all final names
   - No final name collides with a KEY name
   - Every source column appears exactly once in the map (completeness check)
+  - DROP rows have a blank `final_name`
+- **ID-outside-KEY flag:** `collision_flag` is also set (or a separate `id_flag` column added)
+  for any KEEP row whose source name matches `*_ID`, `*STUDY_ID*`, or `ENCRYPTED_*` and is not
+  on the KEY list. Surfaces accidental omissions like `PRECEDE_Study_ID_1` before it gets a
+  `pcnr_` prefix.
 - **Original name preserved as variable label** in the built dataset for traceability.
 
-### D-06: Single PCNR_APPROVED Gate
+### D-06: Single PCNR_APPROVED Gate and Draft/Docs Split
 
-One gate in `00_config.sas` validates both `sentinel_decisions.csv` and `pcnr_name_map.csv`.
-Phase 24 needs both files anyway; two flags create a partial-approval state that has no valid
-use. The name map is reviewed before the gate flips, not after.
+**Draft/docs split (critical):** Program 23 writes drafts only:
+- `qc/23_sentinel_decisions_DRAFT.csv`
+- `qc/23_pcnr_name_map_DRAFT.csv`
 
-Pattern: same as `D15_APPROVED` in `00_config.sas`.
+Program 23 must **never write to `docs/`** and should abort if `docs/sentinel_decisions.csv`
+or `docs/pcnr_name_map.csv` already exist and `PCNR_APPROVED = 1` (guard against overwriting
+human edits on rerun). The human copies drafts to `docs/` and edits them there. From that
+point, the `docs/` files are human-owned.
+
+**Gate placement:** `%pcnr_gate_check` macro runs at the top of program 24. Program 23 does
+not run the gate. This means:
+- Program 23 can be rerun freely to refresh drafts after source data changes.
+- The stale-decision check surfaces any drift between refreshed drafts and the human-edited
+  `docs/` files (since the gate re-reads `docs/` at program 24 runtime).
+
+**Gate flag:** `PCNR_APPROVED` in `00_config.sas`, default 0. Pattern: same as `D15_APPROVED`.
+One flag covers both files; two flags create a partial-approval state with no valid use.
+
+### PCM-T-16: Never PROC IMPORT a Gate File
+
+PROC IMPORT mis-types hex strings that look numeric (`30`, `39`, `09` → integer), breaking
+every key lookup in `sentinel_decisions.csv` and `pcnr_name_map.csv`. Always read gate files
+with a DATA step `infile` using explicit `$` informats for every column.
+
+Add to `docs/DECISIONS.md` trap list alongside PCM-T-14 and PCM-T-15.
 
 ### PCM-D-21 through PCM-D-25 Assignment
 
@@ -170,11 +220,31 @@ To give the planner unambiguous targets for DECISIONS.md entries:
 - **PCM-D-24:** Numeric sentinel approval gate — any numeric `MISSING` action approved per-variable here; default is `KEEP`
 - **PCM-D-25:** Ambiguous-value column scope — the hardcoded demographic and count/score column lists; reviewable before gate flips
 
+### D-07: Proposing Demographic and Count/Score Column Lists
+
+The planner cannot run PROC CONTENTS against P:. The demographic and count/score column lists
+(PCM-D-25) are therefore proposed one of two ways:
+1. **Preferred:** extract candidate column names from `docs/DATA_DICTIONARY.xlsx` or
+   `qc/03_contents_all.txt` (both committed and readable). The planner reads those and proposes
+   a list; Gerard confirms before the gate is set.
+2. **Fallback:** program 23 writes a first-run draft with `column_group` blank for all rows.
+   Gerard fills in the lists manually in the draft before copying to `docs/`.
+
+Whichever approach is used, the final lists are hardcoded in the program header and echoed
+into `23_sentinel_candidates.csv` as the `column_group` column.
+
+### D-08: DROP Rows Skip Sentinel Decisions
+
+Candidates in columns with `role = DROP` require no entry in `sentinel_decisions.csv` — those
+columns never reach `g.pcnr_harmonized`. The gate explicitly skips DROP-role candidates in its
+coverage check. `role` is carried from the name map draft into `23_sentinel_candidates.csv` so
+the skip reason is visible to reviewers.
+
 ### Claude's Discretion
 
 - Exact column widths and sort tiebreakers within candidate_class groups
 - Whether PCNR-02 numeric output is a separate section within `23_sentinel_candidates.csv` or its own `23_numeric_sentinels.txt` (REQUIREMENTS says "counts reported" — either is acceptable)
-- Middle-truncation algorithm details (propose in the plan; Gerard confirms at the checkpoint)
+- Middle-truncation algorithm details (propose in plan with real example from contents export; Gerard confirms at checkpoint)
 
 </decisions>
 
@@ -194,6 +264,10 @@ To give the planner unambiguous targets for DECISIONS.md entries:
 ### Gate file reference (schema to extend, not copy)
 - `docs/concept_decisions.csv` — columns: concept, varname, value_txt, n_rows, target_value, confirmed, harmonized_name, priority, reviewer, comment
 - `docs/concept_decisions_TEMPLATE.csv` — blank template showing expected headers
+
+### Column inventory (for proposing PCM-D-25 lists without running PROC CONTENTS against P:)
+- `qc/03_contents_all.txt` — committed PROC CONTENTS export; planner uses this to propose demographic and count/score column lists
+- `docs/DATA_DICTIONARY.xlsx` — 175-variable dictionary; alternate source for column names and labels
 
 ### Source dataset
 - `g.master_data_harmonized` — 41,150 rows, 175 columns (read-only; PCM-T-02 forbids writing to it)
@@ -222,22 +296,23 @@ No external specs — requirements fully captured in decisions above and REQUIRE
 ### Integration Points
 - `sas/00_config.sas` — add `%let PCNR_APPROVED = 0;`
 - `run_pipeline.cmd` — program 23 wired after program 20 and before program 24 (Phase 25 handles full wiring, not this phase)
-- `docs/` — new files: `sentinel_decisions.csv`, `pcnr_name_map.csv`
-- `qc/` — new outputs: `23_sentinel_candidates.csv`, `23_case_variants.csv`
+- `docs/` — human-owned gate files (`sentinel_decisions.csv`, `pcnr_name_map.csv`); program 23 never writes here
+- `qc/` — program outputs: `23_sentinel_candidates.csv`, `23_case_variants.csv`, `23_sentinel_decisions_DRAFT.csv`, `23_pcnr_name_map_DRAFT.csv`
 
 </code_context>
 
 <specifics>
 ## Specific Ideas
 
-- **Hex key:** `raw_hex = put(value, $hex.)` written alongside `raw_value`. Gate uses `raw_hex` for matching; Excel users read `raw_value`. This handles whitespace variants and non-ASCII in a single mechanism.
-- **Wildcard coalesce order:** gate resolves each candidate by looking for a per-variable row first (`variable = that_column`), then a wildcard row (`variable = *`). If neither matches → gate failure. AMBIGUOUS candidates must have a per-variable row or the gate fails even if a wildcard would otherwise cover them.
-- **Stale wildcard detection:** a `*` row whose `normalized_value` appears in no column in the current scan is stale. The gate must actively check this, not just skip unmatched decisions.
-- **DROP proposal from concept_decisions.csv:** program reads `docs/concept_decisions.csv`, extracts `varname` → `harmonized_name` pairs where the harmonized name starts with `h_`, and sets `role = DROP` (proposed) for those raw columns in the name map. Gerard confirms rather than hunts.
-- **PCM-D-23 middle-truncation:** preserve the final `_token`; cut characters from just before it to hit ≤ 32 chars. Example: `pcnr_Long_Variable_Name_DATE` → `pcnr_Long_Variabl_DATE` (cut middle, keep `_DATE`). `collision_flag` catches any remaining collisions.
-- **PCM-D-25 column lists** (hardcoded in program header, echoed into `column_group`):
-  - Demographic: to be proposed by planner from PROC CONTENTS of `g.master_data_harmonized` and confirmed by Gerard
-  - Count/score: similarly proposed from PROC CONTENTS
+- **Hex key for character values:** `raw_hex = put(value, $hex.)`. Gate uses `raw_hex` for matching; `raw_value` is display only. Handles whitespace variants and non-ASCII in one mechanism. Never read gate files with PROC IMPORT (PCM-T-16).
+- **Hex key for numeric candidates:** `raw_hex = put(strip(put(x, best32.)), $hex.)` — hex of the text representation, not the float bytes.
+- **Control-character normalized tokens:** tab → `<TAB>`, CR/LF → `<CRLF>`, NBSP (`'A0'x`) → `<NBSP>` in `normalized_value`. Allows wildcard targeting by token, not by empty string.
+- **Wildcard coalesce order:** gate resolves each KEEP/KEY candidate by looking for a per-variable row first (`variable = that_column`), then a wildcard row (`variable = *`). If neither → gate failure. AMBIGUOUS candidates must have a per-variable row or the gate fails even if a wildcard covers the `normalized_value`.
+- **Stale wildcard detection:** a `*` row whose `normalized_value` appears in no KEEP/KEY column's scan is stale; gate aborts.
+- **DROP proposal from concept_decisions.csv:** program reads `docs/concept_decisions.csv`, extracts `varname` → `harmonized_name` pairs where `harmonized_name` starts with `h_`, and proposes `role = DROP` for those raw columns in the name map draft. Gerard confirms rather than hunts.
+- **PCM-D-23 truncation example:** planner should extract a real name > 27 characters from `qc/03_contents_all.txt` and show the algorithm's output for that name in the plan. The `pcnr_Long_Variable_Name_DATE` example used in discussion was 28 characters and would not trigger truncation — it is not a valid illustration.
+- **PCM-D-25 column lists:** planner proposes from `qc/03_contents_all.txt` or `docs/DATA_DICTIONARY.xlsx` (both committed). Gerard confirms before gate is set.
+- **Draft/docs workflow:** program 23 → writes `qc/*_DRAFT.csv` → human copies to `docs/` and edits → program 24 gate re-reads `docs/` files. Program 23 aborts if `docs/sentinel_decisions.csv` exists and `PCNR_APPROVED = 1`.
 
 </specifics>
 

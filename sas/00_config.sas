@@ -37,7 +37,8 @@
 /* ---- Phase 23 / PCNR gate flag ----
    0 = awaiting human review of qc/23_sentinel_candidates.csv and qc/23_pcnr_name_map_DRAFT.csv
    1 = approved -- lets 24_pcnr_build.sas proceed with recode and rename operations */
-%let PCNR_APPROVED = 0;
+/* PCNR gate approved: docs/sentinel_decisions.csv + docs/pcnr_name_map.csv reviewed and committed (Phase 23). Same pattern as D15_APPROVED. */
+%let PCNR_APPROVED = 1;
 %put NOTE: [00_config] PCNR_APPROVED = &PCNR_APPROVED;
 
 /* ---- Pipeline flag ----

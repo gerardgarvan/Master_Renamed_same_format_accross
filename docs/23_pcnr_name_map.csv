@@ -1,0 +1,176 @@
+source_name,source_label,role,h_strip,proposed_name,override_name,final_name,name_len,collision_flag,id_flag
+ABP_LESS_THAN_60_COUNT,ABP_LESS_THAN_60_COUNT,KEEP,N,pcnr_ABP_LESS_THAN_60_COUNT,,pcnr_ABP_LESS_THAN_60_COUNT,27,0,0
+ABP_LESS_THAN_70_COUNT,ABP_LESS_THAN_70_COUNT,KEEP,N,pcnr_ABP_LESS_THAN_70_COUNT,,pcnr_ABP_LESS_THAN_70_COUNT,27,0,0
+ABP_LESS_THAN_80_COUNT,ABP_LESS_THAN_80_COUNT,KEEP,N,pcnr_ABP_LESS_THAN_80_COUNT,,pcnr_ABP_LESS_THAN_80_COUNT,27,0,0
+ASA__Anesth_Record_,ASA (Anesth Record),KEEP,N,pcnr_ASA__Anesth_Record_,,pcnr_ASA__Anesth_Record_,24,0,0
+AVG_ABP_Mean,AVG_ABP_Mean,KEEP,N,pcnr_AVG_ABP_Mean,,pcnr_AVG_ABP_Mean,17,0,0
+AVG_BIS_index,AVG_BIS_index,KEEP,N,pcnr_AVG_BIS_index,,pcnr_AVG_BIS_index,18,0,0
+AVG_NIBP_mean,AVG_NIBP_mean,KEEP,N,pcnr_AVG_NIBP_mean,,pcnr_AVG_NIBP_mean,18,0,0
+Admit_BMI,Admit BMI,KEEP,N,pcnr_Admit_BMI,,pcnr_Admit_BMI,14,0,0
+Admit_Source,Admit Source,KEEP,N,pcnr_Admit_Source,,pcnr_Admit_Source,17,0,0
+Age_at_Encounter,Age at Encounter,KEEP,N,pcnr_Age_at_Encounter,,pcnr_Age_at_Encounter,21,0,0
+Anesthesia_Type,Anesthesia Type,KEEP,N,pcnr_Anesthesia_Type,,pcnr_Anesthesia_Type,20,0,0
+BIS_INDEX_LESS_30_COUNT,BIS_INDEX_LESS_30_COUNT,KEEP,N,pcnr_BIS_INDEX_LESS_30_COUNT,,pcnr_BIS_INDEX_LESS_30_COUNT,28,0,0
+BIS_INDEX_LESS_40_COUNT,BIS_INDEX_LESS_40_COUNT,KEEP,N,pcnr_BIS_INDEX_LESS_40_COUNT,,pcnr_BIS_INDEX_LESS_40_COUNT,28,0,0
+Base_Procedure_1,Base Procedure 1,KEEP,N,pcnr_Base_Procedure_1,,pcnr_Base_Procedure_1,21,0,0
+Base_Procedure_Code_1,Base Procedure Code 1,KEEP,N,pcnr_Base_Procedure_Code_1,,pcnr_Base_Procedure_Code_1,26,0,0
+Braden_Activity,Braden Activity,KEEP,N,pcnr_Braden_Activity,,pcnr_Braden_Activity,20,0,0
+Braden_Mobility,Braden Mobility,KEEP,N,pcnr_Braden_Mobility,,pcnr_Braden_Mobility,20,0,0
+Braden_Sensory_Perception,Braden Sensory Perception,KEEP,N,pcnr_Braden_Sensory_Perception,,pcnr_Braden_Sensory_Perception,30,0,0
+COMP10_T80,COMP10_T80,KEEP,N,pcnr_COMP10_T80,,pcnr_COMP10_T80,15,0,0
+COMP10_T81,COMP10_T81,KEEP,N,pcnr_COMP10_T81,,pcnr_COMP10_T81,15,0,0
+COMP10_T82,COMP10_T82,KEEP,N,pcnr_COMP10_T82,,pcnr_COMP10_T82,15,0,0
+COMP10_T83,COMP10_T83,KEEP,N,pcnr_COMP10_T83,,pcnr_COMP10_T83,15,0,0
+COMP10_T84,COMP10_T84,KEEP,N,pcnr_COMP10_T84,,pcnr_COMP10_T84,15,0,0
+COMP10_T85,COMP10_T85,KEEP,N,pcnr_COMP10_T85,,pcnr_COMP10_T85,15,0,0
+COMP10_T86,COMP10_T86,KEEP,N,pcnr_COMP10_T86,,pcnr_COMP10_T86,15,0,0
+COMP10_T87,COMP10_T87,KEEP,N,pcnr_COMP10_T87,,pcnr_COMP10_T87,15,0,0
+COMP10_T88,COMP10_T88,KEEP,N,pcnr_COMP10_T88,,pcnr_COMP10_T88,15,0,0
+CPT1_Class,CPT1 Class,KEEP,N,pcnr_CPT1_Class,,pcnr_CPT1_Class,15,0,0
+CPT1_Label,CPT1 Label,KEEP,N,pcnr_CPT1_Label,,pcnr_CPT1_Label,15,0,0
+CPT_1,CPT 1,KEEP,N,pcnr_CPT_1,,pcnr_CPT_1,10,0,0
+CPT_1_Description,CPT 1 Description,KEEP,N,pcnr_CPT_1_Description,,pcnr_CPT_1_Description,22,0,0
+Charges,Charges,KEEP,N,pcnr_Charges,,pcnr_Charges,12,0,0
+Charlson_Comorbidity_Index,Charlson_Comorbidity_Index,KEEP,N,pcnr_Charlson_Comorbidity_Index,,pcnr_Charlson_Comorbidity_Index,31,0,0
+CognitiveDisorder_YN,CognitiveDisorder_YN,KEEP,N,pcnr_CognitiveDisorder_YN,,pcnr_CognitiveDisorder_YN,25,0,0
+Cognitive_Category,Cognitive_Category,KEEP,N,pcnr_Cognitive_Category,,pcnr_Cognitive_Category,23,0,0
+Cognitive_Disorder,Cognitive_Disorder,KEEP,N,pcnr_Cognitive_Disorder,,pcnr_Cognitive_Disorder,23,0,0
+Cognitive_Score,Cognitive_Score,KEEP,N,pcnr_Cognitive_Score,,pcnr_Cognitive_Score,20,0,0
+Day_of_Week__CHAR_,Day of Week (CHAR),KEEP,N,pcnr_Day_of_Week__CHAR_,,pcnr_Day_of_Week__CHAR_,23,0,0
+Day_of_Week__NUM_,Day of Week (NUM),KEEP,N,pcnr_Day_of_Week__NUM_,,pcnr_Day_of_Week__NUM_,22,0,0
+Death,Death,KEEP,N,pcnr_Death,,pcnr_Death,10,0,0
+Death_Date_Y_N,Death_Date Y/N,DROP,N,,,,0,0,0
+Death_Days_After_Surgery,Death_Days_After_Surgery,KEEP,N,pcnr_Death_Days_After_Surgery,,pcnr_Death_Days_After_Surgery,29,0,0
+Diabetes_YN,Diabetes_YN,DROP,N,,,,0,0,0
+Dischg_Disposition,Dischg Disposition,KEEP,N,pcnr_Dischg_Disposition,,pcnr_Dischg_Disposition,23,0,0
+ENCRYPTED_ENCOUNTER,ENCRYPTED_ENCOUNTER,KEY,N,,,,0,0,0
+ENCRYPTED_MRN,ENCRYPTED_MRN,KEY,N,,,,0,0,0
+Education,Education,KEEP,N,pcnr_Education,,pcnr_Education,14,0,0
+Emergent,Emergent Y/N (Anesth Record),KEEP,N,pcnr_Emergent,,pcnr_Emergent,13,0,0
+EmployeeCode,EmployeeCode,KEEP,N,pcnr_EmployeeCode,,pcnr_EmployeeCode,17,0,0
+EmployeeStatus,EmployeeStatus,KEEP,N,pcnr_EmployeeStatus,,pcnr_EmployeeStatus,19,0,0
+Ethnicity,Ethnicity,KEEP,N,pcnr_Ethnicity,,pcnr_Ethnicity,14,0,0
+Feels_Exausted_Value,Feels_Exausted_Value,DROP,N,,,,0,0,0
+Frailty_Category,Frailty_Category,KEEP,N,pcnr_Frailty_Category,,pcnr_Frailty_Category,21,0,0
+Frailty_Score,Frailty_Score,KEEP,N,pcnr_Frailty_Score,,pcnr_Frailty_Score,18,0,0
+H_DEATH_YN,,KEEP,Y,pcnr_DEATH_YN,,pcnr_DEATH_YN,13,0,0
+H_DIABETES,,KEEP,Y,pcnr_DIABETES,,pcnr_DIABETES,13,0,0
+H_FRAILTY_ACTIVITY,,KEEP,Y,pcnr_FRAILTY_ACTIVITY,,pcnr_FRAILTY_ACTIVITY,21,0,0
+H_FRAILTY_EXHAUST,,KEEP,Y,pcnr_FRAILTY_EXHAUST,,pcnr_FRAILTY_EXHAUST,20,0,0
+H_FRAILTY_GRIP,,KEEP,Y,pcnr_FRAILTY_GRIP,,pcnr_FRAILTY_GRIP,17,0,0
+H_FRAILTY_WALKING,,KEEP,Y,pcnr_FRAILTY_WALKING,,pcnr_FRAILTY_WALKING,20,0,0
+H_FRAILTY_WEIGHT,,KEEP,Y,pcnr_FRAILTY_WEIGHT,,pcnr_FRAILTY_WEIGHT,19,0,0
+H_HYPERLIPIDEMIA,,KEEP,Y,pcnr_HYPERLIPIDEMIA,,pcnr_HYPERLIPIDEMIA,19,0,0
+H_HYPERTENSION,,KEEP,Y,pcnr_HYPERTENSION,,pcnr_HYPERTENSION,17,0,0
+H_MOVEMENT_DISORDER,,KEEP,Y,pcnr_MOVEMENT_DISORDER,,pcnr_MOVEMENT_DISORDER,22,0,0
+H_SLEEP_APNEA,,KEEP,Y,pcnr_SLEEP_APNEA,,pcnr_SLEEP_APNEA,16,0,0
+H_SSDI_DEATH,,KEEP,Y,pcnr_SSDI_DEATH,,pcnr_SSDI_DEATH,15,0,0
+Holidays,Holidays,KEEP,N,pcnr_Holidays,,pcnr_Holidays,13,0,0
+Hydromorphone_mg_IntraOp_Total,Hydromorphone_mg_IntraOp_Total,KEEP,N,pcnr_Hydromorphone_mg_Intr_Total,,pcnr_Hydromorphone_mg_Intr_Total,32,0,0
+Hydromorphone_mg__1_7_Total,Hydromorphone_mg__1_7_Total,KEEP,N,pcnr_Hydromorphone_mg__1_7_Total,,pcnr_Hydromorphone_mg__1_7_Total,32,0,0
+Hyperlipidemia_YN,Hyperlipidemia_YN,DROP,N,,,,0,0,0
+Hypertension_YN,Hypertension_YN,DROP,N,,,,0,0,0
+ICD10_Principal_Diagnosis,ICD10 Principal Diagnosis,KEEP,N,pcnr_ICD10_Principal_Diagnosis,,pcnr_ICD10_Principal_Diagnosis,30,0,0
+ICD10_Principal_Diagnosis_Desc,ICD10 Principal Diagnosis Desc,KEEP,N,pcnr_ICD10_Principal_Diagno_Desc,,pcnr_ICD10_Principal_Diagno_Desc,32,0,0
+ICD10_Principal_Diagnosis_POA,ICD10 Principal Diagnosis POA,KEEP,N,pcnr_ICD10_Principal_Diagnos_POA,,pcnr_ICD10_Principal_Diagnos_POA,32,0,0
+ICU_LOS_TOTAL_TIME_HOURS,ICU_LOS_TOTAL_TIME_HOURS,KEEP,N,pcnr_ICU_LOS_TOTAL_TIME_HOURS,,pcnr_ICU_LOS_TOTAL_TIME_HOURS,29,0,0
+ISO_Exp_IntraOp_MAC_Average,ISO_Exp_IntraOp_MAC_Average,KEEP,N,pcnr_ISO_Exp_IntraOp_MAC_Average,,pcnr_ISO_Exp_IntraOp_MAC_Average,32,0,0
+ISO_Exp_IntraOp_MAC_Minutes_Tota,ISO_Exp_IntraOp_MAC_Minutes_Total,KEEP,N,pcnr_ISO_Exp_IntraOp_MAC_Mi_Tota,,pcnr_ISO_Exp_IntraOp_MAC_Mi_Tota,32,0,0
+ISO_Exp_IntraOp_MAC_Total,ISO_Exp_IntraOp_MAC_Total,KEEP,N,pcnr_ISO_Exp_IntraOp_MAC_Total,,pcnr_ISO_Exp_IntraOp_MAC_Total,30,0,0
+ISO_Exp_IntraOp_Total,ISO_Exp_IntraOp_Total,KEEP,N,pcnr_ISO_Exp_IntraOp_Total,,pcnr_ISO_Exp_IntraOp_Total,26,0,0
+ISO_SEV_Exp_IntraOp_MAC_Average,ISO_SEV_Exp_IntraOp_MAC_Average,KEEP,N,pcnr_ISO_SEV_Exp_IntraOp_Average,,pcnr_ISO_SEV_Exp_IntraOp_Average,32,0,0
+ISO_SEV_IntraOp_MAC_Average,ISO_SEV_IntraOp_MAC_Average,KEEP,N,pcnr_ISO_SEV_IntraOp_MAC_Average,,pcnr_ISO_SEV_IntraOp_MAC_Average,32,0,0
+ISO_SEV_MAC_TOTAL_Exp,ISO_SEV_MAC_TOTAL_Exp,KEEP,N,pcnr_ISO_SEV_MAC_TOTAL_Exp,,pcnr_ISO_SEV_MAC_TOTAL_Exp,26,0,0
+Intraop_Ketamine,Intraop_Ketamine,KEEP,N,pcnr_Intraop_Ketamine,,pcnr_Intraop_Ketamine,21,0,0
+Ketamine_mg_1_7_Total,Ketamine_mg_1_7_Total,KEEP,N,pcnr_Ketamine_mg_1_7_Total,,pcnr_Ketamine_mg_1_7_Total,26,0,0
+Ketamine_mg_IntraOp_Total,Ketamine_mg_IntraOp_Total,KEEP,N,pcnr_Ketamine_mg_IntraOp_Total,,pcnr_Ketamine_mg_IntraOp_Total,30,0,0
+LOS,LOS,KEEP,N,pcnr_LOS,,pcnr_LOS,8,0,0
+LOS_in_Hours,LOS in Hours,KEEP,N,pcnr_LOS_in_Hours,,pcnr_LOS_in_Hours,17,0,0
+Latitude,Latitude,KEEP,N,pcnr_Latitude,,pcnr_Latitude,13,0,0
+Lidocaine_mg_1_7_Total,Lidocaine_mg_1_7_Total,KEEP,N,pcnr_Lidocaine_mg_1_7_Total,,pcnr_Lidocaine_mg_1_7_Total,27,0,0
+Lidocaine_mg_IntraOp_Total,Lidocaine_mg_IntraOp_Total,KEEP,N,pcnr_Lidocaine_mg_IntraOp_Total,,pcnr_Lidocaine_mg_IntraOp_Total,31,0,0
+Longitude,Longitude,KEEP,N,pcnr_Longitude,,pcnr_Longitude,14,0,0
+Low_Physical_Activity_Value,Low_Physical_Activity_Value,DROP,N,,,,0,0,0
+Marital_Status,Marital Status,KEEP,N,pcnr_Marital_Status,,pcnr_Marital_Status,19,0,0
+MovementDisorder_YN,MovementDisorder_YN,DROP,N,,,,0,0,0
+NIBP_LESS_60_COUNT,NIBP_LESS_60_COUNT,KEEP,N,pcnr_NIBP_LESS_60_COUNT,,pcnr_NIBP_LESS_60_COUNT,23,0,0
+NIBP_LESS_70_COUNT,NIBP_LESS_70_COUNT,KEEP,N,pcnr_NIBP_LESS_70_COUNT,,pcnr_NIBP_LESS_70_COUNT,23,0,0
+NIBP_LESS_80_COUNT,NIBP_LESS_80_COUNT,KEEP,N,pcnr_NIBP_LESS_80_COUNT,,pcnr_NIBP_LESS_80_COUNT,23,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY1,ORAL_MORPHINE_EQUIV_mg_POD_DAY1,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY1,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY1,32,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY2,ORAL_MORPHINE_EQUIV_mg_POD_DAY2,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY2,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY2,32,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY3,ORAL_MORPHINE_EQUIV_mg_POD_DAY3,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY3,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY3,32,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY4,ORAL_MORPHINE_EQUIV_mg_POD_DAY4,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY4,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY4,32,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY5,ORAL_MORPHINE_EQUIV_mg_POD_DAY5,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY5,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY5,32,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY6,ORAL_MORPHINE_EQUIV_mg_POD_DAY6,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY6,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY6,32,0,0
+ORAL_MORPHINE_EQUIV_mg_POD_DAY7,ORAL_MORPHINE_EQUIV_mg_POD_DAY7,KEEP,N,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY7,,pcnr_ORAL_MORPHINE_EQUIV_mg_DAY7,32,0,0
+Oral_Morphine_Equiv_Given__1_7_T,Oral_Morphine_Equiv_Given__1_7_Total_mg,KEEP,N,pcnr_Oral_Morphine_Equiv_Given_T,,pcnr_Oral_Morphine_Equiv_Given_T,32,0,0
+Oral_Morphine_Equiv_IntraOp_Tota,Oral_Morphine_Equiv_IntraOp_Total_mg,KEEP,N,pcnr_Oral_Morphine_Equiv_In_Tota,,pcnr_Oral_Morphine_Equiv_In_Tota,32,0,0
+PRECEDE_STUDY_ID,PRECEDE_STUDY_ID,KEY,N,,,,0,0,0
+Patient_Type,Patient Type,KEEP,N,pcnr_Patient_Type,,pcnr_Patient_Type,17,0,0
+Payer,Payer,KEEP,N,pcnr_Payer,,pcnr_Payer,10,0,0
+Preop_block,Preop_block,KEEP,N,pcnr_Preop_block,,pcnr_Preop_block,16,0,0
+Propofol_mg_1_7_Total,Propofol_mg_1_7_Total,KEEP,N,pcnr_Propofol_mg_1_7_Total,,pcnr_Propofol_mg_1_7_Total,26,0,0
+Propofol_mg_IntraOp_Total,Propofol_mg_IntraOp_Total,KEEP,N,pcnr_Propofol_mg_IntraOp_Total,,pcnr_Propofol_mg_IntraOp_Total,30,0,0
+Race,Race,KEEP,N,pcnr_Race,,pcnr_Race,9,0,0
+Room_Type,Room Type,KEEP,N,pcnr_Room_Type,,pcnr_Room_Type,14,0,0
+SD_ABP_Mean,SD_ABP_Mean,KEEP,N,pcnr_SD_ABP_Mean,,pcnr_SD_ABP_Mean,16,0,0
+SD_BIS_index,SD_BIS_index,KEEP,N,pcnr_SD_BIS_index,,pcnr_SD_BIS_index,17,0,0
+SD_NIBP_mean,SD_NIBP_mean,KEEP,N,pcnr_SD_NIBP_mean,,pcnr_SD_NIBP_mean,17,0,0
+SEV_Exp_IntraOp_MAC_Average,SEV_Exp_IntraOp_MAC_Average,KEEP,N,pcnr_SEV_Exp_IntraOp_MAC_Average,,pcnr_SEV_Exp_IntraOp_MAC_Average,32,0,0
+SEV_Exp_IntraOp_MAC_Minutes_Tota,SEV_Exp_IntraOp_MAC_Minutes_Total,KEEP,N,pcnr_SEV_Exp_IntraOp_MAC_Mi_Tota,,pcnr_SEV_Exp_IntraOp_MAC_Mi_Tota,32,0,0
+SEV_Exp_IntraOp_MAC_Total,SEV_Exp_IntraOp_MAC_Total,KEEP,N,pcnr_SEV_Exp_IntraOp_MAC_Total,,pcnr_SEV_Exp_IntraOp_MAC_Total,30,0,0
+SEV_Exp_IntraOp_Total,SEV_Exp_IntraOp_Total,KEEP,N,pcnr_SEV_Exp_IntraOp_Total,,pcnr_SEV_Exp_IntraOp_Total,26,0,0
+SORT_ID,SORT_ID,KEEP,N,pcnr_SORT_ID,,pcnr_SORT_ID,12,0,1
+SSDI_Death_Date_Y_N,SSDI Death Date Y/N,DROP,N,,,,0,0,0
+Service,Service,KEEP,N,pcnr_Service,,pcnr_Service,12,0,0
+Sex,Sex,KEEP,N,pcnr_Sex,,pcnr_Sex,8,0,0
+Sleep_Apnea_YN,Sleep_Apnea_YN,DROP,N,,,,0,0,0
+Slow_Walking_Speed_Value,Slow_Walking_Speed_Value,DROP,N,,,,0,0,0
+Sufentanil_mg_IntraOp_Total,Sufentanil_mg_IntraOp_Total,KEEP,N,pcnr_Sufentanil_mg_IntraOp_Total,,pcnr_Sufentanil_mg_IntraOp_Total,32,0,0
+Sufentanil_mg__1_7_Total,Sufentanil_mg__1_7_Total,KEEP,N,pcnr_Sufentanil_mg__1_7_Total,,pcnr_Sufentanil_mg__1_7_Total,29,0,0
+Total_EPHEDRINE_SULFATE_PRESSORS,Total_EPHEDRINE_SULFATE_PRESSORS_mg,KEEP,N,pcnr_Total_EPHEDRINE_SU_PRESSORS,,pcnr_Total_EPHEDRINE_SU_PRESSORS,32,0,0
+Total_Midazolam_mg,Total_Midazolam_mg,KEEP,N,pcnr_Total_Midazolam_mg,,pcnr_Total_Midazolam_mg,23,0,0
+Total_Norepinephrine_Bitartrate_,Total_Norepinephrine_Bitartrate_MAR_mg,KEEP,N,pcnr_Total_Norepinephrine_Bitart,,pcnr_Total_Norepinephrine_Bitart,32,0,0
+Total_Phenylephrine_HCI_mg,Total_Phenylephrine_HCI_mg,KEEP,N,pcnr_Total_Phenylephrine_HCI_mg,,pcnr_Total_Phenylephrine_HCI_mg,31,0,0
+Total_Phenylephrine_HCl_Pressors,Total_Phenylephrine_HCl_Pressors_mg,KEEP,N,pcnr_Total_Phenylephrin_Pressors,,pcnr_Total_Phenylephrin_Pressors,32,0,0
+Unintended_Weight_Loss_Value,Unintended_Weight_Loss_Value,DROP,N,,,,0,0,0
+Week_Grip_Strength_Value,Week_Grip_Strength_Value,DROP,N,,,,0,0,0
+Weekend_Indicator,Weekend_Indicator,KEEP,N,pcnr_Weekend_Indicator,,pcnr_Weekend_Indicator,22,0,0
+YEAR,YEAR,KEEP,N,pcnr_YEAR,,pcnr_YEAR,9,0,0
+_30_DAY_MORTALITY,30_DAY_MORTALITY,KEEP,N,pcnr__30_DAY_MORTALITY,,pcnr__30_DAY_MORTALITY,22,0,0
+complication_sum,complication_sum,KEEP,N,pcnr_complication_sum,,pcnr_complication_sum,21,0,0
+fentaNYL_SUBLIMAZE_mg_IntraOp_To,fentaNYL_SUBLIMAZE_mg_IntraOp_Total,KEEP,N,pcnr_fentaNYL_SUBLIMAZE_mg_In_To,,pcnr_fentaNYL_SUBLIMAZE_mg_In_To,32,0,0
+fentaNYL_SUBLIMAZE_mg__1_7_Total,fentaNYL_SUBLIMAZE_mg__1_7_Total,KEEP,N,pcnr_fentaNYL_SUBLIMAZE_mg_Total,,pcnr_fentaNYL_SUBLIMAZE_mg_Total,32,0,0
+in_md1,,KEEP,N,pcnr_in_md1,,pcnr_in_md1,11,0,0
+in_md2,,KEEP,N,pcnr_in_md2,,pcnr_in_md2,11,0,0
+in_md4,,KEEP,N,pcnr_in_md4,,pcnr_in_md4,11,0,0
+in_md5,,KEEP,N,pcnr_in_md5,,pcnr_in_md5,11,0,0
+in_md6,,KEEP,N,pcnr_in_md6,,pcnr_in_md6,11,0,0
+in_md7,,KEEP,N,pcnr_in_md7,,pcnr_in_md7,11,0,0
+in_md8,,KEEP,N,pcnr_in_md8,,pcnr_in_md8,11,0,0
+n_sources,,KEEP,N,pcnr_n_sources,,pcnr_n_sources,14,0,0
+pecan_ID,,KEY,N,,,,0,0,0
+rt_ADMIT_to_AN_END_mins,rt_ADMIT_to_AN_END_mins,KEEP,N,pcnr_rt_ADMIT_to_AN_END_mins,,pcnr_rt_ADMIT_to_AN_END_mins,28,0,0
+rt_ADMIT_to_AN_START_mins,rt_ADMIT_to_AN_START_mins,KEEP,N,pcnr_rt_ADMIT_to_AN_START_mins,,pcnr_rt_ADMIT_to_AN_START_mins,30,0,0
+rt_ADMIT_to_BLOCK_END_mins,rt_ADMIT_to_BLOCK_END_mins,KEEP,N,pcnr_rt_ADMIT_to_BLOCK_END_mins,,pcnr_rt_ADMIT_to_BLOCK_END_mins,31,0,0
+rt_ADMIT_to_BLOCK_START_mins,rt_ADMIT_to_BLOCK_START_mins,KEEP,N,pcnr_rt_ADMIT_to_BLOCK_STAR_mins,,pcnr_rt_ADMIT_to_BLOCK_STAR_mins,32,0,0
+rt_ADMIT_to_DRESS_mins,rt_ADMIT_to_DRESS_mins,KEEP,N,pcnr_rt_ADMIT_to_DRESS_mins,,pcnr_rt_ADMIT_to_DRESS_mins,27,0,0
+rt_ADMIT_to_INCISION_mins,rt_ADMIT_to_INCISION_mins,KEEP,N,pcnr_rt_ADMIT_to_INCISION_mins,,pcnr_rt_ADMIT_to_INCISION_mins,30,0,0
+rt_ADMIT_to_RM_END_mins,rt_ADMIT_to_RM_END_mins,KEEP,N,pcnr_rt_ADMIT_to_RM_END_mins,,pcnr_rt_ADMIT_to_RM_END_mins,28,0,0
+rt_ADMIT_to_RM_START_mins,rt_ADMIT_to_RM_START_mins,KEEP,N,pcnr_rt_ADMIT_to_RM_START_mins,,pcnr_rt_ADMIT_to_RM_START_mins,30,0,0
+rt_ANCHOR_to_ADMIT_days,rt_ANCHOR_to_ADMIT_days,KEEP,N,pcnr_rt_ANCHOR_to_ADMIT_days,,pcnr_rt_ANCHOR_to_ADMIT_days,28,0,0
+rt_ANCHOR_to_DISCHG_days,rt_ANCHOR_to_DISCHG_days,KEEP,N,pcnr_rt_ANCHOR_to_DISCHG_days,,pcnr_rt_ANCHOR_to_DISCHG_days,29,0,0
+rt_ANCHOR_to_SURGERY_days,rt_ANCHOR_to_SURGERY_days,KEEP,N,pcnr_rt_ANCHOR_to_SURGERY_days,,pcnr_rt_ANCHOR_to_SURGERY_days,30,0,0
+rt_AN_START_to_AN_END_mins,rt_AN_START_to_AN_END_mins,KEEP,N,pcnr_rt_AN_START_to_AN_END_mins,,pcnr_rt_AN_START_to_AN_END_mins,31,0,0
+rt_BLOCK_START_TO_BLOCK_END_mins,rt_BLOCK_START_TO_BLOCK_END_mins,KEEP,N,pcnr_rt_BLOCK_START_TO_BLOC_mins,,pcnr_rt_BLOCK_START_TO_BLOC_mins,32,0,0
+rt_INCISE_to_DRESS_mins,rt_INCISE_to_DRESS_mins,KEEP,N,pcnr_rt_INCISE_to_DRESS_mins,,pcnr_rt_INCISE_to_DRESS_mins,28,0,0
+rt_INCISE_to_DRESS_neg,"Negative incision-to-dressing interval (1=yes, value retained)",KEEP,N,pcnr_rt_INCISE_to_DRESS_neg,,pcnr_rt_INCISE_to_DRESS_neg,27,0,0
+rt_RM_START_to_AN_START_mins,rt_RM_START_to_AN_START_mins,KEEP,N,pcnr_rt_RM_START_to_AN_STAR_mins,,pcnr_rt_RM_START_to_AN_STAR_mins,32,0,0
+rt_RM_START_to_DRESS_mins,rt_RM_START_to_DRESS_mins,KEEP,N,pcnr_rt_RM_START_to_DRESS_mins,,pcnr_rt_RM_START_to_DRESS_mins,30,0,0
+rt_RM_START_to_EMERGENCE_mins,rt_RM_START_to_EMERGENCE_mins,KEEP,N,pcnr_rt_RM_START_to_EMERGEN_mins,,pcnr_rt_RM_START_to_EMERGEN_mins,32,0,0
+rt_RM_START_to_INCISION_mins,rt_RM_START_to_INCISION_mins,KEEP,N,pcnr_rt_RM_START_to_INCISIO_mins,,pcnr_rt_RM_START_to_INCISIO_mins,32,0,0
+rt_RM_START_to_INCISION_neg,"Negative room-start-to-incision offset (1=yes, value retained)",KEEP,N,pcnr_rt_RM_START_to_INCISION_neg,,pcnr_rt_RM_START_to_INCISION_neg,32,0,0
+rt_RM_START_to_INDUCTION_mins,rt_RM_START_to_INDUCTION_mins,KEEP,N,pcnr_rt_RM_START_to_INDUCTI_mins,,pcnr_rt_RM_START_to_INDUCTI_mins,32,0,0
+rt_RM_START_to_RM_END_mins,rt_RM_START_to_RM_END_mins,KEEP,N,pcnr_rt_RM_START_to_RM_END_mins,,pcnr_rt_RM_START_to_RM_END_mins,31,0,0
+rt_RM_START_to_RM_END_neg,"Negative room-start-to-room-end interval (1=yes, value retained)",KEEP,N,pcnr_rt_RM_START_to_RM_END_neg,,pcnr_rt_RM_START_to_RM_END_neg,30,0,0
+rt_envelope_flag,Operative sub-interval exceeds room interval (1=yes),KEEP,N,pcnr_rt_envelope_flag,,pcnr_rt_envelope_flag,21,0,0

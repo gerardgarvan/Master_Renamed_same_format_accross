@@ -37,7 +37,7 @@ existing SAS programs, committed QC outputs)
 - Candidates: `-999, -99, -9, 99, 999, 777, 888, 9999, 99999`; IS NOT MISSING guard on every scan
 - Numeric candidates go into `sentinel_decisions.csv` with `var_type = num`
 - Default pre-filled `action = KEEP`; changed to `MISSING` only when PCM-D-24 approves per-variable
-- Numeric keying: `raw_hex = %hexkey(strip(put(x, best32.)))` — hex of the text string
+- Numeric keying: `raw_hex = %hexkey(strip(put(x, best32.)))` — hex of the text string (see Pattern 4; bare `$hex.` truncates to 2 bytes)
 - Wildcards NOT allowed for `var_type = num`
 
 **D-04: `sentinel_decisions.csv` Schema (locked)**
@@ -164,7 +164,7 @@ sas/23_pcnr_inventory.sas
   HEADER: hardcoded demographic + count/score column lists (PCM-D-25)
   SECTION 0: Preconditions
     - %include 00_config.sas
-    - Gate: PCNR_APPROVED must be 0 (structural guard — program only writes drafts)
+    - (No PCNR_APPROVED check: program 23 runs at any gate value and only writes drafts)
     - Gate: g.master_data_harmonized exists + row count = 41,150
     - Gate: docs/concept_decisions.csv readable (needed for DROP proposals)
   SECTION 1: Write fingerprint (qc/23_sentinel_fingerprint.txt)
@@ -172,7 +172,7 @@ sas/23_pcnr_inventory.sas
   SECTION 2: Character sentinel sweep (PCNR-01, D-01)
     - PROC SQL + DATA step loop over all char vars from dictionary.columns
     - Normalize: upcase, strip, compbl
-    - raw_hex = put(value, $hex.)
+    - raw_hex = %hexkey(value)   /* never bare $hex. */
     - Exact-match AUTO classification; contains-match REVIEW; AMBIGUOUS from D-02 list
     - Control-char scan: '09'x, '0D'x, '0A'x, 'A0'x → normalized tokens
     - column_group column from hardcoded lists
@@ -251,13 +251,14 @@ run;
 ### Pattern 4: Hex Key Generation
 
 ```sas
-/* Character value — MUST use $hex400. + length trim; bare $hex. encodes only first 2 bytes */
-raw_hex = substr(put(raw_value, $hex400.), 1, 2*length(raw_value));
-/* Define in 00_config.sas as: %macro hexkey(var) / substr(put(&var,$hex400.),1,2*length(&var)) %mend; */
-/* grep -n '\$hex\.' sas/*.sas must return nothing — any bare $hex. is the truncating form */
+/* Character value */
+/* CORRECTED: bare $hex. has default width 4 and encodes only the first 2 bytes, so
+   UNKNOWN and UNK both became 554E. Use the shared %hexkey macro from 00_config.sas:
+   %macro hexkey(var);substr(put(&var, $hex400.), 1, 2*length(&var))%mend hexkey; */
+raw_hex = %hexkey(raw_value);   /* significant bytes only, survives CSV round-trip */
 
-/* Numeric sentinel — same length-trim applied to text representation */
-raw_hex = substr(put(strip(put(x, best32.)), $hex400.), 1, 2*length(strip(put(x, best32.))));
+/* Numeric sentinel */
+raw_hex = %hexkey(strip(put(x, best32.)));  /* hex of the text representation */
 
 /* Control-character normalized tokens */
 if raw_value = '09'x then normalized_value = '<TAB>';
@@ -306,7 +307,7 @@ run;
 |---------|-------------|-------------|-----|
 | Column type/length metadata | Manual PROC CONTENTS parse | `dictionary.columns` in PROC SQL | Authoritative, no intermediate dataset |
 | Dataset metadata for fingerprint | Custom macro | `SASHELP.VTABLE` (nobs, nvar, modate) | Direct, always current |
-| Hex encoding of values | Custom byte loop | `put(value, $hex.)` SAS format | Handles all byte values including non-ASCII |
+| Hex encoding of values | Custom byte loop | `%hexkey(value)` = `substr(put(value, $hex400.), 1, 2*length(value))` | Handles all byte values including non-ASCII; bare `$hex.` truncates to 2 bytes |
 | Gate abort | Custom error handling | `%fail_out` macro from `00_config.sas` | Consistent abort pattern across pipeline |
 | Collision detection | Hash-based approach | PROC SORT + DATA step LAG or PROC SQL self-join | Simple, deterministic, no external tools |
 
@@ -392,33 +393,22 @@ Variables at exactly 32 characters (SAS limit — already at limit, `pcnr_` pref
 - `Oral_Morphine_Equiv_Given__1_7_T` (32 chars)
 - `ISO_Exp_IntraOp_MAC_Minutes_Tota` (32 chars)
 
-**Correct truncation table — all 10 at-limit names (acceptance criteria for Plan 02 Task 1):**
+**Worked truncation example for planner to verify algorithm:**
 
-| Source name (32 chars) | Proposed name (32 chars) | Notes |
-|---|---|---|
-| rt_BLOCK_START_TO_BLOCK_END_mins | pcnr_rt_BLOCK_START_TO_BLOC_mins | head=22: `rt_BLOCK_START_TO_BLOC` |
-| fentaNYL_SUBLIMAZE_mg__1_7_Total | pcnr_fentaNYL_SUBLIMAZE_mg_Total | double-_ in source; head loses `_1_7` distinguisher — flag for `override_name` at checkpoint |
-| fentaNYL_SUBLIMAZE_mg_IntraOp_To | pcnr_fentaNYL_SUBLIMAZE_mg_In_To | already truncated at source |
-| Total_Phenylephrine_HCl_Pressors | pcnr_Total_Phenylephrin_Pressors | |
-| Total_Norepinephrine_Bitartrate_ | pcnr_Total_Norepinephrine_Bitar_ | trailing `_` in source → final_token is empty → fallback to tail truncation; result has trailing `_` which is stripped from head → `pcnr_Total_Norepinephrine_Bitar_` ⚠ empty final_token edge case — use tail truncation |
-| Total_EPHEDRINE_SULFATE_PRESSORS | pcnr_Total_EPHEDRINE_SU_PRESSORS | |
-| SEV_Exp_IntraOp_MAC_Minutes_Tota | pcnr_SEV_Exp_IntraOp_MAC_Mi_Tota | |
-| Oral_Morphine_Equiv_IntraOp_Tota | pcnr_Oral_Morphine_Equiv_In_Tota | |
-| Oral_Morphine_Equiv_Given__1_7_T | pcnr_Oral_Morphine_Equiv_Given_T | double-_ → `_1_7` lost, flag for checkpoint |
-| ISO_Exp_IntraOp_MAC_Minutes_Tota | pcnr_ISO_Exp_IntraOp_MAC_Mi_Tota | |
-
-No collisions in the table. `Total_Norepinephrine_Bitartrate_` exposes the empty-final-token edge case: trailing `_` in the source means the final token is an empty string — fall back to tail truncation. Strip trailing `_` from `head` before rejoining so a truncation that lands on an underscore cannot produce a double `__`.
-
-**Worked example (primary checkpoint example):**
 Name: `rt_BLOCK_START_TO_BLOCK_END_mins` (32 chars)
 After `pcnr_` prefix: `pcnr_rt_BLOCK_START_TO_BLOCK_END_mins` = 37 chars (exceeds 32)
-Algorithm:
-1. `final_token` = `mins` (4 chars)
-2. Budget: 32 − 5(`pcnr_`) − 1(`_`) − 4(`mins`) = **22 chars** for `head`
-3. `rt_BLOCK_START_TO_BLOCK_END` (27 chars) → trim to 22 = `rt_BLOCK_START_TO_BLOC`
-4. Result: `pcnr_rt_BLOCK_START_TO_BLOC_mins` = **32 chars** ✓
 
-**Confirm this table at the PCM-D-23 checkpoint before the name map draft is generated.**
+Apply PCM-D-23 algorithm:
+1. `final_token` = last token after final `_` = `mins`
+2. Prefix + head + `_` + final_token must be exactly 32 chars
+   `pcnr_` (5) + `_` (1) + `mins` (4) = 10 chars consumed → `head` can be 22 chars
+   `rt_BLOCK_START_TO_BLOCK_END` (27 chars) → trim to 22 = `rt_BLOCK_START_TO_BLOC`
+   Result: `pcnr_rt_BLOCK_START_TO_BLOC_mins` = 32 chars
+   (Corrected 2026-09-28: an earlier version trimmed to 21 chars and gave `..._BLO_mins`, 31 chars.
+   The full 10-name table, including the trailing-underscore and double-underscore edge cases,
+   is in 23-02-PLAN.md Task 1 and is authoritative.)
+
+**Confirm this algorithm output at the PCM-D-23 checkpoint before the name map draft is generated.**
 
 Note: variables in `g.master_data_harmonized` that were already truncated at the source
 (e.g., `fentaNYL_SUBLIMAZE_mg_IntraOp_To` has already lost its trailing characters) cannot
@@ -507,7 +497,7 @@ quit;
     create table work._num_&val as
     select name as variable,
            "&val" as raw_value length=20,
-           put(strip("&val"), $hex.) as raw_hex length=40,
+           /* superseded: Plan 01 uses a single-pass DATA step array scan + %hexkey */
            count(*) as n_rows
     from g.master_data_harmonized (keep=<numvars>)
     /* Must use IS NOT MISSING -- PROC SQL syntax */
@@ -567,7 +557,7 @@ by SAS assertions within the program and manual acceptance criteria.
 | PCNR-02 | Numeric sentinels scanned with IS NOT MISSING; report only | Inspect draft CSV for `var_type = num` rows; confirm `action = KEEP` pre-filled |
 | PCNR-03 | Ambiguous values reported separately | `candidate_class = AMBIGUOUS` rows present in `23_sentinel_candidates.csv`; no AMBIGUOUS row resolved by wildcard |
 | PCNR-04 | Case/whitespace variants in `23_case_variants.csv` | File written; spot-check `Race`, `Sex`, `Patient_Type` for known variants |
-| PCNR-05 | Name map complete; all names <= 32 chars and unique | Assertions in SECTION 8: max(name_len) <= 32; zero collision_flag rows after overrides |
+| PCNR-05 | Name map complete; all names <= 32 chars and unique | SECTION 8: max(name_len) <= 32 asserted; collision_flag count reported as NOTE (hard zero-collision check runs in the Phase 24 gate against docs/pcnr_name_map.csv) |
 | PCNR-06 | Draft files written; gate flag default 0 | `qc/23_sentinel_decisions_DRAFT.csv` and `qc/23_pcnr_name_map_DRAFT.csv` exist; `PCNR_APPROVED = 0` in `00_config.sas` |
 
 ### Static Check (acceptance criterion for every plan wave)
@@ -605,7 +595,6 @@ Must show only the `concept_decisions.csv` read with no `file=`, `outfile=`, `fi
      (length 60), `Admit_Source` (length 28-40), `Dischg_Disposition` (length 28-43),
      `Anesthesia_Type` (length 33). Planner should propose this as the exclusion list rather than
      the length heuristic, so the scope is explicit and auditable in the program header.
-   - **Resolved:** freetext_cols = Base_Procedure_1 only (locked per plan). Length-50 heuristic rejected.
 
 3. **`UNKNOWN` wildcard dual-class problem**
    - What we know: `UNKNOWN` is AUTO for non-demographic columns but AMBIGUOUS for demographic columns

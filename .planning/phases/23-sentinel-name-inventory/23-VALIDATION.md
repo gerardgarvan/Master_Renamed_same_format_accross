@@ -60,11 +60,15 @@ Phase 23. The flip to 1 is Phase 24 scope.
 
 - No new test framework needed. SAS outputs verified by file existence, log assertions, and grep
   static checks on the source. The recurring static checks (mandatory each wave):
-  - `grep -n '\$hex\.' sas/*.sas` must return NOTHING (bare $hex. is the truncating form)
+  - `grep -n '\$hex\.' sas/00_config.sas sas/23_pcnr_inventory.sas` must return NOTHING (bare $hex. is
+    the truncating form; scoped to these two files so older programs' unrelated uses don't false-fail)
+  - `grep -n "%macro hexkey(var) */" sas/00_config.sas` must return NOTHING (`/` = macro-options syntax error)
   - `grep -ni "proc import" sas/23_pcnr_inventory.sas` must return NOTHING (PCM-T-16)
   - `grep -ni "%put WARNING" sas/23_pcnr_inventory.sas` must return NOTHING (Phase 22 scanner fails on WARNING)
   - `grep -ni "docs" sas/23_pcnr_inventory.sas` shows ONLY the concept_decisions.csv read
   - every `%if` inside a `%macro ... %mend` block (PCM-T-15)
+  - no `%fail_out` tied to collision_flag in program 23 (collisions are NOTE-only at draft stage;
+    the hard assertion is in the Phase 24 gate)
 
 *Existing infrastructure covers all phase requirements.*
 
@@ -75,10 +79,10 @@ Phase 23. The flip to 1 is Phase 24 scope.
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
 | Human review of qc/23_sentinel_candidates.csv | PCM-D-21, D-25 | Human judgement on placeholder values | Gerard opens qc/23_sentinel_candidates.csv (sorted AMBIGUOUS first); confirms classification |
-| Name-map truncation review | PCM-D-23 | 10 names hit 32-char limit; human confirms/overrides | Gerard checks qc/23_pcnr_name_map_DRAFT.csv against the RESEARCH.md 10-name table |
+| Name-map truncation review | PCM-D-23 | 10 source names already at 32 chars need truncation; human confirms/overrides | Gerard checks qc/23_pcnr_name_map_DRAFT.csv against the 10-name table in 23-02-PLAN.md Task 1; plans an override_name for each collision_flag=1 row |
 | PCM-D-24 numeric approvals / D-25 column scope | PCM-D-24, D-25 | Price sign-off on analytic-facing decisions | Price reviews numeric sentinel rows and demographic/score column lists |
 | Copy drafts P: qc/ -> C: docs/ | PCNR-06 | P: drive inaccessible to the agent | Human copies + edits docs/sentinel_decisions.csv and docs/pcnr_name_map.csv |
-| Pre-commit PHI scan | D-09 | Hard gate before git add -f | Agent scans REVIEW rows' raw_value; PHI hit -> add column to freetext_cols + rerun program 23 (never hand-delete) |
+| Pre-commit PHI scan | D-09 | Hard gate before git add -f; the agent must not read a file that may hold PHI | HUMAN scans REVIEW rows' raw_value and reports "PHI scan clean"; PHI hit -> add column to freetext_cols + rerun program 23 (never hand-delete) |
 
 ---
 

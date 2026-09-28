@@ -34,6 +34,12 @@
        17_summary_stats_by_domain.sas build work.analysis_base_ext */
 %let D15_APPROVED = 1;
 
+/* ---- Phase 23 / PCNR gate flag ----
+   0 = awaiting human review of qc/23_sentinel_candidates.csv and qc/23_pcnr_name_map_DRAFT.csv
+   1 = approved -- lets 24_pcnr_build.sas proceed with recode and rename operations */
+%let PCNR_APPROVED = 0;
+%put NOTE: [00_config] PCNR_APPROVED = &PCNR_APPROVED;
+
 /* ---- Pipeline flag ----
    0 = running standalone; the program redirects the log to its own file.
    1 = running under 99_run_all.sas, which owns the master log.
@@ -72,3 +78,12 @@
 %put NOTE: [00_config] xwalk_backup_path = &xwalk_backup_path;
 %put NOTE: [00_config] D15_APPROVED      = &D15_APPROVED;
 %put NOTE: [00_config] in_pipeline       = &in_pipeline;
+
+/* ---- Shared hex-key macro (Phase 23+) ----
+   Usage (char):    raw_hex = %hexkey(raw_value);
+   Usage (numeric): raw_hex = %hexkey(strip(put(x, best32.)));
+   $hex400. covers values up to 200 bytes. substr(..., 1, 2*length(&var)) strips
+   trailing-blank hex padding so keys are comparable byte-for-byte.
+   NEVER use bare put(x,$hex.) -- default width 4 encodes only the first 2 bytes,
+   so UNKNOWN and UNK both produce 554E and -999/-99 both produce 2D39. */
+%macro hexkey(var);substr(put(&var, $hex400.), 1, 2*length(&var))%mend hexkey;

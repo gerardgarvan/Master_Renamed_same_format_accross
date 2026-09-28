@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: pcnr_ Clean Analysis Dataset
 status: unknown
-last_updated: "2026-09-28T19:58:38.330Z"
+last_updated: "2026-09-28T20:41:18.526Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 9
+  completed_plans: 7
+  percent: 78
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
 
 **Core value:** A single `run_pipeline.cmd` that runs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
 
-**Current focus:** Phase 23 — sentinel-name-inventory
+**Current focus:** Phase 24 — build-g-pcnr-harmonized
 
 ---
 
 ## Current Position
 
-Phase: 24
-Plan: Not started
+Phase: 24 (build-g-pcnr-harmonized) — EXECUTING
+Plan: 2 of 3
 Last activity: 2026-09-28
 
 ### v2.1 Phase Status
@@ -44,7 +44,7 @@ Last activity: 2026-09-28
 | 24 | Build g.pcnr_harmonized | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | Not started |
 
-**Progress:** [██████████] 100%
+**Progress:** [████████░░] 78%
 
 ### v2.0 Phase Status (shipped 2026-09-24)
 

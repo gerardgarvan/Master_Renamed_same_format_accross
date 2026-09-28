@@ -38,8 +38,8 @@ at 16b, and the new programs run downstream of 16b.
 
 ### Build g.pcnr_harmonized (Phase 24)
 
-- [ ] **PCNR-07**: `g.pcnr_harmonized` built from `g.master_data_harmonized` only (no other input except the two approved CSVs). WORK-then-promote; `g.master_data_harmonized` is never written (PCM-T-02).
-- [ ] **PCNR-08**: Every `MISSING` decision in `sentinel_decisions.csv` applied by exact match on the raw value after the same normalization used in PCNR-01. Character columns keep their type and length; numeric recodes (if any are approved) become standard missing.
+- [x] **PCNR-07**: `g.pcnr_harmonized` built from `g.master_data_harmonized` only (no other input except the two approved CSVs). WORK-then-promote; `g.master_data_harmonized` is never written (PCM-T-02).
+- [x] **PCNR-08**: Every `MISSING` decision in `sentinel_decisions.csv` applied by exact match on the raw value after the same normalization used in PCNR-01. Character columns keep their type and length; numeric recodes (if any are approved) become standard missing.
 - [ ] **PCNR-09**: Columns renamed per `docs/pcnr_name_map.csv`; key columns handled per PCM-D-22. Each pcnr column keeps its original label and format; a blank original label is set to the original variable name so the lineage is visible in PROC CONTENTS.
 - [ ] **PCNR-10**: Recode audit `qc/24_pcnr_recode_counts.csv`: variable × raw value × rows recoded, plus a per-variable total.
 - [ ] **PCNR-11**: Assertions (all abort on failure):
@@ -107,8 +107,8 @@ Per project practice, sign-off on analytic-facing decisions (D-21, D-24, D-25) g
 | PCNR-04 | 23 | Complete |
 | PCNR-05 | 23 | Complete |
 | PCNR-06 | 23 | Complete |
-| PCNR-07 | 24 | Pending |
-| PCNR-08 | 24 | Pending |
+| PCNR-07 | 24 | Complete |
+| PCNR-08 | 24 | Complete |
 | PCNR-09 | 24 | Pending |
 | PCNR-10 | 24 | Pending |
 | PCNR-11 | 24 | Pending |

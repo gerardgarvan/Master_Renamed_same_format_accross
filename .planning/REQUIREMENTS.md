@@ -42,7 +42,7 @@ at 16b, and the new programs run downstream of 16b.
 - [x] **PCNR-08**: Every `MISSING` decision in `sentinel_decisions.csv` applied by exact match on the raw value after the same normalization used in PCNR-01. Character columns keep their type and length; numeric recodes (if any are approved) become standard missing.
 - [ ] **PCNR-09**: Columns renamed per `docs/pcnr_name_map.csv`; key columns handled per PCM-D-22. Each pcnr column keeps its original label and format; a blank original label is set to the original variable name so the lineage is visible in PROC CONTENTS.
 - [ ] **PCNR-10**: Recode audit `qc/24_pcnr_recode_counts.csv`: variable × raw value × rows recoded, plus a per-variable total.
-- [ ] **PCNR-11**: Assertions (all abort on failure):
+- [x] **PCNR-11**: Assertions (all abort on failure):
   - 41,150 rows; `PRECEDE_STUDY_ID` unique and identical in set to the source; `pecan_ID` identical row by row
   - column count equals the source column count (1:1 mapping, nothing dropped or added)
   - per variable: `n_missing_after = n_missing_before + n_recoded`, exactly
@@ -111,7 +111,7 @@ Per project practice, sign-off on analytic-facing decisions (D-21, D-24, D-25) g
 | PCNR-08 | 24 | Complete |
 | PCNR-09 | 24 | Pending |
 | PCNR-10 | 24 | Pending |
-| PCNR-11 | 24 | Pending |
+| PCNR-11 | 24 | Complete |
 | PCNR-12 | 25 | Pending |
 | PCNR-13 | 25 | Pending |
 | PCNR-14 | 25 | Pending |

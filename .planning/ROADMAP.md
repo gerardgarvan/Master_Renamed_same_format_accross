@@ -55,7 +55,7 @@ every recoded cell counted and traceable to an approved decision.
 
 | Phase | Name | Requirements | Depends on | Status |
 |-------|------|--------------|------------|--------|
-| 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | — | Planned (3 plans, 2 waves) |
+| 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | — | Complete (2026-09-28) |
 | 23 | Sentinel & Name Inventory | PCNR-01..06 | 22 (FIX-02) | Not started |
 | 24 | Build g.pcnr_harmonized | PCNR-07..11 | 23 + PCNR_APPROVED=1 | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | PCNR-12..17 | 24 | Not started |
@@ -75,9 +75,9 @@ run stopped at 16b, and every v2.1 program runs after 16b.
 **Note:** INV-07 is independent and can run in parallel with the rest of the phase.
 
 **Plans:** 3 plans in 2 waves
-- [ ] 22-01-PLAN.md — Runner hardening: RUN-02 line-start warning count, RUN-03 SAS_EXE override, log-scan script (Wave 1)
-- [ ] 22-02-PLAN.md — INV-07 formatted workbook (19b) + FIX-02 commit verification (Wave 1)
-- [ ] 22-03-PLAN.md — Human pipeline run gate + DOC-05 documentation updates (Wave 2)
+- [x] 22-01-PLAN.md — Runner hardening: RUN-02 line-start warning count, RUN-03 SAS_EXE override, log-scan script (Wave 1)
+- [x] 22-02-PLAN.md — INV-07 formatted workbook (19b) + FIX-02 commit verification (Wave 1)
+- [x] 22-03-PLAN.md — Human pipeline run gate + DOC-05 documentation updates (Wave 2)
 
 
 #### Phase 23: Sentinel & Name Inventory
@@ -130,7 +130,7 @@ new program (decided in the plan)
 
 | Phase | Name | Plans Complete | Status | Completed |
 |-------|------|----------------|--------|-----------|
-| 22 | Pipeline Green & Hardening | 2/3 | In Progress | -- |
+| 22 | Pipeline Green & Hardening | 3/3 | Complete | 2026-09-28 |
 
 ### Phase 22 Plan Progress
 
@@ -138,7 +138,7 @@ new program (decided in the plan)
 |------|------|--------|--------|
 | 22-01 | Runner hardening + log scanner (RUN-02, RUN-03, D-11) | Complete | 24b853b, e9e5ddc, 24e9d3f |
 | 22-02 | INV-07 sheet order fix (FAMILIES to position 2) | Complete | 8ddb3d1 |
-| 22-03 | DOC-05 human verification run | Not started | -- |
+| 22-03 | DOC-05 human verification run | Complete | cb70b2a |
 
 ---
 

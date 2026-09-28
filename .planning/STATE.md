@@ -31,15 +31,15 @@ See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
 
 ## Current Position
 
-Phase: 22 (pipeline-green-hardening) -- EXECUTING
-Plan: 2 of 3 -- COMPLETE (22-01 runner hardening + log scanner; 22-02 INV-07 sheet order fix)
-Last activity: 2026-09-24 -- 22-02 complete (INV-07 FAMILIES sheet moved to position 2)
+Phase: 22 (pipeline-green-hardening) -- COMPLETE
+Plan: 3 of 3 -- COMPLETE (22-01 runner hardening + log scanner; 22-02 INV-07 sheet order fix; 22-03 human run gate + DOC-05)
+Last activity: 2026-09-28 -- 22-03 complete (pipeline PASSED, DOC-05 closed, Phase 22 complete)
 
 ### v2.1 Phase Status
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 22 | Pipeline Green & Hardening | Not started |
+| 22 | Pipeline Green & Hardening | Complete (2026-09-28) |
 | 23 | Sentinel & Name Inventory | Not started |
 | 24 | Build g.pcnr_harmonized | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | Not started |

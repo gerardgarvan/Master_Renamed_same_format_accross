@@ -56,7 +56,7 @@ every recoded cell counted and traceable to an approved decision.
 | Phase | Name | Requirements | Depends on | Status |
 |-------|------|--------------|------------|--------|
 | 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | Complete    | 2026-09-28 |
-| 23 | Sentinel & Name Inventory | 3/3 | Complete   | 2026-09-28 |
+| 23 | Sentinel & Name Inventory | 3/3 | Complete    | 2026-09-28 |
 | 24 | Build g.pcnr_harmonized | PCNR-07..11 | 23 + PCNR_APPROVED=1 | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | PCNR-12..17 | 24 | Not started |
 

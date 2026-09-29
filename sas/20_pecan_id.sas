@@ -36,6 +36,8 @@
   Revised     : 2026-09-23 (review fixes -- CALL EXECUTE timing, report layout,
                 D-14 orphan/mismatch logic, r7/r8/r9 list, open-code %IF removal,
                 ranking guard, MRN type guard, backup-on-change only)
+                2026-09-29 (%unquote on digit-prefix sheet name literal in
+                reach_one -- same macro-quoting fix as program 19 R5-01)
 ==========================================================================*/
 
 
@@ -740,8 +742,11 @@ run;
         run;
       %end;
       %else %do;
+        /* %superq leaves macro-quoting bytes around the value; inside a
+           quoted name literal they reach the XLSX engine verbatim and no
+           sheet matches. %unquote strips them first. */
         data work._reach_tmp;
-          set _rchx."%superq(_rsheet)"n(keep=&col);
+          set _rchx."%unquote(%superq(_rsheet))"n(keep=&col);
         run;
       %end;
       %if &syserr > 4 %then %let ok = 0;

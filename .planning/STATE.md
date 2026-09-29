@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: pcnr_ Clean Analysis Dataset
 status: unknown
-last_updated: "2026-09-29T14:24:40.681Z"
+last_updated: "2026-09-29T14:27:43.398Z"
 last_activity: 2026-09-29
 progress:
   total_phases: 4
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
 
 ## Current Position
 
-Phase: 25 (pcnr-cohort-dictionary-wiring) — EXECUTING
-Plan: 3 of 3
+Phase: 25
+Plan: Not started
 Last activity: 2026-09-29
 
 ### v2.1 Phase Status

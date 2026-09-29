@@ -25,6 +25,7 @@ All entries are ASCII only (session encoding is not UTF-8).
 | PCM-D-14 | Pipeline-derived column rule (HARM-07) | **Resolved 2026-09-14 -- see entry below** | Gerard |
 | PCM-D-17 | pecan_ID derivation method + MRN retention | **Resolved 2026-09-23 -- see entry below** | Gerard |
 | PCM-D-18 | pecan_ID attach point (10b + 16b at build time) | **Resolved 2026-09-23 -- see entry below** | Gerard |
+| PCM-D-26 | Program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort | **Resolved 2026-09-28 -- see entry below** | Gerard |
 
 ---
 
@@ -855,3 +856,20 @@ This trap applies to all future programs that consume gate files produced by pro
 Added alongside PCM-T-14 (no bare $hex.) and PCM-T-15.
 
 **Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03
+
+---
+
+## PCM-D-26 -- Program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort: RESOLVED
+
+**Decision (v2.1 resolution):** Program 17 reads g.analytic_cohort unchanged.
+Repointing to g.pcnr_analytic_cohort deferred; requires domain map re-approval and
+result review with Price before implementation. If needed sooner, a separate 17b reading
+the pcnr cohort could run alongside.
+
+**Rationale:** Every column name changes to pcnr_*, requiring the domain map behind
+DOMAIN_MAP_APPROVED to be rebuilt and re-approved -- substantive analytical work.
+Recoded values (e.g., 4,586 EmployeeStatus "Unknown" -> missing; 758 race refused/unknown
+-> missing) change reported statistics: denominators and category percentages shift.
+
+**Owner:** Gerard (decided 2026-09-28); Price required for any future repoint.
+**Resolved:** 2026-09-28 -- Phase 25.

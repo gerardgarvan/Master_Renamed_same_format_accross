@@ -43,6 +43,7 @@ libname g "&g_path";
    to a file and every later submit in this session appears to vanish.        */
 %macro fail_out(msg=);
   %put ERROR: &msg;
+  ods _all_ close;     /* closes ODS EXCEL too if an abort happens mid-workbook */
   ods listing;
   proc printto; run;
   %put ERROR: 25_pcnr_cohort.sas aborted -- &msg;
@@ -113,6 +114,9 @@ libname g "&g_path";
    ========================================================================= */
 %put NOTE: [25_pcnr_cohort] SECTION 1 -- applying Patient_Type filter;
 
+/* VERIFY: this condition must be byte-for-byte the one in sas/16b_cohort_rebuild.sas
+   (same literals, same upcase/strip handling), applied to the pcnr_ column name.
+   The Section 2 ID-set assertion will catch a mismatch, but only after the fact. */
 data work._pcnr_cohort_candidate;
   set g.pcnr_harmonized;
   where pcnr_Patient_Type in ('INPATIENT', 'OBSERVATION');
@@ -154,29 +158,9 @@ quit;
 %_assert_id_set;
 
 /* =========================================================================
-   SECTION 3: WORK-then-promote to g.pcnr_analytic_cohort
-   ========================================================================= */
-%put NOTE: [25_pcnr_cohort] SECTION 3 -- promoting to g.pcnr_analytic_cohort;
-
-data g.pcnr_analytic_cohort;
-  set work._pcnr_cohort_candidate;
-run;
-
-proc sql noprint;
-  select count(*) into :n_promoted trimmed from g.pcnr_analytic_cohort;
-quit;
-
-%macro _assert_promoted_n;
-  %if &n_promoted ne 13890 %then
-    %fail_out(msg=g.pcnr_analytic_cohort has &n_promoted rows after promote -- expected 13890);
-  %put NOTE: [25_pcnr_cohort] SECTION 3 OK -- g.pcnr_analytic_cohort promoted: &n_promoted rows.;
-%mend _assert_promoted_n;
-%_assert_promoted_n;
-
-/* =========================================================================
    SECTION 4: Compute complete-case Ns
    n_before from g.analytic_cohort (original variable names, read-only)
-   n_after  from g.pcnr_analytic_cohort (pcnr_ prefixed names)
+   n_after  from work._pcnr_cohort_candidate (pcnr_ prefixed names; promoted after Section 5)
    ========================================================================= */
 %put NOTE: [25_pcnr_cohort] SECTION 4 -- computing complete-case Ns;
 
@@ -191,12 +175,12 @@ proc sql noprint;
       and Cognitive_Score is not missing
       and Frailty_Score is not missing;
 
-  /* n_after: from g.pcnr_analytic_cohort using pcnr_ names */
-  select count(pcnr_Admit_BMI)       into :n_bmi_after   trimmed from g.pcnr_analytic_cohort;
-  select count(pcnr_Cognitive_Score) into :n_cog_after   trimmed from g.pcnr_analytic_cohort;
-  select count(pcnr_Frailty_Score)   into :n_frail_after trimmed from g.pcnr_analytic_cohort;
+  /* n_after: from the validated WORK candidate (promoted only after Section 5 passes) */
+  select count(pcnr_Admit_BMI)       into :n_bmi_after   trimmed from work._pcnr_cohort_candidate;
+  select count(pcnr_Cognitive_Score) into :n_cog_after   trimmed from work._pcnr_cohort_candidate;
+  select count(pcnr_Frailty_Score)   into :n_frail_after trimmed from work._pcnr_cohort_candidate;
   select count(*)                    into :n_all3_after  trimmed
-    from g.pcnr_analytic_cohort
+    from work._pcnr_cohort_candidate
     where pcnr_Admit_BMI is not missing
       and pcnr_Cognitive_Score is not missing
       and pcnr_Frailty_Score is not missing;
@@ -233,6 +217,7 @@ run;
 
 /* Extract n_recoded_total for the three score variables.
    PCM-D-24 approved no numeric recodes, so all three are expected = 0. */
+%let rc_bmi = ; %let rc_cog = ; %let rc_frail = ;   /* SQL INTO leaves them undefined on 0 rows */
 proc sql noprint;
   select n_recoded_total into :rc_bmi   trimmed
     from work._recode_totals where upcase(final_name) = 'PCNR_ADMIT_BMI';
@@ -242,9 +227,11 @@ proc sql noprint;
     from work._recode_totals where upcase(final_name) = 'PCNR_FRAILTY_SCORE';
 quit;
 
-/* If any macro variable is empty (variable not in file), treat as unknown and skip
-   (guard only -- pipeline should not reach here with missing recode records).     */
+/* Every KEEP column has a row in the totals file (program 24 writes one per KEEP/KEY
+   column), so an empty value means the file or the names are wrong -- fail, do not skip. */
 %macro _assert_zero_recode_no_change;
+  %if %length(&rc_bmi) = 0 or %length(&rc_cog) = 0 or %length(&rc_frail) = 0 %then
+    %fail_out(msg=PCNR-13 -- score column missing from qc/24_pcnr_recode_totals.csv (bmi=&rc_bmi cog=&rc_cog frail=&rc_frail));
   %if %length(&rc_bmi) > 0 %then %do;
     %if &rc_bmi = 0 %then %do;
       %if &n_bmi_after ne &n_bmi_before %then
@@ -296,6 +283,29 @@ data _null_;
   put "all_three,&n_all3_before,&n_all3_after,%eval(&n_all3_before - &n_all3_after)";
 run;
 %put NOTE: [25_pcnr_cohort] SECTION 5 OK -- qc/25_complete_case_n.csv written.;
+
+/* =========================================================================
+   SECTION 3: WORK-then-promote to g.pcnr_analytic_cohort
+   Runs AFTER the Section 4-5 assertions (n_after is computed on the WORK candidate),
+   so a failed benchmark or zero-recode check never leaves a promoted dataset behind.
+   ========================================================================= */
+%put NOTE: [25_pcnr_cohort] SECTION 3 -- promoting to g.pcnr_analytic_cohort;
+
+data g.pcnr_analytic_cohort;
+  set work._pcnr_cohort_candidate;
+run;
+
+proc sql noprint;
+  select count(*) into :n_promoted trimmed from g.pcnr_analytic_cohort;
+quit;
+
+%macro _assert_promoted_n;
+  %if &n_promoted ne 13890 %then
+    %fail_out(msg=g.pcnr_analytic_cohort has &n_promoted rows after promote -- expected 13890);
+  %put NOTE: [25_pcnr_cohort] SECTION 3 OK -- g.pcnr_analytic_cohort promoted: &n_promoted rows.;
+%mend _assert_promoted_n;
+%_assert_promoted_n;
+
 
 /* =========================================================================
    SECTION 6: PCNR_DICTIONARY.xlsx (KEY, VARIABLES, RECODES, COHORT_N)
@@ -505,3 +515,12 @@ run;
 
 %put NOTE: [25_pcnr_cohort] SECTION 7 OK -- qc/25_pcnr_variables.csv written (&n_vars_csv rows).;
 %put NOTE: [25_pcnr_cohort] ==== Phase 25 complete ====;
+
+/* Restore the log on the SUCCESS path too (fail_out only restores it on abort);
+   otherwise later submits in an interactive session keep writing to 25_pcnr_cohort.log */
+%macro _restore_log;
+  %if &in_pipeline = 0 %then %do;
+    proc printto; run;
+  %end;
+%mend _restore_log;
+%_restore_log;

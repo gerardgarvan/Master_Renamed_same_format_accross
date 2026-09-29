@@ -174,12 +174,128 @@ quit;
 %_assert_promoted_n;
 
 /* =========================================================================
-   SECTION 4: Compute complete-case Ns -- see Plan 25-01 Task 2
+   SECTION 4: Compute complete-case Ns
+   n_before from g.analytic_cohort (original variable names, read-only)
+   n_after  from g.pcnr_analytic_cohort (pcnr_ prefixed names)
    ========================================================================= */
+%put NOTE: [25_pcnr_cohort] SECTION 4 -- computing complete-case Ns;
+
+proc sql noprint;
+  /* n_before: from g.analytic_cohort using original variable names */
+  select count(Admit_BMI)       into :n_bmi_before   trimmed from g.analytic_cohort;
+  select count(Cognitive_Score) into :n_cog_before   trimmed from g.analytic_cohort;
+  select count(Frailty_Score)   into :n_frail_before trimmed from g.analytic_cohort;
+  select count(*)               into :n_all3_before  trimmed
+    from g.analytic_cohort
+    where Admit_BMI is not missing
+      and Cognitive_Score is not missing
+      and Frailty_Score is not missing;
+
+  /* n_after: from g.pcnr_analytic_cohort using pcnr_ names */
+  select count(pcnr_Admit_BMI)       into :n_bmi_after   trimmed from g.pcnr_analytic_cohort;
+  select count(pcnr_Cognitive_Score) into :n_cog_after   trimmed from g.pcnr_analytic_cohort;
+  select count(pcnr_Frailty_Score)   into :n_frail_after trimmed from g.pcnr_analytic_cohort;
+  select count(*)                    into :n_all3_after  trimmed
+    from g.pcnr_analytic_cohort
+    where pcnr_Admit_BMI is not missing
+      and pcnr_Cognitive_Score is not missing
+      and pcnr_Frailty_Score is not missing;
+quit;
+
+%put NOTE: [25_pcnr_cohort] n_before: BMI=&n_bmi_before Cog=&n_cog_before Frail=&n_frail_before All3=&n_all3_before;
+%put NOTE: [25_pcnr_cohort] n_after:  BMI=&n_bmi_after  Cog=&n_cog_after  Frail=&n_frail_after  All3=&n_all3_after;
 
 /* =========================================================================
-   SECTION 5: Assertions + write qc/25_complete_case_n.csv -- see Plan 25-01 Task 2
+   SECTION 5: Assertions + write qc/25_complete_case_n.csv
    ========================================================================= */
+%put NOTE: [25_pcnr_cohort] SECTION 5 -- asserting n_after <= n_before;
+
+/* Assertion 1: n_after must not exceed n_before for any measure.
+   Recoding only adds missing values, never fills them in.              */
+%macro _assert_n_after(measure=, nbefore=, nafter=);
+  %if &nafter > &nbefore %then
+    %fail_out(msg=PCNR-13 FAILED -- &measure n_after (&nafter) > n_before (&nbefore));
+%mend _assert_n_after;
+
+%_assert_n_after(measure=pcnr_Admit_BMI,       nbefore=&n_bmi_before,   nafter=&n_bmi_after);
+%_assert_n_after(measure=pcnr_Cognitive_Score, nbefore=&n_cog_before,   nafter=&n_cog_after);
+%_assert_n_after(measure=pcnr_Frailty_Score,   nbefore=&n_frail_before, nafter=&n_frail_after);
+%_assert_n_after(measure=all_three,            nbefore=&n_all3_before,  nafter=&n_all3_after);
+
+/* Assertion 1b: For measures with 0 recodes, n_after must equal n_before.
+   Read qc/24_pcnr_recode_totals.csv via DATA step infile (PCM-T-16).
+   Schema: variable,final_name,n_recoded_total                          */
+data work._recode_totals;
+  infile "&qc_path.\24_pcnr_recode_totals.csv" dsd firstobs=2 truncover;
+  length variable $ 64 final_name $ 64 n_recoded_total 8;
+  input variable $ final_name $ n_recoded_total;
+run;
+
+/* Extract n_recoded_total for the three score variables.
+   PCM-D-24 approved no numeric recodes, so all three are expected = 0. */
+proc sql noprint;
+  select n_recoded_total into :rc_bmi   trimmed
+    from work._recode_totals where upcase(final_name) = 'PCNR_ADMIT_BMI';
+  select n_recoded_total into :rc_cog   trimmed
+    from work._recode_totals where upcase(final_name) = 'PCNR_COGNITIVE_SCORE';
+  select n_recoded_total into :rc_frail trimmed
+    from work._recode_totals where upcase(final_name) = 'PCNR_FRAILTY_SCORE';
+quit;
+
+/* If any macro variable is empty (variable not in file), treat as unknown and skip
+   (guard only -- pipeline should not reach here with missing recode records).     */
+%macro _assert_zero_recode_no_change;
+  %if %length(&rc_bmi) > 0 %then %do;
+    %if &rc_bmi = 0 %then %do;
+      %if &n_bmi_after ne &n_bmi_before %then
+        %fail_out(msg=PCNR-13 FAILED -- pcnr_Admit_BMI had 0 recodes but n_after (&n_bmi_after) ne n_before (&n_bmi_before));
+    %end;
+  %end;
+  %if %length(&rc_cog) > 0 %then %do;
+    %if &rc_cog = 0 %then %do;
+      %if &n_cog_after ne &n_cog_before %then
+        %fail_out(msg=PCNR-13 FAILED -- pcnr_Cognitive_Score had 0 recodes but n_after (&n_cog_after) ne n_before (&n_cog_before));
+    %end;
+  %end;
+  %if %length(&rc_frail) > 0 %then %do;
+    %if &rc_frail = 0 %then %do;
+      %if &n_frail_after ne &n_frail_before %then
+        %fail_out(msg=PCNR-13 FAILED -- pcnr_Frailty_Score had 0 recodes but n_after (&n_frail_after) ne n_before (&n_frail_before));
+    %end;
+  %end;
+  /* all_three: require equality when all three component recode counts are 0 */
+  %if %length(&rc_bmi) > 0 and %length(&rc_cog) > 0 and %length(&rc_frail) > 0 %then %do;
+    %if &rc_bmi = 0 and &rc_cog = 0 and &rc_frail = 0 %then %do;
+      %if &n_all3_after ne &n_all3_before %then
+        %fail_out(msg=PCNR-13 FAILED -- all_three: all component recode counts are 0 but n_after (&n_all3_after) ne n_before (&n_all3_before));
+    %end;
+  %end;
+  %put NOTE: [25_pcnr_cohort] SECTION 5 -- zero-recode equality assertions passed.;
+%mend _assert_zero_recode_no_change;
+%_assert_zero_recode_no_change;
+
+/* Assertion 2: n_before benchmarks must match known values (PCNR-13).
+   Hard-coded from STATE.md / CONTEXT.md.                              */
+%macro _assert_n_before_benchmarks;
+  %if &n_bmi_before   ne 12726 %then %fail_out(msg=pcnr_Admit_BMI n_before=&n_bmi_before -- expected 12726);
+  %if &n_cog_before   ne 7252  %then %fail_out(msg=pcnr_Cognitive_Score n_before=&n_cog_before -- expected 7252);
+  %if &n_frail_before ne 8150  %then %fail_out(msg=pcnr_Frailty_Score n_before=&n_frail_before -- expected 8150);
+  %if &n_all3_before  ne 6523  %then %fail_out(msg=all_three n_before=&n_all3_before -- expected 6523);
+  %put NOTE: [25_pcnr_cohort] SECTION 5 -- n_before benchmarks confirmed.;
+%mend _assert_n_before_benchmarks;
+%_assert_n_before_benchmarks;
+
+/* Write qc/25_complete_case_n.csv via DATA step PUT (PCM-T-16 -- never PROC EXPORT).
+   n_difference computed inline with %eval.                                          */
+data _null_;
+  file "&qc_path.\25_complete_case_n.csv";
+  put "measure,n_before,n_after,n_difference";
+  put "pcnr_Admit_BMI,&n_bmi_before,&n_bmi_after,%eval(&n_bmi_before - &n_bmi_after)";
+  put "pcnr_Cognitive_Score,&n_cog_before,&n_cog_after,%eval(&n_cog_before - &n_cog_after)";
+  put "pcnr_Frailty_Score,&n_frail_before,&n_frail_after,%eval(&n_frail_before - &n_frail_after)";
+  put "all_three,&n_all3_before,&n_all3_after,%eval(&n_all3_before - &n_all3_after)";
+run;
+%put NOTE: [25_pcnr_cohort] SECTION 5 OK -- qc/25_complete_case_n.csv written.;
 
 /* =========================================================================
    SECTION 6: PCNR_DICTIONARY.xlsx -- see Plan 25-02

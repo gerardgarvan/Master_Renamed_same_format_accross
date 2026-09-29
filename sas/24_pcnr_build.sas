@@ -73,24 +73,37 @@ libname g "&g_path";
 
 %macro pcnr_gate_check;
 
+  /* cur_nobs/cur_nvar/cur_modate are re-used by SECTION 8 Check 7. PROC SQL INTO inside a
+     macro creates LOCAL variables, which would vanish when this macro ends -- declare global. */
+  %global cur_nobs cur_nvar cur_modate;
+  %local fp_nobs fp_nvars fp_modate;
+
   /* ---- Check 1: Gate flag ---- */
   %if &PCNR_APPROVED ne 1 %then %do;
     %fail_out(msg=PCNR_APPROVED is not 1 -- gate closed. Set PCNR_APPROVED=1 in 00_config.sas after reviewing gate files.);
   %end;
   %put NOTE: [24] Check 1 passed -- PCNR_APPROVED=&PCNR_APPROVED;
 
-  /* ---- Check 2: Fingerprint -- read file and compare against dictionary.tables ---- */
+  /* ---- Check 2: Fingerprint -- read file and compare against dictionary.tables ----
+     Program 23 writes ONE line of blank-separated key=value tokens:
+       nobs=41150 nvars=175 modate=28SEP2026:11:28:22
+     Split on blanks, then on '=' (modate contains colons but no '='). Key is NVARS, not NVAR. */
   data work._fingerprint_raw;
     infile "&qc_path.\23_sentinel_fingerprint.txt" truncover lrecl=200;
-    length field $20 value $40;
-    input field $ value $;
-    field = upcase(strip(field));
-    value = strip(value);
+    length _tok $80 field $20 value $40;
+    input;
+    do _k = 1 to countw(_infile_, ' ');
+      _tok  = scan(_infile_, _k, ' ');
+      field = upcase(scan(_tok, 1, '='));
+      value = strip(scan(_tok, 2, '='));
+      output;
+    end;
+    keep field value;
   run;
 
   proc sql noprint;
     select value into :fp_nobs   trimmed from work._fingerprint_raw where field = 'NOBS';
-    select value into :fp_nvar   trimmed from work._fingerprint_raw where field = 'NVAR';
+    select value into :fp_nvars  trimmed from work._fingerprint_raw where field = 'NVARS';
     select value into :fp_modate trimmed from work._fingerprint_raw where field = 'MODATE';
 
     /* Check that g.master_data_harmonized exists before querying its attributes */
@@ -98,6 +111,10 @@ libname g "&g_path";
     from dictionary.tables
     where libname='G' and memname='MASTER_DATA_HARMONIZED';
   quit;
+
+  %if %length(&fp_nobs) = 0 or %length(&fp_nvars) = 0 or %length(&fp_modate) = 0 %then %do;
+    %fail_out(msg=Fingerprint file unreadable -- expected nobs/nvars/modate tokens in 23_sentinel_fingerprint.txt);
+  %end;
 
   %if &n_harm_tab ne 1 %then %do;
     %fail_out(msg=g.master_data_harmonized not found in g library -- run Phase 23 first);
@@ -115,8 +132,8 @@ libname g "&g_path";
   %if &cur_nobs ne &fp_nobs %then %do;
     %fail_out(msg=Fingerprint mismatch: nobs -- expected &fp_nobs got &cur_nobs);
   %end;
-  %if &cur_nvar ne &fp_nvar %then %do;
-    %fail_out(msg=Fingerprint mismatch: nvar -- expected &fp_nvar got &cur_nvar);
+  %if &cur_nvar ne &fp_nvars %then %do;
+    %fail_out(msg=Fingerprint mismatch: nvars -- expected &fp_nvars got &cur_nvar);
   %end;
   %if &cur_modate ne &fp_modate %then %do;
     %fail_out(msg=Fingerprint mismatch: modate -- expected &fp_modate got &cur_modate);
@@ -341,13 +358,54 @@ libname g "&g_path";
         group by upcase(normalized_value)
         having cnt > 1
     );
-    %let n_dup_dec = %eval(&n_dup_pv + &n_dup_wc);
   quit;
+  %let n_dup_dec = %eval(&n_dup_pv + &n_dup_wc);
 
   %if &n_dup_dec > 0 %then %do;
     %fail_out(msg=Duplicate decision check failed -- &n_dup_pv duplicate per-variable keys and &n_dup_wc duplicate wildcard keys);
   %end;
   %put NOTE: [24] Check 11 passed -- no duplicate decision keys;
+
+  /* ---- Check 12: Name-map integrity -- fail at the cause, not later at the
+     SECTION 5 column count ---- */
+  proc sql noprint;
+    create table work._src_cols as
+    select upcase(name) as uname
+    from dictionary.columns
+    where libname='G' and memname='MASTER_DATA_HARMONIZED';
+
+    select count(*) into :n_nm_badrole trimmed
+    from work._name_map where role not in ('KEEP','KEY','DROP');
+
+    select count(*) into :n_nm_dupsrc trimmed
+    from (select upcase(source_name) as u from work._name_map
+          group by calculated u having count(*) > 1);
+
+    select count(*) into :n_nm_nosrc trimmed           /* map row with no source column */
+    from work._name_map m
+    where upcase(m.source_name) not in (select uname from work._src_cols);
+
+    select count(*) into :n_nm_unmapped trimmed        /* source column with no map row */
+    from work._src_cols s
+    where s.uname not in (select upcase(source_name) from work._name_map);
+
+    select count(*) into :n_nm_badkeep trimmed         /* KEEP name blank, too long, or invalid */
+    from work._name_map
+    where role = 'KEEP'
+      and (missing(final_name) or length(final_name) > 32 or nvalid(final_name, 'v7') = 0);
+
+    select count(*) into :n_nm_dupout trimmed          /* two output columns with one name */
+    from (select upcase(coalescec(final_name, source_name)) as o from work._name_map
+          where role in ('KEEP','KEY')
+          group by calculated o having count(*) > 1);
+  quit;
+  %let n_nm_bad = %eval(&n_nm_badrole + &n_nm_dupsrc + &n_nm_nosrc + &n_nm_unmapped
+                        + &n_nm_badkeep + &n_nm_dupout);
+
+  %if &n_nm_bad > 0 %then %do;
+    %fail_out(msg=Name-map check failed -- badrole=&n_nm_badrole dupsrc=&n_nm_dupsrc nosrc=&n_nm_nosrc unmapped=&n_nm_unmapped badkeep=&n_nm_badkeep dupout=&n_nm_dupout);
+  %end;
+  %put NOTE: [24] Check 12 passed -- name map complete and consistent;
 
   %put NOTE: [24] gate passed -- nobs=&cur_nobs nvar=&cur_nvar;
 
@@ -455,22 +513,27 @@ quit;
    - It is %include'd inside an open DATA step (SECTION 3)
    - One select/when block per char column with at least one rule
    - Columns with zero rules are omitted entirely
-   - raw_value in comment is display-only: sanitize */ to * / and replace non-ASCII bytes
+   - raw_value in comment is display-only: the comment terminator is broken up with a
+     space and non-ASCII bytes are replaced
    - Numeric rules (if any) use: if var = value and not missing(var) then call missing(var);
 */
 
-/* Write header block as a single-row data step */
+/* Write header block as a single-row data step.
+   SINGLE quotes on every PUT literal in this section: the macro processor scans
+   double-quoted strings, so "%include..." / "%hexkey(" inside double quotes would be
+   treated as macro calls when THIS step compiles, not written as text. */
 data _null_;
   file "&qc_path.\24_recode_rules_generated.sas" lrecl=32767;
-  put "/* qc/24_recode_rules_generated.sas";
-  put "   Machine-generated by sas/24_pcnr_build.sas SECTION 2.";
-  put "   Do not edit -- re-run program 24 to regenerate.";
-  put "   This file is %include'd inside a DATA step (no options/run/include here). */";
-  put " ";
+  put '/* qc/24_recode_rules_generated.sas';
+  put '   Machine-generated by sas/24_pcnr_build.sas SECTION 2.';
+  put '   Do not edit -- re-run program 24 to regenerate.';
+  put '   This file is included inside a DATA step (no options/run/include here). */';
+  put ' ';
 run;
 
 /* Write char select/when blocks: sequential read, detect variable break by retained _prev_var.
    work._char_rules is sorted by variable, raw_hex so all rules for a column are contiguous. */
+%macro _s2_write_char_rules;
 %if &n_char_vars > 0 %then %do;
 data _null_;
   file "&qc_path.\24_recode_rules_generated.sas" lrecl=32767 mod;
@@ -479,56 +542,55 @@ data _null_;
   retain _prev_var '';
 
   /* Sanitize raw_value for display in comment:
-     - bytes outside 0x20-0x7E become <non-ascii>
-     - */ becomes * / to prevent comment breakout */
-  _safe_val = '';
-  do _i_byte = 1 to length(raw_value);
-    _c = substr(raw_value, _i_byte, 1);
-    if rank(_c) >= 32 and rank(_c) <= 126 then
-      _safe_val = cats(_safe_val, _c);
-    else
-      _safe_val = cats(_safe_val, '<non-ascii>');
-  end;
+     - bytes outside 0x20-0x7E become ~ (cats() was dropping embedded blanks:
+       PATIENT REFUSED became PATIENTREFUSED)
+     - the comment terminator is broken up with a space to prevent breakout */
+  _safe_val = prxchange('s/[^\x20-\x7E]/~/', -1, strip(raw_value));
   _safe_val = tranwrd(_safe_val, '*/', '* /');
 
   /* Open a new select block when the variable changes */
   if variable ne _prev_var then do;
     if _prev_var ne '' then do;
-      put "  otherwise;";
-      put "end;";
-      put " ";
+      put '  otherwise;';
+      put 'end;';
+      put ' ';
     end;
-    put "/* variable: " variable +(-1) " */";
-    put "select (%hexkey(" variable +(-1) "));";
+    put '/* variable: ' variable +(-1) ' */';
+    put 'select (%hexkey(' variable +(-1) '));';
     _prev_var = variable;
   end;
 
   /* Write the when clause for this rule */
-  put "  when ('" raw_hex +(-1) "') call missing(" variable +(-1) ");  /* "
-      _safe_val +(-1) " -- " rule_source +(-1) " */";
+  put "  when ('" raw_hex +(-1) "') call missing(" variable +(-1) ');  /* '
+      _safe_val +(-1) ' -- ' rule_source +(-1) ' */';
 
   /* Close the last block at end of file */
   if _eof then do;
-    put "  otherwise;";
-    put "end;";
-    put " ";
+    put '  otherwise;';
+    put 'end;';
+    put ' ';
   end;
 run;
 %end;
+%mend _s2_write_char_rules;
+%_s2_write_char_rules;
 
 /* Write numeric rules (currently none per PCM-D-24; future-proof branch).
    Format: if var = value and not missing(var) then call missing(var); */
+%macro _s2_write_num_rules;
 %if &n_num_vars > 0 %then %do;
 data _null_;
   file "&qc_path.\24_recode_rules_generated.sas" lrecl=32767 mod;
   set work._num_rules end=_eof;
   length _nval $50;
   _nval = strip(raw_value);
-  put "/* numeric: " variable +(-1) " -- " rule_source +(-1) " */";
-  put "if " variable +(-1) " = " _nval +(-1)
-      " and not missing(" variable +(-1) ") then call missing(" variable +(-1) ");";
+  put '/* numeric: ' variable +(-1) ' -- ' rule_source +(-1) ' */';
+  put 'if ' variable +(-1) ' = ' _nval +(-1)
+      ' and not missing(' variable +(-1) ') then call missing(' variable +(-1) ');';
 run;
 %end;
+%mend _s2_write_num_rules;
+%_s2_write_num_rules;
 
 %put NOTE: [24] wrote qc/24_recode_rules_generated.sas;
 
@@ -576,6 +638,11 @@ quit;
 /* Step 2: build nmiss() expression lists -- each column: nmiss(col) */
 %macro _s3_build_nmiss_exprs;
   %local _i _col;
+  %global n_recode_step_changes;
+  %if &_n_recode_vars = 0 %then %do;     /* no MISSING rules: nothing to count */
+    %let n_recode_step_changes = 0;
+    %return;
+  %end;
   %let _src_expr  = ;
   %let _rec_expr  = ;
   %do _i = 1 %to &_n_recode_vars;
@@ -791,6 +858,7 @@ quit;
    rename_list: source_name=final_name for role=KEEP (space-separated)
    drop_list:   source_name for role=DROP (space-separated)
 */
+%let drop_list = ;     /* stays blank if the name map has no DROP rows */
 proc sql noprint;
   select catx('=', source_name, final_name)
   into  :rename_list separated by ' '
@@ -827,7 +895,8 @@ run;
    Key columns keep original names (final_name blank -> not in rename_list).
    Formats travel with the variable automatically via SET -- do not strip. */
 data work.pcnr_harmonized;
-  set work._recoded (drop = &drop_list rename = (&rename_list));
+  set work._recoded (%sysfunc(ifc(%length(&drop_list), drop = &drop_list, ))
+                     rename = (&rename_list));
   %include "&qc_path.\24_label_stmts_generated.sas";
 run;
 
@@ -875,8 +944,8 @@ proc sql noprint;
       where e.expected_name = a.actual_name
   );
 
-  %let n_name_mismatch = %eval(&n_expected_missing + &n_extra);
 quit;
+%let n_name_mismatch = %eval(&n_expected_missing + &n_extra);
 
 %macro _s5_nameset_gate;
   %if &n_name_mismatch > 0 %then %do;
@@ -899,7 +968,7 @@ proc sql noprint;
            select name, type, length
            from dictionary.columns
            where libname='G' and memname='MASTER_DATA_HARMONIZED'
-       ) src on src.name = m.source_name
+       ) src on upcase(src.name) = upcase(m.source_name)
        inner join (
            select name, type, length
            from dictionary.columns
@@ -910,7 +979,20 @@ proc sql noprint;
 
   select count(*) into :n_typelen_mismatch trimmed
   from work._s5_typelen_check;
+
+  /* The inner joins above drop any column whose name fails to match, which would let the
+     check pass vacuously. Require every KEEP/KEY row to match on both sides. */
+  select count(*) into :n_typelen_matched trimmed
+  from work._name_map m
+       inner join dictionary.columns src
+         on src.libname='G' and src.memname='MASTER_DATA_HARMONIZED'
+        and upcase(src.name) = upcase(m.source_name)
+       inner join dictionary.columns out
+         on out.libname='WORK' and out.memname='PCNR_HARMONIZED'
+        and upcase(out.name) = upcase(coalescec(m.final_name, m.source_name))
+  where m.role in ('KEEP','KEY');
 quit;
+%let n_typelen_mismatch = %eval(&n_typelen_mismatch + (&n_typelen_matched ne 163));
 
 %macro _s5_typelen_gate;
   %if &n_typelen_mismatch > 0 %then %do;
@@ -1028,21 +1110,21 @@ proc sql noprint;
   select count(distinct PRECEDE_STUDY_ID) into :n_sid_src trimmed
   from g.master_data_harmonized;
 
-  /* Anti-join: IDs in output not in source */
+  /* Set differences both ways. EXCEPT de-duplicates and sorts once; the correlated
+     NOT EXISTS it replaces compared 41,150 x 41,150 rows per direction. */
   select count(*) into :n_sid_anti1 trimmed
-  from g.pcnr_harmonized o
-  where not exists (
-      select 1 from g.master_data_harmonized s
-      where s.PRECEDE_STUDY_ID = o.PRECEDE_STUDY_ID
-  );
+  from (select PRECEDE_STUDY_ID from g.pcnr_harmonized
+        except
+        select PRECEDE_STUDY_ID from g.master_data_harmonized);
 
-  /* Anti-join: IDs in source not in output */
   select count(*) into :n_sid_anti2 trimmed
-  from g.master_data_harmonized s
-  where not exists (
-      select 1 from g.pcnr_harmonized o
-      where o.PRECEDE_STUDY_ID = s.PRECEDE_STUDY_ID
-  );
+  from (select PRECEDE_STUDY_ID from g.master_data_harmonized
+        except
+        select PRECEDE_STUDY_ID from g.pcnr_harmonized);
+
+  /* PCNR-11: PRECEDE_STUDY_ID unique -- one non-missing ID per row */
+  select count(*) into :n_sid_missing trimmed
+  from g.pcnr_harmonized where PRECEDE_STUDY_ID is missing;
 quit;
 
 %macro _s8_key_identity;
@@ -1051,6 +1133,9 @@ quit;
   %end;
   %if &n_sid_anti1 ne 0 or &n_sid_anti2 ne 0 %then %do;
     %fail_out(msg=PCNR-11 Check 2 FAILED -- PRECEDE_STUDY_ID set mismatch: anti1=&n_sid_anti1 anti2=&n_sid_anti2);
+  %end;
+  %if &n_sid_out ne &n_pcnr_rows or &n_sid_missing ne 0 %then %do;
+    %fail_out(msg=PCNR-11 Check 2 FAILED -- PRECEDE_STUDY_ID not unique: distinct=&n_sid_out rows=&n_pcnr_rows missing=&n_sid_missing);
   %end;
 %mend _s8_key_identity;
 %_s8_key_identity;
@@ -1116,46 +1201,57 @@ proc sql noprint;
   from  work._name_map where role='KEEP';
 quit;
 
-/* Step 2: compute nmiss(source) for each KEEP source_name into macro variables */
-%macro _s8_nmiss_src;
-  %local _i _col;
-  %do _i = 1 %to &_n_keep;
-    %let _col = %scan(&_keep_src_names, &_i, %str( ));
-    proc sql noprint;
-      select nmiss(&_col) into :_nmiss_src_&_i trimmed
-      from g.master_data_harmonized;
-    quit;
-  %end;
-%mend _s8_nmiss_src;
-%_s8_nmiss_src;
-
-/* Step 3: compute nmiss(output) for each KEEP final_name into macro variables */
-%macro _s8_nmiss_out;
-  %local _i _col;
-  %do _i = 1 %to &_n_keep;
-    %let _col = %scan(&_keep_out_names, &_i, %str( ));
-    proc sql noprint;
-      select nmiss(&_col) into :_nmiss_out_&_i trimmed
-      from g.pcnr_harmonized;
-    quit;
-  %end;
-%mend _s8_nmiss_out;
-%_s8_nmiss_out;
-
-/* Step 4: build comparison dataset and join to n_recoded_total */
-data work._s8_mmcheck;
-  length variable $32 final_name $32 nmiss_src 8 nmiss_out 8;
+/* Steps 2-4: one pass over each dataset. %local and %do are illegal in open code
+   (PCM-T-15), so all of this lives in a named macro. Each dataset is read once with
+   arrays: cmiss() counts missing for both char and numeric. */
+%macro _s8_build_mmcheck;
   %local _i _src _out;
-  %do _i = 1 %to &_n_keep;
-    %let _src = %scan(&_keep_src_names, &_i, %str( ));
-    %let _out = %scan(&_keep_out_names, &_i, %str( ));
-    variable  = "&_src";
-    final_name = "&_out";
-    nmiss_src = &&_nmiss_src_&_i;
-    nmiss_out = &&_nmiss_out_&_i;
-    output;
-  %end;
-run;
+
+  /* nmiss per KEEP column in the source -> one row per column */
+  data work._s8_nm_src (keep=_pos nmiss_src);
+    set g.master_data_harmonized (keep=&_keep_src_names) end=_eof;
+    array _m{&_n_keep} _temporary_ (&_n_keep*0);
+    %do _i = 1 %to &_n_keep;
+      %let _src = %scan(&_keep_src_names, &_i, %str( ));
+      _m{&_i} = _m{&_i} + cmiss(&_src);
+    %end;
+    if _eof then do _pos = 1 to &_n_keep;
+      nmiss_src = _m{_pos};
+      output;
+    end;
+  run;
+
+  /* nmiss per KEEP column in the output */
+  data work._s8_nm_out (keep=_pos nmiss_out);
+    set g.pcnr_harmonized (keep=&_keep_out_names) end=_eof;
+    array _m{&_n_keep} _temporary_ (&_n_keep*0);
+    %do _i = 1 %to &_n_keep;
+      %let _out = %scan(&_keep_out_names, &_i, %str( ));
+      _m{&_i} = _m{&_i} + cmiss(&_out);
+    %end;
+    if _eof then do _pos = 1 to &_n_keep;
+      nmiss_out = _m{_pos};
+      output;
+    end;
+  run;
+
+  /* names by position */
+  data work._s8_names;
+    length variable $32 final_name $32;
+    %do _i = 1 %to &_n_keep;
+      _pos = &_i;
+      variable   = "%scan(&_keep_src_names, &_i, %str( ))";
+      final_name = "%scan(&_keep_out_names, &_i, %str( ))";
+      output;
+    %end;
+  run;
+
+  data work._s8_mmcheck;
+    merge work._s8_names work._s8_nm_src work._s8_nm_out;
+    by _pos;
+  run;
+%mend _s8_build_mmcheck;
+%_s8_build_mmcheck;
 
 proc sql noprint;
   create table work._s8_mmviolations as
@@ -1198,13 +1294,12 @@ data _null_;
   call symputx(cats('_sent_fn_', _n_), final_name, 'G');
   call symputx(cats('_sent_rh_', _n_), raw_hex,    'G');
   call symputx(cats('_sent_vt_', _n_), var_type,   'G');
-  call symputx('_n_sentinel_rules2', _n_, 'G');
 run;
 
 %macro _s8_zero_sentinels;
   %local _i _fn _rh _vt _cnt _total;
   %let _total = 0;
-  %do _i = 1 %to &_n_sentinel_rules2;
+  %do _i = 1 %to &_n_sentinel_rules;     /* from PROC SQL count: 0 when no rules */
     %let _fn = &&_sent_fn_&_i;
     %let _rh = &&_sent_rh_&_i;
     %let _vt = &&_sent_vt_&_i;
@@ -1243,7 +1338,7 @@ proc sql noprint;
            select name, type, length
            from dictionary.columns
            where libname='G' and memname='MASTER_DATA_HARMONIZED'
-       ) src on src.name = m.source_name
+       ) src on upcase(src.name) = upcase(m.source_name)
        inner join (
            select name, type, length
            from dictionary.columns

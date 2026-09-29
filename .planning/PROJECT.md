@@ -57,15 +57,23 @@ DECISIONS.md — with no manual steps.
 
 ---
 
-## Next Milestone: v2.2 (planning not yet started)
+## Current Milestone: v2.2 pcnr Normalization, Gap-Fill & Linkage
 
-**Candidate features (see Next section in Requirements):**
-- PCM-D-15 gap-fill wiring: r1-r9 extension-column gap candidates integrated into base file
-- r7/r8/r9 linkage resolution: MRN-based linking feasibility for 2022 IDs (PCM-D-16 follow-up)
-- Type conversion of character columns that are entirely numeric after sentinel removal
-- Case/whitespace normalization of category values (reported in v2.1, deferred)
+**Goal:** Normalize and type-convert the pcnr datasets, wire r1-r9 gap-fill for linkable files, investigate r7-r9 and raw\ linkage feasibility, harden the source directory against accidental modification, and correct the md8 row-count finding.
 
-Start with `/gsd:new-milestone` to gather requirements and build the roadmap.
+**Target features (in build order):**
+
+1. **Normalization + type conversion (pcnr datasets)** — case/whitespace normalization of category levels, then numeric type conversion for character columns that are entirely numeric post-sentinel removal. Exclusion list sourced from `19_raw_key_columns.csv` plus named code columns (CPT, Base_Procedure_Code, ZIP); maintained in one place so a new ID column cannot be converted by accident.
+
+2. **Gap-fill wiring (PCM-D-15)** — limited to r1-r9 files that link on PRECEDE_STUDY_ID; r7-r9 held pending item 3 outcome.
+
+3. **r7/r8/r9 linkage investigation (PCM-D-16 follow-up)** — read `qc\20_linkage_reach.txt` to confirm r7-r9 carry no character ENCRYPTED_MRN. Investigate the 2018_2019 MRN/ENCOUNTER Crypto files and the same-named `raw\` files (2018_2019 X_MASTER/CPT_ROLLUP, 2018_2022 X_MASTER, ALL_AIM2) as evidence of a second encryption scheme; those raw\ copies match the crosswalk at 14.5%, 64%, and 41% respectively. Determine whether r7-r9 use that scheme and whether MRN linking is feasible. Record findings regardless of outcome so no later phase uses a raw\ copy under the wrong encryption assumption.
+
+4. **md8 row-count correction** — verify md8 by counting rows where any of the 68 columns is non-missing (treating the NULL sentinel as missing) and confirm count = 22,473. The raw\ copy is a row-count reference only; its MRNs use a different encryption and the two files are not interchangeable. Update pipeline docs and planning artifacts to reflect the corrected finding.
+
+5. **raw\master source hardening** — read-only file attribute stops Excel re-saves but does not reliably prevent deletion on a network share; full protection (remove write/delete rights on the folder) requires IT engagement. Add a guard in program 19: hash md1-md8 and compare against a stored baseline; any change to a source file fails the run immediately rather than going unnoticed. The baseline hashes file is updated only intentionally (e.g., when an extract is added or replaced), never automatically by program 19. Today's verified hashes from `19_raw_files.csv` are the natural starting baseline.
+
+**Deferred:** Program 17 repoint (PCM-D-26) — depends on Price review and domain map re-approval; defer until after normalization so Price reviews final pcnr values once.
 
 ---
 
@@ -194,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-09-29 — v2.1 milestone complete (pcnr_ Clean Analysis Dataset shipped)*
+*Last updated: 2026-09-29 — v2.2 milestone started (pcnr Normalization, Gap-Fill & Linkage)*

@@ -1,8 +1,8 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: pcnr_ Clean Analysis Dataset
-status: unknown
+milestone: v2.2
+milestone_name: pcnr Normalization, Gap-Fill & Linkage
+status: planning
 last_updated: "2026-09-29T17:20:25.701Z"
 last_activity: 2026-09-29
 progress:
@@ -31,9 +31,10 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 ## Current Position
 
-Phase: 25
-Plan: Not started
-Last activity: 2026-09-29
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-29 — Milestone v2.2 started
 
 ### v2.1 Phase Status
 

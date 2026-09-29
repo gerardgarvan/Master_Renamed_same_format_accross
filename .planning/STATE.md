@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: pcnr_ Clean Analysis Dataset
 status: unknown
-last_updated: "2026-09-29T02:13:20.352Z"
+last_updated: "2026-09-29T02:16:29.975Z"
 last_activity: 2026-09-29
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 92
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
 ## Current Position
 
 Phase: 25 (pcnr-cohort-dictionary-wiring) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Last activity: 2026-09-29
 
 ### v2.1 Phase Status
@@ -44,7 +44,7 @@ Last activity: 2026-09-29
 | 24 | Build g.pcnr_harmonized | Not started |
 | 25 | pcnr Cohort, Dictionary & Wiring | Not started |
 
-**Progress:** [████████░░] 83%
+**Progress:** [█████████░] 92%
 
 ### v2.0 Phase Status (shipped 2026-09-24)
 
@@ -117,6 +117,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Phase 24 P02 | 125 | 2 tasks | 1 files |
 | Phase 24 P03 | 8 | 2 tasks | 1 files |
 | Phase 25 P01 | 15 | 2 tasks | 1 files |
+| Phase 25 P02 | 10 | 2 tasks | 1 files |
 
 ## Accumulated Context
 

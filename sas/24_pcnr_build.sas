@@ -32,13 +32,21 @@
 
 options mprint nofmterr nodate nonumber ps=max ls=200;
 
-/* ---- Include config (standalone guard: pipeline runner pre-includes it) ---- */
-%macro _24_include_config;
-  %if not %symexist(sas_path) %then %do;
-    %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
+/* In pipeline (batch sas.exe), stop at first ERROR rather than cascading into later sections.
+   Omitted for interactive runs: errorabend would close the SAS session on any error. */
+%macro set_errorabend;
+  %if &in_pipeline = 1 %then %do;
+    options errorabend;
   %end;
-%mend _24_include_config;
-%_24_include_config;
+%mend set_errorabend;
+
+/* ---- Include config in OPEN CODE ----
+   Do NOT wrap this %include in a macro: the %let statements in 00_config.sas would then
+   run inside that macro and create LOCAL variables (sas_path, qc_path, g_path,
+   PCNR_APPROVED, ...) that disappear the moment the macro ends. Re-including the config
+   when the runner has already included it is harmless (same %let values). */
+%include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
+%set_errorabend;   /* stop at first ERROR in pipeline runs */
 
 /* ---- Log routing (copied verbatim from sas/10b_concept_harmonize.sas lines 76-88) ---- */
 %macro route_log;

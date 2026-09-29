@@ -18,8 +18,8 @@ Deliverables:
 - `qc/25_complete_case_n.csv` — before/after complete-case Ns for BMI/Cognitive/Frailty/all-three
 - `qc/PCNR_DICTIONARY.xlsx` — KEY + VARIABLES + RECODES + COHORT_N sheets; UF blue headers
 - `qc/25_pcnr_variables.csv` — machine-readable copy of the VARIABLES sheet
-- `run_pipeline.cmd` wires 16 programs; full end-to-end run PASS with `PCNR_APPROVED = 1`
-- `docs/DECISIONS.md` updated for PCM-D-21 through PCM-D-26
+- `run_pipeline.cmd` wires 23, 24, 25 (after 16b); full end-to-end run PASS with `PCNR_APPROVED = 1`
+- `docs/DECISIONS.md` gains PCM-D-26 (PCM-D-21..25 and 27 were written in Phase 23; confirm, do not duplicate)
 
 </domain>
 
@@ -70,11 +70,15 @@ Location rationale: `qc/` on P: keeps it alongside other generated QC outputs; `
 for human-owned gate files and the existing DATA_DICTIONARY (which lives on P: too).
 Since the file contains only column metadata (no row-level data), there is no PHI concern.
 
-### D-03: Runner Wiring — Programs 23, 24, 25; Insert After 10b
+### D-03: Runner Wiring — Programs 23, 24, 25; Insert After 16b
 
 Wire all three new programs in `run_pipeline.cmd`, in order: 23 → 24 → 25.
 
-**Insert position: after `10b_concept_harmonize.sas`, before `16b_cohort_rebuild.sas`.**
+**Insert position: after `16b_cohort_rebuild.sas`, before `17_summary_stats_by_domain.sas`.**
+(Corrected 2026-09-28: the earlier "after 10b, before 16b" placed 25 before 16b, but program 25
+reads `g.analytic_cohort`, which 16b writes -- 25 would have compared against the PREVIOUS run's
+cohort. 16b only reads `g.master_data_harmonized`, so running 23 after 16b keeps the modate
+reasoning below intact.)
 
 Do NOT insert after program 20. The reason:
 - Program 10b reads `g.master_data_harmonized` and WORK-then-promotes it, changing its `modate`.
@@ -82,14 +86,15 @@ Do NOT insert after program 20. The reason:
 - If 23 runs before 10b, the fingerprint reflects the pre-10b modate; 10b then changes it;
   program 24's gate aborts every subsequent run on the fingerprint check.
 - 23 must run AFTER 10b so it captures the post-10b modate that will remain stable.
+- 25 must run AFTER 16b because it reads `g.analytic_cohort` (n_before and the ID-set check).
 
-Final program order in runner:
+Final program order in runner (other programs, e.g. 19b if wired in Phase 22, keep their places):
 ```
 01 02 03 04 05 06 07 08
 19 20
 10b
-23 24 25
 16b
+23 24 25
 17 18
 ```
 
@@ -98,7 +103,10 @@ pipeline pass is correct and by design — it re-reads `g.master_data_harmonized
 the fingerprint and draft CSVs. The human-owned `docs/` files are unchanged by program 23.
 
 **Also add `options errorabend;` for `in_pipeline = 1`** in program 25 (and confirm it is
-present in 23 and 24 if not already). This is the errorabend fix established in Phase 22.
+present in 23 and 24 if not already). It must be set immediately after the `00_config.sas`
+include and BEFORE any gate check -- the Phase 24 test run showed a gate whose `%if` errors
+fails open and lets later sections run. The config `%include` itself must be in OPEN CODE,
+never inside a macro (a macro-wrapped include makes every config variable local).
 
 ### D-04: PCNR-13 Output — QC CSV with Assertions
 
@@ -108,7 +116,10 @@ Write `qc/25_complete_case_n.csv` with columns:
 Measures: `pcnr_Admit_BMI`, `pcnr_Cognitive_Score`, `pcnr_Frailty_Score`, `all_three`.
 `n_before` = complete-case N in `g.analytic_cohort` (benchmarks: 12,726 / 7,252 / 8,150 / 6,523).
 `n_after` = complete-case N in `g.pcnr_analytic_cohort`.
-`n_difference = n_before - n_after` (should equal that variable's recode count or 0).
+`n_difference = n_before - n_after`. Admit_BMI, Cognitive_Score and Frailty_Score are numeric
+and PCM-D-24 approved no numeric recodes, so every n_difference must currently be 0; program 25
+asserts n_difference = 0 for a measure whenever `qc/24_pcnr_recode_totals.csv` shows 0 recodes
+for its column(s), and n_after <= n_before otherwise.
 
 Two assertions (both use `%fail_out` on failure):
 1. `n_after <= n_before` for every measure — recoding only adds missing, never fills them.
@@ -171,7 +182,7 @@ Static checks (include in plan acceptance criteria):
 - `sas/00_config.sas` — `%fail_out`, `%hexkey`, `PCNR_APPROVED` gate, `in_pipeline` flag, `errorabend` pattern
 - `sas/16b_cohort_rebuild.sas` — cohort subsetting structure: Section 0 options/log/macros, filter step, assertions, WORK-then-promote; model for program 25 Sections 0–3
 - `sas/08_dictionary.sas` — ODS EXCEL structure, KEY sheet leftmost pattern, `styles.uf_inventory`, UF blue headers; model for the dictionary sections of program 25
-- `run_pipeline.cmd` — current 14-program runner; Phase 25 extends to 17 programs
+- `run_pipeline.cmd` — current runner; Phase 25 adds programs 23, 24, 25 (count may include 19b from Phase 22)
 
 ### QC inputs (program 25 reads these)
 - `qc/24_pcnr_recode_totals.csv` — per-variable n_recoded_total; feeds VARIABLES sheet
@@ -207,7 +218,7 @@ No external specs — requirements fully captured in REQUIREMENTS.md and prior C
 - All counts via `SELECT COUNT(*) INTO :macvar TRIMMED` (never automatic row-count macros)
 
 ### Integration Points
-- `run_pipeline.cmd` — insert programs 23, 24, 25 after `10b_concept_harmonize.sas`, before `16b_cohort_rebuild.sas`
+- `run_pipeline.cmd` — insert programs 23, 24, 25 after `16b_cohort_rebuild.sas`, before `17_summary_stats_by_domain.sas`
 - `sas/00_config.sas` — `PCNR_APPROVED` flag (default 0; flip to 1 after gate files confirmed); `in_pipeline` detection
 - `g` libname — `g.pcnr_analytic_cohort` promoted here; `g.analytic_cohort` and `g.pcnr_harmonized` read here
 - `qc/` on P: — all outputs land here (PCNR_DICTIONARY.xlsx, 25_complete_case_n.csv, 25_pcnr_variables.csv)
@@ -218,7 +229,12 @@ No external specs — requirements fully captured in REQUIREMENTS.md and prior C
 ## Specific Ideas
 
 - **PCM-D-26 note for DECISIONS.md:** Record as "not repointed in v2.1; revisit once pcnr_analytic_cohort is in use and domain map is re-approved with Price." A separate 17b program reading the pcnr cohort is the preferred path if recoded statistics are needed sooner.
-- **Runner insert point:** After 10b (not after 20) — 10b changes modate of g.master_data_harmonized. Planner must verify by reading `run_pipeline.cmd` and confirming the position.
+- **Runner insert point:** After 16b (which is after 10b) — 10b changes modate of g.master_data_harmonized, and 25 reads 16b's g.analytic_cohort. Planner must verify by reading `run_pipeline.cmd` and confirming the position.
+- **Actual CSV schemas program 25 reads (verified against the files):**
+  - `docs/pcnr_name_map.csv`: source_name, source_label, role, h_strip, proposed_name, override_name, final_name, name_len, collision_flag, id_flag (final_name BLANK for KEY/DROP)
+  - `qc/24_pcnr_recode_totals.csv`: variable, final_name, n_recoded_total
+  - `qc/24_pcnr_recode_counts.csv`: variable, final_name, raw_value, raw_hex, var_type, rule_source, n_expected, n_recoded
+- **DECISIONS.md numbering:** Phase 23 already wrote PCM-D-21..D-25 and PCM-D-27 (column scope, renumbered from D-25 to keep REQUIREMENTS' meaning of D-25 = companion columns). Phase 25 adds PCM-D-26 only and must not duplicate or rewrite the others.
 - **Complete-case N benchmarks** (n_before values to assert against):
   `pcnr_Admit_BMI = 12,726`, `pcnr_Cognitive_Score = 7,252`, `pcnr_Frailty_Score = 8,150`, `all_three = 6,523`.
   These are the within-cohort Ns from `g.analytic_cohort` as of v2.0; the planner may re-derive from

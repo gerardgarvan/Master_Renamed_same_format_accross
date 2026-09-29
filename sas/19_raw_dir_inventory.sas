@@ -325,23 +325,47 @@ run;
                (starts with letter or underscore); digit-prefix names still need the
                literal form but are non-master XLSX files not required by D-06. */
             %if %sysfunc(prxmatch(%str(/^[A-Za-z_]\w*$/), %superq(_sh&j))) %then %do;
+              /* Letter/underscore-start: unquoted SAS name -- case-insensitive,
+                 no XLSX engine case-sensitivity issue (R3-B-01). */
               data work.&dsname._s&j;
                 set _xlw.&&_sh&j;
               run;
+              %if &syserr > 4 %then %do;
+                /* Remove any partial copy so existence = success below */
+                proc datasets lib=work nolist nowarn; delete &dsname._s&j; quit;
+              %end;
+              %else %if &syserr > 0 and %length(&fwarn) = 0 %then
+                %let fwarn = %superq(syswarningtext);
+              %if %sysfunc(exist(work.&dsname._s&j)) = 0 %then
+                %let n_fail = %eval(&n_fail + 1);
             %end;
             %else %do;
-              data work.&dsname._s&j;
-                set _xlw."%superq(_sh&j)"n;
-              run;
+              /* Digit-prefix memnames need a name literal, but the XLSX engine
+                 matches case-sensitively and dictionary.members returns UPPERCASE.
+                 Pre-check with %sysfunc(open()) -- returns 0 silently on failure,
+                 so no ERROR is logged.  If inaccessible, record as read-failed
+                 via NOTE only (digit-prefix sheets are non-master files, not
+                 required by D-06). */
+              %let _dsid_chk = %sysfunc(open(_xlw.%superq(_sh&j)));
+              %if &_dsid_chk > 0 %then %do;
+                %let _rc_chk = %sysfunc(close(&_dsid_chk));
+                data work.&dsname._s&j;
+                  set _xlw."%superq(_sh&j)"n;
+                run;
+                %if &syserr > 4 %then %do;
+                  /* Remove any partial copy so existence = success below */
+                  proc datasets lib=work nolist nowarn; delete &dsname._s&j; quit;
+                %end;
+                %else %if &syserr > 0 and %length(&fwarn) = 0 %then
+                  %let fwarn = %superq(syswarningtext);
+                %if %sysfunc(exist(work.&dsname._s&j)) = 0 %then
+                  %let n_fail = %eval(&n_fail + 1);
+              %end;
+              %else %do;
+                %put NOTE: [19] digit-prefix sheet %superq(_sh&j) in file_id=&i -- inaccessible via XLSX engine (case-sensitivity); recorded as read-failed;
+                %let n_fail = %eval(&n_fail + 1);
+              %end;
             %end;
-            %if &syserr > 4 %then %do;
-              /* Remove any partial copy so existence = success below */
-              proc datasets lib=work nolist nowarn; delete &dsname._s&j; quit;
-            %end;
-            %else %if &syserr > 0 and %length(&fwarn) = 0 %then
-              %let fwarn = %superq(syswarningtext);
-            %if %sysfunc(exist(work.&dsname._s&j)) = 0 %then
-              %let n_fail = %eval(&n_fail + 1);
           %end;
           %let syscc = 0;
 

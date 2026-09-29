@@ -46,7 +46,19 @@
 
 options mprint nofmterr nodate nonumber ps=max ls=200;
 
+/* In pipeline (batch sas.exe), stop at first ERROR rather than cascading into later sections.
+   Omitted for interactive runs: errorabend would close the SAS session on any error. */
+%macro _set_errorabend_23;
+  %if &in_pipeline = 1 %then %do;
+    options errorabend;
+  %end;
+%mend _set_errorabend_23;
+
+/* ---- Include config in OPEN CODE ----
+   Do NOT wrap this %include in a macro: the %let statements in 00_config.sas would then
+   run inside that macro and create LOCAL variables that disappear when the macro ends. */
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
+%_set_errorabend_23;   /* stop at first ERROR in pipeline runs */
 
 /* ---- Column lists (PCM-D-27) -- hardcoded in program header -----------
    If a raw name is absent from g.master_data_harmonized but its h_ survivor

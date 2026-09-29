@@ -11,7 +11,9 @@ REM    01 verify_sources   02 ownership        03 prep_all
 REM    04 merge            05 qc_merge         06 reconcile
 REM    07 cohort           08 dictionary
 REM    19 raw_dir_inventory  20 pecan_id
-REM    10b concept_harmonize  16b cohort_rebuild
+REM    10b concept_harmonize
+REM    16b cohort_rebuild
+REM    23 pcnr_inventory  24 pcnr_build  25 pcnr_cohort
 REM    17 summary_stats_by_domain  18 supplemental_raw_gap
 REM
 REM  Exit codes: 0/1 = continue (1 = warnings only)
@@ -113,6 +115,18 @@ call :run_program "10b concept_harmonize" "10b_concept_harmonize.sas"
 if !ERRORLEVEL! NEQ 0 goto :fail
 
 call :run_program "16b cohort_rebuild"  "16b_cohort_rebuild.sas"
+if !ERRORLEVEL! NEQ 0 goto :fail
+
+REM ---- Programs 23-25: pcnr sentinel inventory, harmonized build, cohort (PCNR-15) ----
+REM      After 10b (23's fingerprint must capture 10b's modate) and after 16b
+REM      (25 reads g.analytic_cohort, which 16b writes).
+call :run_program "23 pcnr_inventory"   "23_pcnr_inventory.sas"
+if !ERRORLEVEL! NEQ 0 goto :fail
+
+call :run_program "24 pcnr_build"       "24_pcnr_build.sas"
+if !ERRORLEVEL! NEQ 0 goto :fail
+
+call :run_program "25 pcnr_cohort"      "25_pcnr_cohort.sas"
 if !ERRORLEVEL! NEQ 0 goto :fail
 
 REM ---- Program 17: domain summary stats (DOMAIN_MAP_APPROVED gate must be 1) ----

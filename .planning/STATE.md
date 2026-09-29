@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: pcnr_ Clean Analysis Dataset
 status: unknown
-last_updated: "2026-09-29T02:16:29.975Z"
+last_updated: "2026-09-29T14:24:40.681Z"
 last_activity: 2026-09-29
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -40,11 +40,11 @@ Last activity: 2026-09-29
 | Phase | Name | Status |
 |-------|------|--------|
 | 22 | Pipeline Green & Hardening | Complete (2026-09-28) |
-| 23 | Sentinel & Name Inventory | Not started |
-| 24 | Build g.pcnr_harmonized | Not started |
-| 25 | pcnr Cohort, Dictionary & Wiring | Not started |
+| 23 | Sentinel & Name Inventory | Complete (2026-09-28) |
+| 24 | Build g.pcnr_harmonized | Complete (2026-09-28) |
+| 25 | pcnr Cohort, Dictionary & Wiring | Complete (2026-09-29) |
 
-**Progress:** [█████████░] 92%
+**Progress:** [██████████] 100%
 
 ### v2.0 Phase Status (shipped 2026-09-24)
 
@@ -118,6 +118,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Phase 24 P03 | 8 | 2 tasks | 1 files |
 | Phase 25 P01 | 15 | 2 tasks | 1 files |
 | Phase 25 P02 | 10 | 2 tasks | 1 files |
+| Phase 25 P03 | 30 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -180,7 +181,7 @@ PCM-D-17 and PCM-D-18 resolved 2026-09-23 (see PROJECT.md Key Decisions).
 - **PCM-D-24** -- whether any numeric sentinels are recoded. Before Phase 24.
 - **PCM-D-25** -- whether reason codes (Declined/Refused/Not applicable) are preserved. RESOLVED 2026-09-28: no companion columns in v2.1; values become MISSING per sentinel_decisions.csv. (Gerard)
 - **PCM-D-27** -- ambiguous-value column scope (demographic + score/count lists). RESOLVED 2026-09-28: lists hardcoded in sas/23_pcnr_inventory.sas header; confirmed at Phase 23 checkpoint. (Gerard)
-- **PCM-D-26** -- program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort. Before Phase 25.
+- **PCM-D-26** -- program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort. RESOLVED 2026-09-28: program 17 reads g.analytic_cohort unchanged; repointing to g.pcnr_analytic_cohort deferred pending Price review and domain map re-approval. (Gerard)
 
 ### Pending Todos
 
@@ -215,4 +216,4 @@ To resume: read this file, then `.planning/ROADMAP.md`, then `.planning/REQUIREM
 **Do** restart the SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-28 — Phase 22 pipeline green; full run_pipeline.cmd PASSED; scanner operational (pre-existing xlsx-read findings noted as known); Phase 22 complete*
+*Last updated: 2026-09-29 — Phase 25 complete; all v2.1 milestone deliverables shipped; pipeline PASSED; g.pcnr_analytic_cohort 13,890 rows; PCNR_DICTIONARY.xlsx written; PCM-D-26 resolved; progress 100%*

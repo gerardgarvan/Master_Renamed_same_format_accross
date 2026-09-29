@@ -58,7 +58,7 @@ every recoded cell counted and traceable to an approved decision.
 | 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | Complete    | 2026-09-28 |
 | 23 | Sentinel & Name Inventory | 3/3 | Complete    | 2026-09-28 |
 | 24 | Build g.pcnr_harmonized | 3/3 | Complete    | 2026-09-29 |
-| 25 | pcnr Cohort, Dictionary & Wiring | 2/3 | In Progress|  |
+| 25 | pcnr Cohort, Dictionary & Wiring | 3/3 | Complete   | 2026-09-29 |
 
 #### Phase 22: Pipeline Green & Hardening
 
@@ -134,10 +134,10 @@ downstream summary program.
 4. `run_pipeline.cmd` runs 17 programs (23/24/25 inserted after 10b, before 16b); full run PASS
 5. Program 17 input resolved (PCM-D-26); DECISIONS.md updated (PCM-D-21 through D-26)
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 - [x] 25-01-PLAN.md — sas/25_pcnr_cohort.sas Sections 0-5: cohort build, N assertions, complete-case CSV (Wave 1)
 - [x] 25-02-PLAN.md — sas/25_pcnr_cohort.sas Sections 6-7: PCNR_DICTIONARY.xlsx + pcnr_variables.csv (Wave 2)
-- [ ] 25-03-PLAN.md — Runner wiring (23/24/25), errorabend confirm, DECISIONS.md, human run gate (Wave 3)
+- [x] 25-03-PLAN.md — Runner wiring (23/24/25), errorabend confirm, DECISIONS.md, human run gate (Wave 3)
 
 ---
 

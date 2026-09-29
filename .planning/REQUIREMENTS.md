@@ -56,9 +56,9 @@ at 16b, and the new programs run downstream of 16b.
 - [x] **PCNR-12**: `g.pcnr_analytic_cohort` derived from `g.pcnr_harmonized` with the PCM-D-05 restriction (`pcnr_Patient_Type` in INPATIENT, OBSERVATION). Asserted: N = 13,890 and the `PRECEDE_STUDY_ID` set is identical to `g.analytic_cohort`.
 - [x] **PCNR-13**: Complete-case Ns for `pcnr_Admit_BMI`, `pcnr_Cognitive_Score`, `pcnr_Frailty_Score` reported side by side with the `g.analytic_cohort` values (12,726 / 7,252 / 8,150 within cohort). Any difference must equal that variable's recode count.
 - [x] **PCNR-14**: Data dictionary for the pcnr datasets: KEY sheet leftmost, UF blue headers, one row per variable with pcnr name, original name, label, type, length, values recoded, n recoded, coverage before and after. Either a PCNR sheet in `docs/DATA_DICTIONARY.xlsx` or a separate `docs/PCNR_DICTIONARY.xlsx` (decided in the Phase 25 plan).
-- [ ] **PCNR-15**: New programs wired into `run_pipeline.cmd` after 16b and before 17, as separate sas.exe sessions (PCM-C-05). Full end-to-end run PASS.
-- [ ] **PCNR-16**: Program 17 input resolved per PCM-D-26. If repointed to `g.pcnr_analytic_cohort`, its own sentinel recoding is reconciled against `sentinel_decisions.csv` so the rules live in one place.
-- [ ] **PCNR-17**: `docs/DECISIONS.md` records PCM-D-21 through PCM-D-26 with attribution and date.
+- [x] **PCNR-15**: New programs wired into `run_pipeline.cmd` after 16b and before 17, as separate sas.exe sessions (PCM-C-05). Full end-to-end run PASS.
+- [x] **PCNR-16**: Program 17 input resolved per PCM-D-26. If repointed to `g.pcnr_analytic_cohort`, its own sentinel recoding is reconciled against `sentinel_decisions.csv` so the rules live in one place.
+- [x] **PCNR-17**: `docs/DECISIONS.md` records PCM-D-21 through PCM-D-26 with attribution and date.
 
 ---
 
@@ -115,9 +115,9 @@ Per project practice, sign-off on analytic-facing decisions (D-21, D-24, D-25) g
 | PCNR-12 | 25 | Complete |
 | PCNR-13 | 25 | Complete |
 | PCNR-14 | 25 | Complete |
-| PCNR-15 | 25 | Pending |
-| PCNR-16 | 25 | Pending |
-| PCNR-17 | 25 | Pending |
+| PCNR-15 | 25 | Complete |
+| PCNR-16 | 25 | Complete |
+| PCNR-17 | 25 | Complete |
 
 **Coverage:** 22 requirements, 22 mapped, 0 unmapped.
 

@@ -936,7 +936,7 @@ run;
   %local n_drift;
   %let n_drift = 0;
 
-  %if not %sysfunc(fileexist("&docs_path.\raw_hash_baseline.csv")) %then %do;
+  %if %sysfunc(fileexist(&docs_path.\raw_hash_baseline.csv)) = 0 %then %do;
     %fail_out(msg=HARD-01 baseline docs/raw_hash_baseline.csv not found -- run 19b once to seed it);
   %end;
 

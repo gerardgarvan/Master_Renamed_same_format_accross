@@ -41,7 +41,13 @@
   4. The baseline hashes file in `docs/` contains today's verified sha256 values from `19_raw_files.csv` and is never overwritten automatically by program 19
   5. `docs/DECISIONS.md` contains a documentation-only note explaining that the read-only file attribute is insufficient on a network share and that full protection requires IT engagement
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 26-01-PLAN.md — FIX-03: CONTAINS sentinel audit + narrowing (human checkpoint) + sentinel_decisions.csv reconcile
+- [ ] 26-02-PLAN.md — FIX-04: two QC assertions in program 24 (Cognitive_Score=0, rt sentinel -9)
+- [ ] 26-03-PLAN.md — HARD-01/02: 19b seed program + program 19 sha256 hash guard + baseline CSV
+- [ ] 26-04-PLAN.md — HARD-03: PCM-D-29 documentation note on network-share protection
 
 ---
 

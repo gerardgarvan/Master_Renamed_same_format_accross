@@ -925,7 +925,63 @@ run;
 
 
 /* ============================================================
-   SECTION 13 -- ODS Excel (D-05): KEY leftmost, UF blue headers
+   SECTION 13 -- HARD-01 hash guard (D-10)
+   Reads docs/raw_hash_baseline.csv (seeded once by 19b_seed_hash_baseline.sas)
+   and aborts the pipeline before any merge program if any md1-md8 sha256
+   has drifted from the baseline.  Program 19 NEVER writes the baseline.
+   ============================================================ */
+
+/* 13a -- Verify baseline file exists */
+%macro check_hash_baseline;
+  %local n_drift;
+  %let n_drift = 0;
+
+  %if not %sysfunc(fileexist("&docs_path.\raw_hash_baseline.csv")) %then %do;
+    %fail_out(msg=HARD-01 baseline docs/raw_hash_baseline.csv not found -- run 19b once to seed it);
+  %end;
+
+  /* Read baseline via DATA step infile (PCM-T-16) -- no PROC IMPORT */
+  data work._baseline;
+    length file_name $200 sha256 $64 byte_size 8 seeded_date $12;
+    infile "&docs_path.\raw_hash_baseline.csv" dsd dlm=',' firstobs=2 truncover lrecl=500;
+    input file_name $ sha256 $ byte_size seeded_date $;
+  run;
+
+  /* Assert exactly 8 baseline rows */
+  %local n_base;
+  %let n_base = 0;
+  proc sql noprint;
+    select count(*) into :n_base trimmed
+    from work._baseline;
+  quit;
+  %if &n_base ne 8 %then %do;
+    %fail_out(msg=HARD-01 baseline row count is &n_base -- expected 8. Re-seed docs/raw_hash_baseline.csv by running 19b.);
+  %end;
+
+  /* Compare md1-md8 sha256 values from current run against baseline.
+     Restrict work.files_out to the md-master directory (same scope as
+     SECTION 11b) so same-named files in other raw\ subdirectories do not
+     produce duplicate join rows or false drift.  Both sides lowercased. */
+  proc sql noprint;
+    select count(*) into :n_drift trimmed
+    from work._baseline b
+    left join (select * from work.files_out
+               where upcase(full_path) like upcase("&raw_path.\master\%")) f
+      on upcase(strip(b.file_name)) = upcase(strip(f.filename))
+    where lowcase(strip(b.sha256)) ne coalesce(lowcase(strip(f.sha256)), 'missing');
+  quit;
+
+  %if &n_drift > 0 %then %do;
+    %fail_out(msg=HARD-01 HASH GUARD FAILED -- &n_drift md1-md8 source file(s) changed since baseline. Delete docs/raw_hash_baseline.csv and re-run 19b to acknowledge new sources.);
+  %end;
+
+  %put NOTE: HARD-01 hash guard passed -- all md1-md8 sha256 values match baseline.;
+%mend check_hash_baseline;
+%check_hash_baseline;
+
+
+/* ============================================================
+   SECTION 14 -- ODS Excel (D-05): KEY leftmost, UF blue headers
    ============================================================ */
 proc sql noprint;
   create table work.sheets_rpt as
@@ -1037,7 +1093,7 @@ ods listing;
 
 
 /* ============================================================
-   SECTION 14 -- Output verification and log restore
+   SECTION 15 -- Output verification and log restore
    No literal quotes inside %sysfunc(fileexist()) (B-06).
    ============================================================ */
 %macro verify_output;

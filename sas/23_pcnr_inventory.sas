@@ -42,9 +42,13 @@
     - No &SQLOBS; use SELECT COUNT(*) INTO :macvar TRIMMED
 
   Author  : Phase 23 Plan 01
+  Revised : 2026-09-29 -- SUBSTR guard for names ending in an underscore (6d);
+            99c drops MISSOVER (conflicts with TRUNCOVER) and reads raw_hex as
+            $400 to match %hexkey; resolved-list NOTE prints the list;
+            NOQUOTELENMAX silences the long-quoted-string NOTE
 ==========================================================================*/
 
-options mprint nofmterr nodate nonumber ps=max ls=200;
+options mprint nofmterr nodate nonumber ps=max ls=200 noquotelenmax;
 
 /* In pipeline (batch sas.exe), stop at first ERROR rather than cascading into later sections.
    Omitted for interactive runs: errorabend would close the SAS session on any error. */
@@ -251,7 +255,7 @@ quit;
   %end;
   %global &outmvar;
   %let &outmvar = &_final_list;
-  %put NOTE: [23] &listlabel resolved list -- &outmvar;
+  %put NOTE: [23] &listlabel resolved list -- &&&outmvar;
 %mend resolve_collist;
 
 %resolve_collist(rawlist=&demog_cols_raw, outmvar=demog_cols, listlabel=DEMOG);
@@ -952,8 +956,12 @@ data work._name_map_work;
       /* Scan right-to-left for the last _ */
       do _j = length(strip(_stripped)) to 1 by -1;
         if substr(strip(_stripped), _j, 1) = '_' then do;
-          /* final token is everything after position _j */
-          _ft = substr(strip(_stripped), _j+1);
+          /* final token is everything after position _j. A name that ends
+             in an underscore (cut at 32 upstream) has no final token: leave
+             _ft blank so the FALLBACK branch applies, without calling
+             SUBSTR past the end of the string. */
+          if _j < length(strip(_stripped)) then
+            _ft = substr(strip(_stripped), _j+1);
           leave;
         end;
       end;
@@ -1378,8 +1386,8 @@ quit;
   /* PCM-T-16: DATA step infile, never PROC IMPORT */
   data work._sent_dec_lookup;
     infile "&docs_path.\sentinel_decisions.csv"
-      dsd dlm=',' firstobs=2 truncover missover;
-    length variable $64 raw_value $200 raw_hex $200 raw_len 8
+      dsd dlm=',' firstobs=2 truncover;
+    length variable $64 raw_value $200 raw_hex $400 raw_len 8
            normalized_value $200 var_type $4 n_rows 8 pct_rows 8
            column_group $20 candidate_class $10 non_ascii_flag 8
            match_rule $20 action $20 rationale $200

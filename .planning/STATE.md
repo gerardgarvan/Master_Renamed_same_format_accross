@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
-status: planning
-last_updated: "2026-09-29T17:20:25.701Z"
+status: roadmap_defined
+last_updated: "2026-09-29"
 last_activity: 2026-09-29
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-09-29 | **Milestone:** v2.1 COMPLETE
+**Project:** PCM | **Last Updated:** 2026-09-29 | **Milestone:** v2.2 in progress
 
 ---
 
@@ -23,20 +23,32 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
-**Core value:** A single `run_pipeline.cmd` that runs 17 programs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), `g.pcnr_harmonized` (41,150 rows), `g.pcnr_analytic_cohort` (13,890 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
+**Core value:** A single `run_pipeline.cmd` that runs all SAS programs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), `g.pcnr_harmonized` (41,150 rows), `g.pcnr_analytic_cohort` (13,890 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current focus:** v2.1 shipped — start `/gsd:new-milestone` for v2.2
+**Current focus:** v2.2 — pcnr Normalization, Gap-Fill & Linkage; roadmap defined, ready to plan Phase 26
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 26 (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-29 — Milestone v2.2 started
+Status: Roadmap defined
+Last activity: 2026-09-29 — v2.2 roadmap defined (Phases 26-30)
 
-### v2.1 Phase Status
+### v2.2 Phase Status
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 26 | v2.1 Carry-Forward & Source Hardening | Not started |
+| 27 | md8 Row-Count Correction | Not started |
+| 28 | r7/r8/r9 Linkage Investigation | Not started |
+| 29 | Gap-Fill Wiring (r1-r6) | Not started |
+| 30 | pcnr Normalization & Type Conversion | Not started |
+
+**Progress:** [__________] 0% (0/5 phases)
+
+### v2.1 Phase Status (shipped 2026-09-29)
 
 | Phase | Name | Status |
 |-------|------|--------|
@@ -44,8 +56,6 @@ Last activity: 2026-09-29 — Milestone v2.2 started
 | 23 | Sentinel & Name Inventory | Complete (2026-09-28) |
 | 24 | Build g.pcnr_harmonized | Complete (2026-09-28) |
 | 25 | pcnr Cohort, Dictionary & Wiring | Complete (2026-09-29) |
-
-**Progress:** [██████████] 100%
 
 ### v2.0 Phase Status (shipped 2026-09-24)
 
@@ -105,25 +115,26 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Within-cohort Frailty | — | **8,150** (58.7%) | verified 2026-09-22 |
 | g.analytic_cohort (harmonized) | — | **13,890 rows, 174 cols** | rebuilt 2026-09-22 from g.master_data_harmonized |
 | pecan_ID distinct count (harmonized) | — | **33,031** | PID-02, 20_pecan_id.log 2026-09-24 |
-| pecan_ID distinct count (cohort) | — | see 16b_pecan_id_counts.txt | PID-06, 16b_pecan_id_counts.txt, Phase 22 run 2026-09-28 (pipeline PASSED; count in P: qc file, not committed) |
+| pecan_ID distinct count (cohort) | — | see 16b_pecan_id_counts.txt | PID-06, 16b_pecan_id_counts.txt, Phase 22 run 2026-09-28 |
 | r7/r8/r9 MRN linkage reach | — | see report | qc/20_linkage_reach.txt |
 | pcnr recoded cells | reported | — | Phase 24 (PCNR-10) |
 | g.pcnr_harmonized | 41,150 rows | **41,150** | Phase 24; all sentinel values set to missing; all analysis variables renamed pcnr_* |
 | g.pcnr_analytic_cohort | 13,890 rows | **13,890** | Phase 25; PRECEDE_STUDY_ID set identical to g.analytic_cohort |
+| md8 non-missing rows | TBD | TBD | Phase 27 (MD8-01) |
 
 ---
-| Phase 23 P01 | 5 | 3 tasks | 2 files |
-| Phase 23 P02 | 10 | 2 tasks | 1 files |
-| Phase 23-sentinel-name-inventory P03 | 10 | 1 tasks | 1 files |
-| Phase 24 P02 | 125 | 2 tasks | 1 files |
-| Phase 24 P03 | 8 | 2 tasks | 1 files |
-| Phase 25 P01 | 15 | 2 tasks | 1 files |
-| Phase 25 P02 | 10 | 2 tasks | 1 files |
-| Phase 25 P03 | 30 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+**v2.2 (2026-09-29):**
+
+- Phase 26 added: v2.1 Carry-Forward & Source Hardening (FIX-03, FIX-04, HARD-01, HARD-02, HARD-03) — FIX-03 done first because GAP-02 later edits program 23
+- Phase 27 added: md8 Row-Count Correction (MD8-01, MD8-02)
+- Phase 28 added: r7/r8/r9 Linkage Investigation (LINK-01, LINK-02, LINK-03) — produces PCM-D-28; must precede gap-fill to confirm r7-r9 exclusion scope
+- Phase 29 added: Gap-Fill Wiring r1-r6 (GAP-01, GAP-02, GAP-03) — depends on PCM-D-28
+- Phase 30 added: pcnr Normalization & Type Conversion (NORM-01, NORM-02, NORM-03, NORM-04, NORM-05) — depends on Phase 29 final column set
 
 **v2.1 (2026-09-24):**
 
@@ -131,70 +142,44 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 - Phase 23 added: Sentinel & Name Inventory (PCNR-01..06); human checkpoint, PCNR_APPROVED gate
 - Phase 24 added: Build g.pcnr_harmonized (PCNR-07..11)
 - Phase 25 added: pcnr Cohort, Dictionary & Wiring (PCNR-12..17)
-- PCM-D-15 gap-fill and r7/r8/r9 linkage moved to v2.2 candidates
+- PCM-D-15 gap-fill and r7/r8/r9 linkage moved to v2.2
 
 **v2.0 (2026-09-23):**
 
 - Phase 19 added: Raw Directory Inventory (INV-01 through INV-07)
-- Phase 20 added: pecan_ID Derivation (PID-01 through PID-08); depends on Phase 19 (INV-01 checksum, INV-04 key-column flags)
-- Phase 21 added: Runner Wiring & D3 Fix (RUN-01, FIX-01); must follow Phases 19 and 20 to include programs 19 and 20 in 99_run_all.sas
-
-**v1.0 (archived):**
-
-- Phase 5 added: Merge QC (QC-01 through QC-05)
-- AMENDMENT-01 raised 2026-08-26: adds PREP-08, PREP-09 (Phase 3) and QC-06 (Phase 5)
-- Phase 17 added: summary-stats-by-domain
-- Phase 18 added: Supplemental Raw Inventory
+- Phase 20 added: pecan_ID Derivation (PID-01 through PID-08); depends on Phase 19
+- Phase 21 added: Runner Wiring & D3 Fix (RUN-01, FIX-01); must follow Phases 19 and 20
 
 ### Established Decisions
 
 - RUN-01 SATISFIED 2026-09-24: run_pipeline.cmd wires all 14 programs (01-08, 19, 20, 10b, 16b, 17, 18) as separate sas.exe sessions per PCM-C-05; full end-to-end run PASSED; stop-path verified; in_pipeline=1 confirmed via envlen(RUN_ALL) in 00_config.sas
 - PCM-D-19 APPROVED 2026-09-23: DOMAIN_MAP_APPROVED=1 in program 17; D3 DATALINES rows confirmed; supersedes v1 Checkpoint 1 hold
-- PCM-D-20 APPROVED 2026-09-23: program 17 redirected from g.analysis_base (no pipeline producer) to g.analytic_cohort (produced by 16b); keyed comparison writes qc/17_pcm_d20_compare.txt; pecan_ID excluded via existing regex mechanism (a)
+- PCM-D-20 APPROVED 2026-09-23: program 17 redirected from g.analysis_base to g.analytic_cohort; keyed comparison writes qc/17_pcm_d20_compare.txt
+- PCM-D-21 RESOLVED 2026-09-28: sentinel seed list and matching rules; case-insensitive match on normalized value; compound forms included
+- PCM-D-22 RESOLVED 2026-09-28: PRECEDE_STUDY_ID and pecan_ID keep original names (no pcnr_ prefix)
+- PCM-D-23 RESOLVED 2026-09-28: names >27 chars shortened; rule in pcnr_name_map.csv
+- PCM-D-24 RESOLVED 2026-09-28: no numeric values approved for recode in v2.1
+- PCM-D-25 RESOLVED 2026-09-28: rationale column free-text; decided_by and date required
+- PCM-D-26 RESOLVED 2026-09-29: program 17 reads g.analytic_cohort unchanged; repointing deferred to v2.2 pending Price review
 - md3 is the merge spine (complete superset, PCM-F-02); operation is 1:1 merge, not stack-dedup
 - No PROC SQL UPDATE anywhere (silent truncation trap, PCM-T-01)
 - No `data X; set X;` patterns (destroys dataset, PCM-T-02)
 - Single ownership per variable (prevents last-wins overwrite, PCM-T-05)
-- md8 stores literal `NULL` where others store blank; md8 numerics were forced to CHAR $4/$11 in prior work
-- Coalescing BMI from other sources recovers nothing; 28,424 missing are missing at source
-- `PRECEDE_Study_ID_1` in md6 is a duplicate column identical to `PRECEDE_STUDY_ID` -- proven, then dropped
-- Encoding damage confined to `Base_Procedure_1`, <=9 rows per file -- flag only, do not re-encode
-- SRC-05 runs before SRC-01: blank key is "unique" when it occurs once and must be caught first
-- `&SQLOBS` not used anywhere; all counts use explicit `SELECT COUNT(*) INTO :macvar TRIMMED`
-- KEEP= lists generated from `qclib.ownership_map` at run time, never hand-transcribed
-- Ownership resolution is a RULE (md3 if present, else highest-row-count source, ties to lowest number), with md7 override for five frailty components
-- QC-05 bounds calibrated to OBSERVED data: Admit_BMI 10-100, Cognitive_Score 0-3
-- Age_at_Encounter floor of 18 is a type-sanity guard only; do NOT tighten to 64 (PCM-D-07 deferred)
-- g library lives OUTSIDE the git working tree -- `git clean -xdf` deletes ignored files
-- Impossible VALUES are nulled at source (PREP-08); impossible COMBINATIONS are flagged, not nulled (MRG-05)
-- PCM-D-05 RESOLVED 2026-09-21: analytic cohort restricted to INPATIENT+OBSERVATION (N=13,890); BMI forces restriction
-- PCM-D-15 APPROVED 2026-09-22: per-column gap candidates for r1-r9 extension columns; wiring deferred to v2.1 pending PID-07 result
-- PCM-D-16 DIAGNOSED: r7/r8/r9 2022 IDs match 0 base rows -- schema-change-era format change; documented, not fixed
-- PCM-T-12 (method): sweep ALL candidates, do not spot check -- Cognitive_Category and Frailty_Category were found only by full sweep
+- PCM-D-15 APPROVED 2026-09-22: per-column gap candidates for r1-r9; r1-r6 wired in Phase 29; r7-r9 pending PCM-D-28
+- PCM-D-16 DIAGNOSED: r7/r8/r9 2022 IDs match 0 base rows -- PCM-D-28 investigation in Phase 28
 
-### Open Decisions (v2.1)
+### Open Decisions (v2.2)
 
-PCM-D-17 and PCM-D-18 resolved 2026-09-23 (see PROJECT.md Key Decisions).
-
-- **PCM-D-21** -- which candidate values become missing, per variable (sentinel_decisions.csv). Before Phase 24.
-- **PCM-D-22** -- prefix scope (all non-key columns vs recoded-only) and which key columns stay unprefixed. Before Phase 23 name map.
-- **PCM-D-23** -- shortening rule for names over 27 characters. Before Phase 23 name map.
-- **PCM-D-24** -- whether any numeric sentinels are recoded. Before Phase 24.
-- **PCM-D-25** -- whether reason codes (Declined/Refused/Not applicable) are preserved. RESOLVED 2026-09-28: no companion columns in v2.1; values become MISSING per sentinel_decisions.csv. (Gerard)
-- **PCM-D-27** -- ambiguous-value column scope (demographic + score/count lists). RESOLVED 2026-09-28: lists hardcoded in sas/23_pcnr_inventory.sas header; confirmed at Phase 23 checkpoint. (Gerard)
-- **PCM-D-26** -- program 17 input: g.pcnr_analytic_cohort vs g.analytic_cohort. RESOLVED 2026-09-28: program 17 reads g.analytic_cohort unchanged; repointing to g.pcnr_analytic_cohort deferred pending Price review and domain map re-approval. (Gerard)
+- **PCM-D-28** — which encryption scheme r7-r9 use and whether the 9,215-ID mismatch (PCM-D-16) is recoverable; recorded in Phase 28
 
 ### Pending Todos
 
 - Inform Price of PCM-D-05 resolution (decided by Gerard 2026-09-21; update attribution on Price's response)
 - Report to PeCAN data group: source system emits impossible operative timestamp combinations (9 rows) and negative intervals concentrated in percutaneous services
-- Decide whether `.planning/PROJECT.md` should restore the full PCM-T-01..T-11 trap list
-- Commit the 2026-09-24 fixes to 16b_cohort_rebuild.sas and 20_pecan_id.sas (FIX-02)
-- Copy `ownership_map.sas7bdat` to P: qc path if running Phase 5 on a machine that did not run Phase 2
 
 ### Blockers
 
-- Phase 21 is blocked on completion of Phase 20 (programs 19 and 20 must exist before runner wiring) -- RESOLVED: Phase 20 complete 2026-09-23
+None at roadmap definition.
 
 ---
 
@@ -217,4 +202,4 @@ To resume: read this file, then `.planning/ROADMAP.md`, then `.planning/REQUIREM
 **Do** restart the SAS session between programs -- `%abort cancel` leaves an interactive session that swallows the next submit without executing it.
 
 ---
-*Last updated: 2026-09-29 — Phase 25 complete; all v2.1 milestone deliverables shipped; pipeline PASSED; g.pcnr_analytic_cohort 13,890 rows; PCNR_DICTIONARY.xlsx written; PCM-D-26 resolved; progress 100%*
+*Last updated: 2026-09-29 — v2.2 roadmap defined; Phases 26-30 planned; 18 requirements mapped; ready to plan Phase 26*

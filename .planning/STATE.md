@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: pcnr_ Clean Analysis Dataset
 status: unknown
-last_updated: "2026-09-29T14:27:43.398Z"
+last_updated: "2026-09-29T17:20:25.701Z"
 last_activity: 2026-09-29
 progress:
   total_phases: 4
@@ -15,17 +15,17 @@ progress:
 
 # STATE.md — PeCAN Master Dataset Integration
 
-**Project:** PCM | **Last Updated:** 2026-09-24 | **Milestone:** v2.1 STARTED
+**Project:** PCM | **Last Updated:** 2026-09-29 | **Milestone:** v2.1 COMPLETE
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-24 after v2.1 milestone defined)
+See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
-**Core value:** A single `run_pipeline.cmd` that runs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md -- with no manual steps.
+**Core value:** A single `run_pipeline.cmd` that runs 17 programs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), `g.pcnr_harmonized` (41,150 rows), `g.pcnr_analytic_cohort` (13,890 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current focus:** Phase 25 — pcnr-cohort-dictionary-wiring
+**Current focus:** v2.1 shipped — start `/gsd:new-milestone` for v2.2
 
 ---
 
@@ -107,8 +107,8 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | pecan_ID distinct count (cohort) | — | see 16b_pecan_id_counts.txt | PID-06, 16b_pecan_id_counts.txt, Phase 22 run 2026-09-28 (pipeline PASSED; count in P: qc file, not committed) |
 | r7/r8/r9 MRN linkage reach | — | see report | qc/20_linkage_reach.txt |
 | pcnr recoded cells | reported | — | Phase 24 (PCNR-10) |
-| g.pcnr_harmonized | 41,150 rows | — | Phase 24 |
-| g.pcnr_analytic_cohort | 13,890 rows | — | Phase 25 |
+| g.pcnr_harmonized | 41,150 rows | **41,150** | Phase 24; all sentinel values set to missing; all analysis variables renamed pcnr_* |
+| g.pcnr_analytic_cohort | 13,890 rows | **13,890** | Phase 25; PRECEDE_STUDY_ID set identical to g.analytic_cohort |
 
 ---
 | Phase 23 P01 | 5 | 3 tasks | 2 files |

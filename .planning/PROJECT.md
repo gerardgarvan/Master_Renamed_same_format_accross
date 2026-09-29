@@ -4,7 +4,7 @@
 **Owner:** Gerard Garvan (ggarvan)
 **Working folder:** `P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross`
 **Repo:** local disk (see PCM-C-04 -- do NOT put the git repo on the P: drive)
-**Status:** v2.0 SHIPPED 2026-09-24; v2.1 IN PROGRESS
+**Status:** v2.1 SHIPPED 2026-09-29; ready for v2.2 planning
 **Supersedes:** all ad-hoc `master_data_*` merge/stack/dedup code written before this document
 
 ---
@@ -27,45 +27,45 @@ DECISIONS.md — with no manual steps.
 
 ---
 
-## Current State (after v2.0 milestone, 2026-09-24)
+## Current State (after v2.1 milestone, 2026-09-29)
 
 **Pipeline datasets:**
 - `g.master_data_merged` -- 41,150 rows, 176 columns, all assertions pass
 - `g.master_data_harmonized` -- 41,150 rows, 175 columns (includes pecan_ID)
 - `g.analytic_cohort` -- 13,890 rows, 175 columns (INPATIENT+OBSERVATION; includes pecan_ID)
 - `g.pecan_id_xwalk` -- append-only crosswalk (ENCRYPTED_MRN → pecan_ID, surrogate integer per PCM-D-17)
+- `g.pcnr_harmonized` -- 41,150 rows, same column count as source; all sentinel values set to missing; all analysis variables renamed `pcnr_<original>` per approved decisions
+- `g.pcnr_analytic_cohort` -- 13,890 rows; derived from `g.pcnr_harmonized` with PCM-D-05 restriction
 
-**SAS programs:** 14 production programs wired via `run_pipeline.cmd`
+**SAS programs:** 17 production programs wired via `run_pipeline.cmd`
 - Core pipeline: 01-08
 - v2.0 additions: 19 (raw inventory), 20 (pecan_ID derivation)
 - Harmonization/cohort: 10b, 16b, 17, 18
+- v2.1 additions: 23 (sentinel/name inventory), 24 (pcnr build), 25 (pcnr cohort + dictionary)
 
 **Documentation:**
 - `docs/DATA_DICTIONARY.xlsx` -- 175 variables including pecan_ID, KEY sheet leftmost, UF blue headers
-- `docs/DECISIONS.md` -- PCM-D-01 through PCM-D-20 resolved and attributed
-- `qc/19_raw_inventory.xlsx` -- complete variable-level raw directory inventory (INV-01..INV-06)
-- `qc/17_summary_stats_by_domain.xlsx` -- D1-D5 including D3 (Cognitive) now populated
+- `docs/DECISIONS.md` -- PCM-D-01 through PCM-D-26 resolved and attributed
+- `docs/pcnr_name_map.csv` -- original → pcnr column name mapping for all 175 variables
+- `docs/sentinel_decisions.csv` -- PCNR_APPROVED=1; every candidate value with action and rationale
+- `qc/19_raw_inventory.xlsx` -- raw directory inventory with UF blue headers, KEY sheet leftmost (INV-07 closed)
+- `qc/PCNR_DICTIONARY.xlsx` -- pcnr variable dictionary; KEY sheet leftmost, UF blue headers
+- `qc/24_pcnr_recode_counts.csv` -- per-variable × per-value recode audit
+- `qc/17_summary_stats_by_domain.xlsx` -- D1-D5 including D3 (Cognitive)
 - `qc/16b_pecan_id_counts.txt` -- pecan_ID encounter distribution (PID-06)
 - `qc/20_pecan_id_linkage_reach.txt` -- PID-07 r7/r8/r9 MRN linkage reach report
 
-**Known gap (v2.1):**
-- INV-07: `qc/19_raw_inventory.xlsx` workbook formatting (UF colors, KEY sheet legend, FAMILIES sheet) not yet applied
-
 ---
 
-## Current Milestone: v2.1 pcnr_ Clean Analysis Dataset
+## Next Milestone: v2.2 (planning not yet started)
 
-**Goal:** Add `g.pcnr_harmonized` and `g.pcnr_analytic_cohort`, fully derived from
-`g.master_data_harmonized`, with placeholder values (`?`, `Unknown`, ...) set to missing and
-every analysis variable renamed `pcnr_<original name>`. Source datasets are never modified.
+**Candidate features (see Next section in Requirements):**
+- PCM-D-15 gap-fill wiring: r1-r9 extension-column gap candidates integrated into base file
+- r7/r8/r9 linkage resolution: MRN-based linking feasibility for 2022 IDs (PCM-D-16 follow-up)
+- Type conversion of character columns that are entirely numeric after sentinel removal
+- Case/whitespace normalization of category values (reported in v2.1, deferred)
 
-**Target features:**
-- Pipeline green first: 16b/20 fixes committed, runner warning count and `SAS_EXE` hardened
-- Sentinel inventory swept across every column, with a human decision per candidate value
-- Name map for the `pcnr_` prefix, including a rule for names over 27 characters
-- Build with exact accounting: missing after = missing before + recoded, every other cell unchanged
-- pcnr cohort (N = 13,890), pcnr dictionary, runner wiring, program 17 input decision
-- Carry-over: INV-07 workbook formatting, documentation drift
+Start with `/gsd:new-milestone` to gather requirements and build the roadmap.
 
 ---
 
@@ -92,12 +92,12 @@ every analysis variable renamed `pcnr_<original name>`. Source datasets are neve
 - ✓ RUN-01 -- Full pipeline batch driver (`run_pipeline.cmd`): 14 programs, separate sas.exe per PCM-C-05, exit-code gating — v2.0
 - ✓ FIX-01 -- D3 cognitive domain fix: DOMAIN_MAP_APPROVED=1, COGNITIVE_SCORE/COGNITIVE_CATEGORY on D3 sheet — v2.0
 
-### Active (v2.1 — see .planning/REQUIREMENTS.md)
+### Validated (v2.1 milestone, shipped 2026-09-29)
 
-- [ ] FIX-02, RUN-02, RUN-03, INV-07, DOC-05 -- Pipeline green & hardening (Phase 22)
-- [ ] PCNR-01 through PCNR-06 -- Sentinel & name inventory, human decisions (Phase 23)
-- [ ] PCNR-07 through PCNR-11 -- Build g.pcnr_harmonized with exact recode accounting (Phase 24)
-- [ ] PCNR-12 through PCNR-17 -- pcnr cohort, dictionary, runner wiring, program 17 input (Phase 25)
+- ✓ FIX-02, RUN-02, RUN-03, INV-07, DOC-05 -- Pipeline green & hardening; runner warning count corrected, SAS_EXE overridable, raw inventory in UF colors — v2.1
+- ✓ PCNR-01 through PCNR-06 -- Sentinel sweep (every column), numeric sentinels reported, ambiguous values reported, case-variant report, name map, sentinel_decisions.csv with PCNR_APPROVED gate — v2.1
+- ✓ PCNR-07 through PCNR-11 -- `g.pcnr_harmonized` built with exact recode accounting; per-cell identity assertions; source confirmed unmodified — v2.1
+- ✓ PCNR-12 through PCNR-17 -- `g.pcnr_analytic_cohort` (N=13,890); PCNR_DICTIONARY.xlsx; runner wired (17 programs); PCM-D-26 resolved — v2.1
 
 ### Next (v2.2 candidates)
 
@@ -135,7 +135,12 @@ every analysis variable renamed `pcnr_<original name>`. Source datasets are neve
 | PCM-D-18 pecan_ID attach point | Attach in 10b (harmonized) and 16b (cohort); g.master_data_merged untouched | ✓ Resolved 2026-09-23 |
 | PCM-D-19 DOMAIN_MAP_APPROVED | D3 DATALINES rows confirmed; gate flipped to 1 | ✓ Approved 2026-09-23 |
 | PCM-D-20 Program 17 input redirect | g.analysis_base (no pipeline producer) → g.analytic_cohort (pipeline-produced) | ✓ Approved 2026-09-23; 27,260 non-cohort rows correctly excluded |
-| PCM-D-21..D-26 pcnr_ dataset | Sentinel list, prefix scope, long-name rule, numeric sentinels, reason codes, program 17 input | — Open (v2.1) |
+| PCM-D-21 Sentinel seed list & matching rules | Case-insensitive match on normalized value; compound forms included | ✓ Resolved 2026-09-28 |
+| PCM-D-22 Key column prefix handling | PRECEDE_STUDY_ID and pecan_ID keep original names (no pcnr_ prefix) | ✓ Resolved 2026-09-28 |
+| PCM-D-23 Long-name shortening rule | Names >27 chars shortened; rule documented in pcnr_name_map.csv | ✓ Resolved 2026-09-28 |
+| PCM-D-24 Numeric sentinels | No numeric values approved for recode in v2.1 | ✓ Resolved 2026-09-28 |
+| PCM-D-25 Reason codes in sentinel_decisions.csv | Rationale column free-text; decided_by and date required | ✓ Resolved 2026-09-28 |
+| PCM-D-26 Program 17 input | g.analytic_cohort retained as program 17 input; g.pcnr_analytic_cohort deferred to v2.2 repoint | ✓ Resolved 2026-09-29 |
 
 ---
 
@@ -189,4 +194,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-09-24 — v2.1 milestone started (pcnr_ Clean Analysis Dataset)*
+*Last updated: 2026-09-29 — v2.1 milestone complete (pcnr_ Clean Analysis Dataset shipped)*

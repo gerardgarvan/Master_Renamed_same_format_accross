@@ -113,9 +113,57 @@
 
 ---
 
+## Milestone: v2.1 -- pcnr_ Clean Analysis Dataset
+
+**Shipped:** 2026-09-29
+**Phases:** 4 (22, 23, 24, 25) | **Plans:** 12 | **Tasks:** 11
+
+### What Was Built
+
+- Pipeline green end-to-end before any new work: FIX-02 (16b/20 fixes), RUN-02 (line-start WARNING count), RUN-03 (SAS_EXE overridable), INV-07 (19_raw_inventory.xlsx in UF colors), DOC-05 (MILESTONES.md + STATE.md drift closed) (Phase 22)
+- Full sentinel sweep: every character column of g.master_data_harmonized swept (not sampled), numeric sentinels reported, ambiguous values separated, case-variant report produced; pcnr_name_map.csv with shortening rule; sentinel_decisions.csv gated by PCNR_APPROVED; PCM-D-21..D-25 resolved (Phase 23)
+- g.pcnr_harmonized built with exact recode accounting: per-cell identity assertions (non-recoded cells identical to source), per-variable n_missing_after = n_missing_before + n_recoded, source confirmed unmodified post-run; qc/24_pcnr_recode_counts.csv (Phase 24)
+- g.pcnr_analytic_cohort (N=13,890), PCNR_DICTIONARY.xlsx (KEY sheet leftmost, UF blue), runner wired (17 programs, 23/24/25 after 16b), PCM-D-26 resolved (program 17 reads g.analytic_cohort unchanged), full pipeline PASSED (Phase 25)
+
+### What Worked
+
+- **Pipeline-green-first gate (Phase 22):** Running the full pipeline before adding any new programs exposed the 16b OBS=0 cascade early. This meant Phases 23-25 were added onto a known-good base, not a partially broken one.
+- **PCNR_APPROVED gate pattern:** Reusing the concept_decisions.csv pattern (human confirms → program applies exactly that → aborts on any unmapped candidate) made the sentinel application in Phase 24 completely traceable. No sentinel was ever recoded without a named human decision.
+- **Full-comparison assertion (Phase 24):** The PROC COMPARE + DATA step identity check for every non-recoded cell was the strongest safety net in the project. It caught nothing (correct behavior), but its existence meant the run could be presented to reviewers as "proven identical except where specified."
+- **Phase-by-phase %unquote fix (today):** Finding and applying the same macro-quoting fix to programs 19 and 20 on the same day as the pipeline PASS kept the repo clean before archiving. No known issues left in committed code.
+
+### What Was Inefficient
+
+- **PCNR-09 and PCNR-10 checkboxes not ticked at plan completion:** Both were implemented in Phase 24 but the REQUIREMENTS.md checkboxes were found unchecked at milestone close. Same pattern as v2.0 — per-plan checkbox pass at SUMMARY.md creation time remains the gap.
+- **Phase 23 summary one-liners not structured:** The gsd-tools summary-extract tool returned headers rather than sentences for Phase 23 summaries. SUMMARY.md files should begin with a structured `**One-liner:**` line for tooling compatibility.
+- **STATE.md accumulated stale "Open Decisions" section:** PCM-D-21..D-27 were listed as open in STATE.md after they were resolved. The "Established Decisions" section was not updated per-phase. At milestone close, STATE.md needed manual reconciliation rather than being an accurate live record.
+
+### Patterns Established
+
+- `%unquote(%superq(varname))` before quoted XLSX name literals to strip macro-quoting bytes (0x06/0x08) from digit-prefix sheet names — documented as R5-01 in program 19
+- `~$filename` prefix detection for Excel owner/lock files: classify as `lockfile` ftype, route to `listed-not-profiled` with WARNING (R5-02)
+- Two-CSV recode audit output: detail CSV (variable × raw value × n_recoded) + header written separately with no dsd, data with dsd for auto-quoting
+- Gate-file pattern for docs/: `sentinel_decisions.csv` and `pcnr_name_map.csv` committed with `git add -f` to override .gitignore; their presence is the gate for Phase 24
+
+### Key Lessons
+
+1. **Tick requirement checkboxes at plan completion, not milestone end.** Third milestone in a row where stale checkboxes required manual reconciliation at close. This pattern must be solved in the executor workflow, not left to the human.
+2. **SUMMARY.md one-liner must be a structured field.** `gsd-tools summary-extract` looks for a literal `One-liner:` line. Any phase where that line is absent forces manual extraction. Write it first, not last.
+3. **Full-comparison assertions are worth the extra runtime.** The PROC COMPARE scan of 41,150 × 175 cells added run time but was the only way to prove the non-recoded majority was truly untouched. For a dataset used in clinical analysis, this is the correct tradeoff.
+4. **Resolve open decisions in STATE.md at decision time.** The "Open Decisions" block accumulated resolved entries. Moving a decision from Open to "Established Decisions" at resolution time costs nothing and makes STATE.md a reliable resumption artifact.
+
+### Cost Observations
+
+- Model: Claude Sonnet (claude-sonnet-4-6) throughout
+- Sessions: ~8 sessions over 5 days (2026-09-24 to 2026-09-29)
+- Notable: Phase 24 carried the highest per-session complexity (code-generation pattern for recode rules, full-comparison assertion design); Phase 22 was fastest (pipeline already nearly green)
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Duration | Key Pattern |
 |-----------|--------|-------|----------|-------------|
 | v1 | 13 | 23 | 28 days | Assertion-first design; amendment protocol for mid-project corrections |
 | v2.0 | 3 | 6 | 2 days | certutil checksum reuse; cross-machine batch driver testing |
+| v2.1 | 4 | 12 | 5 days | Pipeline-green-first gate; PCNR_APPROVED pattern; full-comparison assertion |

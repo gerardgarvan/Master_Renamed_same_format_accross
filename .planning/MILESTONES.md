@@ -1,5 +1,24 @@
 # MILESTONES.md — PeCAN Master Dataset Integration
 
+## v2.1 pcnr_ Clean Analysis Dataset (Shipped: 2026-09-29)
+
+**Phases completed:** 4 phases, 12 plans, 11 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- SECTION 0 — Preconditions
+- SECTION 6 -- Name-map draft:
+- PCM-D-21 -- Sentinel Seed List and Matching Rules: RESOLVED
+- One-liner:
+- One-liner:
+- SECTION 5
+- One-liner:
+- One-liner:
+- run_pipeline.cmd wired with programs 23/24/25 between 16b and 17; PCM-D-26 resolved deferring program 17 repoint to g.pcnr_analytic_cohort; full pipeline PASSED with g.pcnr_analytic_cohort at 13,890 rows
+
+---
+
 ## v2.0 pecan_ID + Raw Directory Inventory (Shipped: 2026-09-24)
 
 **Phases completed:** 3 phases, 6 plans, 15 tasks

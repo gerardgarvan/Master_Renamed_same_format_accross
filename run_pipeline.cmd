@@ -7,10 +7,11 @@ REM  Full pipeline batch driver. Calls sas.exe separately for
 REM  each program per PCM-C-05 (restart SAS between programs).
 REM
 REM  Program order:
+REM    19 raw_dir_inventory  (FIRST -- HARD-01 hash guard before any merge)
 REM    01 verify_sources   02 ownership        03 prep_all
 REM    04 merge            05 qc_merge         06 reconcile
 REM    07 cohort           08 dictionary
-REM    19 raw_dir_inventory  20 pecan_id
+REM    20 pecan_id
 REM    10b concept_harmonize
 REM    16b cohort_rebuild
 REM    23 pcnr_inventory  24 pcnr_build  25 pcnr_cohort
@@ -78,6 +79,10 @@ if not exist "%SAS_EXE%" (
   goto :fail
 )
 
+REM ---- Program 19: HARD-01 hash guard (MUST run before merge programs) ----
+call :run_program "19 raw_dir_inventory" "19_raw_dir_inventory.sas"
+if !ERRORLEVEL! NEQ 0 goto :fail
+
 REM ---- Programs 1-8: core pipeline ----
 call :run_program "01 verify_sources"   "01_verify_sources.sas"
 if !ERRORLEVEL! NEQ 0 goto :fail
@@ -103,10 +108,7 @@ if !ERRORLEVEL! NEQ 0 goto :fail
 call :run_program "08 dictionary"       "08_dictionary.sas"
 if !ERRORLEVEL! NEQ 0 goto :fail
 
-REM ---- Programs 19-20: v2.0 additions (raw inventory + pecan_ID) ----
-call :run_program "19 raw_dir_inventory" "19_raw_dir_inventory.sas"
-if !ERRORLEVEL! NEQ 0 goto :fail
-
+REM ---- Program 20: v2.0 addition (pecan_ID) ----
 call :run_program "20 pecan_id"         "20_pecan_id.sas"
 if !ERRORLEVEL! NEQ 0 goto :fail
 

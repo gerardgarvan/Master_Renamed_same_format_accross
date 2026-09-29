@@ -1326,4 +1326,107 @@ quit;
 
 %put NOTE: ==== Phase 23 Sentinel Inventory complete ====;
 
+
+/* =========================================================================
+   SECTION 99 -- FIX-03 CONTAINS audit (D-02)
+   Produces qc/23_contains_audit.csv: one row per distinct
+   (contains_fragment, variable, raw_value, n_rows) tuple that the current
+   CONTAINS block matches, limited to non-freetext columns only.
+   Also joins current_action from docs/sentinel_decisions.csv on
+   (variable, raw_hex) so the reviewer can see which matches carry a
+   MISSING decision.
+   Gate: %let run_contains_audit = 1; (default ON).
+   ========================================================================= */
+%let run_contains_audit = 1;
+
+%macro do_contains_audit;
+%if &run_contains_audit = 1 %then %do;
+
+  /* --- 99a. Build per-fragment audit rows from work._char_freq ---- */
+  data work._contains_audit_raw;
+    set work._char_freq;
+    length contains_fragment $40 _isft 8;
+    _isft = (indexw(upcase("&freetext_cols"), upcase(variable)) > 0);
+    if _isft = 1 then delete;   /* honour freetext exclusion */
+
+    /* Array of the 15 current CONTAINS fragments */
+    array _frags[15] $40 _temporary_ (
+      'UNKNOWN'         'NOT DOCUMENTED'   'NOT RECORDED'
+      'MISSING'         'NOT APPLICABLE'   'N/A'
+      'OTHER'           'NONE'             'DECLINED'
+      'REFUSED'         'NOT ASSESSED'     'NOT PERFORMED'
+      'UNABLE TO OBTAIN' 'NOT SPECIFIED'   'PENDING'
+    );
+
+    do _i = 1 to 15;
+      if index(normalized_value, trim(_frags[_i])) > 0 then do;
+        contains_fragment = _frags[_i];
+        output;
+      end;
+    end;
+
+    keep contains_fragment variable raw_value raw_hex n_rows;
+    drop _isft _i;
+  run;
+
+  /* --- 99b. Sort audit rows ---- */
+  proc sort data=work._contains_audit_raw;
+    by contains_fragment variable descending n_rows;
+  run;
+
+  /* --- 99c. Read docs/sentinel_decisions.csv to get current_action ---- */
+  /* PCM-T-16: DATA step infile, never PROC IMPORT */
+  data work._sent_dec_lookup;
+    infile "&docs_path.\sentinel_decisions.csv"
+      dsd dlm=',' firstobs=2 truncover missover;
+    length variable $64 raw_value $200 raw_hex $200 raw_len 8
+           normalized_value $200 var_type $4 n_rows 8 pct_rows 8
+           column_group $20 candidate_class $10 non_ascii_flag 8
+           match_rule $20 action $20 rationale $200
+           decided_by $40 decided_date $20;
+    input variable $ raw_value $ raw_hex $ raw_len
+          normalized_value $ var_type $ n_rows pct_rows
+          column_group $ candidate_class $ non_ascii_flag
+          match_rule $ action $ rationale $ decided_by $ decided_date $;
+    keep variable raw_hex action;
+  run;
+
+  /* --- 99d. Join current_action on (variable, raw_hex) ---- */
+  proc sql noprint;
+    create table work._contains_audit as
+    select a.contains_fragment,
+           a.variable,
+           a.raw_value,
+           a.n_rows,
+           coalesce(b.action, '') as current_action length=20
+    from work._contains_audit_raw as a
+    left join work._sent_dec_lookup as b
+      on upcase(a.variable) = upcase(b.variable)
+     and a.raw_hex = b.raw_hex
+    order by a.contains_fragment, a.variable, a.n_rows desc;
+  quit;
+
+  /* --- 99e. Write qc/23_contains_audit.csv ---- */
+  data _null_;
+    file "&qc_path.\23_contains_audit.csv";
+    put 'contains_fragment,variable,raw_value,n_rows,current_action';
+  run;
+
+  data _null_;
+    set work._contains_audit;
+    file "&qc_path.\23_contains_audit.csv" dsd mod;
+    put contains_fragment variable raw_value n_rows current_action;
+  run;
+
+  %local _audit_rows;
+  proc sql noprint;
+    select count(*) into :_audit_rows trimmed from work._contains_audit;
+  quit;
+  %put NOTE: [23] SECTION 99 FIX-03 -- contains audit rows written = &_audit_rows;
+  %put NOTE: [23] SECTION 99 FIX-03 -- output: &qc_path.\23_contains_audit.csv;
+
+%end; /* run_contains_audit = 1 */
+%mend do_contains_audit;
+%do_contains_audit;
+
 %restore_log;

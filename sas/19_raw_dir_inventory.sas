@@ -32,6 +32,8 @@
   Author  : GSD Phase 19 Plan 01
   Revised : 2026-09-23 (review round 4 -- per-sheet status, exact raw\master match,
             single-type tables)
+            2026-09-29 (round 5 -- %unquote on digit-prefix sheet name literals;
+            Excel ~$ owner files classified as lockfile, listed-not-profiled)
 ==========================================================================*/
 
 /* ============================================================
@@ -118,7 +120,10 @@ data work.files_meta;
     fdate = 'UNKNOWN';
   end;
   _rc = filename('_fr_');
-  if ext in ('csv', 'xlsx', 'xls', 'sas7bdat') then ftype = ext;
+  /* Excel owner/lock files (~$name.xlsx) exist only while a workbook is open;
+     they are not data and must never count as read-failed (R5-02) */
+  if substr(filename, 1, 2) = '~$' then ftype = 'lockfile';
+  else if ext in ('csv', 'xlsx', 'xls', 'sas7bdat') then ftype = ext;
   else ftype = 'other';
   drop _rc _fid;
 run;
@@ -255,6 +260,13 @@ run;
       %let fstatus = listed-not-profiled;
     %end;
 
+    /* ---------------- Excel lock file ---------------- */
+    %else %if &ftype = lockfile %then %do;
+      %let fstatus = listed-not-profiled;
+      %let freason = Excel owner file -- the matching workbook was open in Excel during this run;
+      %put WARNING: [19] Excel lock file found for file_id=&i -- close the workbook and rerun;
+    %end;
+
     /* ---------------- CSV ---------------- */
     %else %if &ftype = csv %then %do;
       proc datasets lib=work nolist nowarn; delete &dsname; quit;
@@ -349,8 +361,11 @@ run;
               %let _dsid_chk = %sysfunc(open(_xlw.%superq(_sh&j)));
               %if &_dsid_chk > 0 %then %do;
                 %let _rc_chk = %sysfunc(close(&_dsid_chk));
+                /* R5-01: %superq leaves macro-quoting bytes (0x06/0x08) around the
+                   value; inside a quoted name literal they are passed to the XLSX
+                   engine verbatim. %unquote strips them before the name is built. */
                 data work.&dsname._s&j;
-                  set _xlw."%superq(_sh&j)"n;
+                  set _xlw."%unquote(%superq(_sh&j))"n;
                 run;
                 %if &syserr > 4 %then %do;
                   /* Remove any partial copy so existence = success below */

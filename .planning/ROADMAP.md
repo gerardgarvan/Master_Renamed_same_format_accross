@@ -124,15 +124,20 @@ cannot take the prefix is enumerated and put in front of a human before any valu
 **Goal:** The clean dataset is usable end to end: cohort, documentation, runner, and the
 downstream summary program.
 
-**Program:** `sas/25_pcnr_cohort.sas`; dictionary via `08_dictionary.sas` extension or a
-new program (decided in the plan)
+**Program:** `sas/25_pcnr_cohort.sas` (cohort + dictionary + QC N table); runner edits to
+`run_pipeline.cmd`.
 
 **Success criteria:**
 1. `g.pcnr_analytic_cohort`: N = 13,890, same `PRECEDE_STUDY_ID` set as `g.analytic_cohort`
 2. Complete-case N differences explained exactly by recode counts
-3. pcnr dictionary with KEY sheet leftmost and UF blue headers
-4. `run_pipeline.cmd` runs 16 programs; full run PASS on both target machines
-5. Program 17 input resolved (PCM-D-26); DECISIONS.md updated
+3. pcnr dictionary (`qc/PCNR_DICTIONARY.xlsx`) with KEY sheet leftmost and UF blue headers
+4. `run_pipeline.cmd` runs 17 programs (23/24/25 inserted after 10b, before 16b); full run PASS
+5. Program 17 input resolved (PCM-D-26); DECISIONS.md updated (PCM-D-21 through D-26)
+
+**Plans:** 3 plans
+- [ ] 25-01-PLAN.md — sas/25_pcnr_cohort.sas Sections 0-5: cohort build, N assertions, complete-case CSV (Wave 1)
+- [ ] 25-02-PLAN.md — sas/25_pcnr_cohort.sas Sections 6-7: PCNR_DICTIONARY.xlsx + pcnr_variables.csv (Wave 2)
+- [ ] 25-03-PLAN.md — Runner wiring (23/24/25), errorabend confirm, DECISIONS.md, human run gate (Wave 3)
 
 ---
 

@@ -57,7 +57,7 @@ every recoded cell counted and traceable to an approved decision.
 |-------|------|--------------|------------|--------|
 | 22 | Pipeline Green & Hardening | FIX-02, RUN-02, RUN-03, INV-07, DOC-05 | Complete    | 2026-09-28 |
 | 23 | Sentinel & Name Inventory | 3/3 | Complete    | 2026-09-28 |
-| 24 | Build g.pcnr_harmonized | 2/3 | In Progress|  |
+| 24 | Build g.pcnr_harmonized | 3/3 | Complete    | 2026-09-29 |
 | 25 | pcnr Cohort, Dictionary & Wiring | PCNR-12..17 | 24 | Not started |
 
 #### Phase 22: Pipeline Green & Hardening
@@ -114,10 +114,10 @@ cannot take the prefix is enumerated and put in front of a human before any valu
 4. Zero remaining approved-sentinel values
 5. `qc/24_pcnr_recode_counts.csv` written; source confirmed unmodified
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 - [x] 24-01-PLAN.md — Gate check (D-01) + rule resolution + code generation; name-map filename fix (Wave 1)
 - [x] 24-02-PLAN.md — Apply recode rules + parallel-set full comparison with cross-checks (Wave 2)
-- [ ] 24-03-PLAN.md — Rename/promote + audit CSVs + PCNR-11 assertions + human run gate (Wave 3)
+- [x] 24-03-PLAN.md — Rename/promote + audit CSVs + PCNR-11 assertions + human run gate (Wave 3)
 
 #### Phase 25: pcnr Cohort, Dictionary & Wiring
 

@@ -1012,6 +1012,69 @@ quit;
 %put NOTE: [24] SECTION 5 -- type/length unchanged for all output columns;
 
 
+/* ===== SECTION 5b: FIX-04 sentinel QC assertions (Plan 26-02 Task 1) =====
+
+   Both assertions query work.pcnr_harmonized (BEFORE the SECTION 6 promote) so
+   a failure never leaves a promoted dataset.  %abort cancel lives inside %assert_eq
+   (a named macro) per PCM-R-05.
+
+   Variable names confirmed from docs/pcnr_name_map.csv:
+     pcnr_Cognitive_Score             (line 38)
+     pcnr_rt_RM_START_to_AN_STAR_mins (line 168 -- middle truncation by PCM-D-23)
+*/
+
+/* %assert_eq -- reused from sas/05_qc_merge.sas lines 41-47.
+   Not included via 00_config.sas, so defined here for program 24's session. */
+%macro assert_eq(actual=, expected=, label=);
+  %if &actual ne &expected %then %do;
+    %put ERROR: QC ASSERTION FAILED -- &label: expected &expected got &actual;
+    %abort cancel;
+  %end;
+  %else %put NOTE: QC ASSERTION OK -- &label = &actual;
+%mend assert_eq;
+
+/* FIX-04: pcnr_Cognitive_Score = 0 is a placeholder sentinel, must not survive (D-05) */
+%macro check_cog_zero;
+  %local n_cog_zero;
+  proc sql noprint;
+    select count(*) into :n_cog_zero trimmed
+    from work.pcnr_harmonized
+    where pcnr_Cognitive_Score = 0;
+  quit;
+  %assert_eq(actual=&n_cog_zero, expected=0,
+             label=FIX-04 pcnr_Cognitive_Score placeholder 0 count);
+%mend check_cog_zero;
+%check_cog_zero;
+
+/* FIX-04: pcnr_rt_RM_START_to_AN_STAR_mins = -9 is a sentinel, must not survive (D-06) */
+%macro check_rt_sentinel;
+  %local n_rt_sentinel;
+  proc sql noprint;
+    select count(*) into :n_rt_sentinel trimmed
+    from work.pcnr_harmonized
+    where pcnr_rt_RM_START_to_AN_STAR_mins = -9;
+  quit;
+  %assert_eq(actual=&n_rt_sentinel, expected=0,
+             label=FIX-04 pcnr_rt_RM_START_to_AN_STAR_mins sentinel -9 count);
+%mend check_rt_sentinel;
+%check_rt_sentinel;
+
+/* NOTE-only cross-tab: recoded Cognitive_Score rows vs pcnr_Cognitive_Category.
+   Surfaces any rows where score was set to missing but category is still non-missing
+   (score/category disagreement for reviewer; never aborts). */
+%macro report_cog_category_check;
+  %local n_cog_cat_disagree;
+  proc sql noprint;
+    select count(*) into :n_cog_cat_disagree trimmed
+    from work.pcnr_harmonized
+    where missing(pcnr_Cognitive_Score)
+      and not missing(pcnr_Cognitive_Category);
+  quit;
+  %put NOTE: [24] FIX-04 cross-tab -- rows with pcnr_Cognitive_Score recoded to missing but pcnr_Cognitive_Category still non-missing: &n_cog_cat_disagree (reviewer action may be needed if > 0);
+%mend report_cog_category_check;
+%report_cog_category_check;
+
+
 /* ===== SECTION 6: WORK-then-promote -- g.pcnr_harmonized (Plan 24-03 Task 1) ===== */
 
 data g.pcnr_harmonized;

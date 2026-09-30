@@ -119,11 +119,11 @@ title;
     length _h $2000;
     _h = upcase(compress(_infile_, '"'));      /* PROC EXPORT may quote names */
     call symputx('_hdr_ok',
-                 (strip(_h) = 'FULL_PATH,FILENAME,EXT,FSIZE,FDATE,SHA256,STATUS'), 'L');
+                 (strip(_h) = 'FULL_PATH,FILENAME,EXT,FSIZE,FDATE,SHA256,STATUS,NOBS,NCOLS,FAIL_REASON,IMPORT_WARNING,FILE_ID'), 'L');
     call symputx('_hdr_disp', translate(strip(_infile_), '|', ','), 'L');
   run;
   %if &_hdr_ok ne 1 %then %do;
-    %fail_out(msg=SEED ABORTED -- qc/19_raw_files.csv header is not full_path|filename|ext|fsize|fdate|sha256|status. Found: %superq(_hdr_disp));
+    %fail_out(msg=SEED ABORTED -- qc/19_raw_files.csv header mismatch. Expected full_path|...|file_id (12 cols). Found: %superq(_hdr_disp));
   %end;
   %put NOTE: qc/19_raw_files.csv header verified.;
 %mend check_raw_files_header;

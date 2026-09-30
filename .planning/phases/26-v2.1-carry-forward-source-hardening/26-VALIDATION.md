@@ -47,6 +47,8 @@ created: 2026-09-29
 | 26-03-02 | 03 | 1 | HARD hash guard | automated | run program 19 → `HARD-01 hash guard passed`, 0 ERROR lines | ❌ W0 | ⬜ pending |
 | 26-03-2b | 03 | 1 | HARD ordering | automated | first `call :run_program` in run_pipeline.cmd is program 19 | ❌ W0 | ⬜ pending |
 | 26-04-01 | 04 | 3 | HARD-03 docs + D-24 amendment | manual inspect | docs/DECISIONS.md has PCM-D-29 and the PCM-D-24 amendment; each heading once | ❌ W0 | ⬜ pending |
+| 26-mze-01 | mze | 1 | HARD-02 seed / abort | manual | run 19c -> docs/source_hash_baseline.csv (9 lines: 1 header + 8 data rows); re-run 19c -> SAS log shows `SEED ABORTED` | ❌ W0 | ⬜ pending |
+| 26-mze-02 | mze | 1 | HARD-02 hash guard pass/fail | automated | run program 19 -> log shows `HARD-02 hash guard passed`; tamper test: corrupt one sha256 in docs/source_hash_baseline.csv (64-char hex value, change last char) -> re-run program 19 -> log shows `HARD-02 HASH GUARD FAILED`; restore value -> passes again | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -69,6 +71,8 @@ created: 2026-09-29
 | FIX-03 cleanup correctness | FIX-03 D-03 | Requires human approval of which CONTAINS rules to drop | Review narrowed CONTAINS block; compare removed rows to audit findings |
 | 19b refuses to overwrite baseline | HARD D-09 | Interactive test — run 19b twice, confirm abort on 2nd run | Run 19b → baseline created; run 19b again → SAS log shows `%abort cancel` |
 | Hash guard triggers on drift | HARD D-10 | Must see the guard fail once | Change ONE sha256 in docs/raw_hash_baseline.csv to a wrong 64-hex value (never edit a source extract), run program 19 → `HARD-01 HASH GUARD FAILED`; restore the value → passes |
+| HARD-02 seed refuses to overwrite data rows | HARD-02 | Interactive test -- seed once, re-run; abort must fire | Run 19c -> baseline created; run 19c again -> SAS log shows SEED ABORTED |
+| HARD-02 guard triggers on drift | HARD-02 | Must see the guard fail once | Change ONE sha256 in docs/source_hash_baseline.csv to wrong 64-hex value; run program 19 -> HARD-02 HASH GUARD FAILED; restore -> passes |
 
 ---
 

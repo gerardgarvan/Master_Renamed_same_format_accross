@@ -873,3 +873,41 @@ Recoded values (e.g., 4,586 EmployeeStatus "Unknown" -> missing; 758 race refuse
 
 **Owner:** Gerard (decided 2026-09-28); Price required for any future repoint.
 **Resolved:** 2026-09-28 -- Phase 25.
+
+---
+
+## PCM-D-30 -- HARD-01 vs HARD-02 Scope Boundary: RESOLVED
+
+**Date:** 2026-09-30
+**Decided by:** Gerard
+**Status:** RESOLVED
+
+**Question:** Which hash guard covers which set of files, and why are they separate?
+
+**Decision:**
+
+HARD-01 (program 19 SECTION 13 + 19b seed): covers the 8 ORIGINAL extracts
+  in raw\master (csv/xlsx format, read-only, not imported by any SAS program directly).
+  Baseline: docs/raw_hash_baseline.csv. Hashes computed by certutil via PIPE in program 19
+  SECTION 5 during the directory inventory.
+
+HARD-02 (program 19 SECTION 14 + 19c seed): covers the 8 RENAMED source extracts
+  in &source_path (master_data_1.sas7bdat ... master_data_8.sas7bdat), which are
+  the files programs 01-08 actually set/import. Baseline: docs/source_hash_baseline.csv.
+  Hashes computed by %src_hash_compute (00_config.sas) using HASHING_FILE(..., 4).
+  Audit CSV written on every run: qc/19_source_hash_check.csv.
+
+These are different directories and different file formats. raw\master holds the
+originals as exported; &source_path holds the working copies renamed to a uniform
+master_data_N.sas7bdat naming convention. A file in &source_path could drift from
+its raw\master counterpart without triggering HARD-01 (which only sees the originals).
+HARD-02 closes that gap.
+
+19c must be run manually once after programs 01-08 have been run successfully and
+the sas7bdat files in &source_path are confirmed correct. 19c is NOT added to
+run_pipeline.cmd (same constraint as 19b for HARD-01).
+
+**Traceability:** HARD-02 requirement; Phase 26 quick task 260930-mze;
+docs/source_hash_baseline.csv (detective control).
+
+**Resolved:** 2026-09-30 | Owner: Gerard | Phase 26 quick

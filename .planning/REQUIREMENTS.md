@@ -18,7 +18,7 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 
 - [ ] **HARD-01**: Program 19 reads a stored baseline hash file from `docs/` and compares each md1-md8 sha256 against it (reusing the sha256 already recorded in `19_raw_files.csv`); any mismatch fails the run with an explicit error before any merge program executes; the baseline file is read with a DATA step `infile` (per PCM-T-16)
 - [ ] **HARD-02**: The baseline hashes file is seeded from today's verified hashes in `19_raw_files.csv` and is updated only intentionally (for example, when an extract is added or replaced); program 19 never overwrites it automatically
-- [ ] **HARD-03**: DECISIONS.md records a documentation-only recommendation that the read-only file attribute is insufficient on a network share and that folder-level write and delete permission removal requires IT engagement
+- [x] **HARD-03**: DECISIONS.md records a documentation-only recommendation that the read-only file attribute is insufficient on a network share and that folder-level write and delete permission removal requires IT engagement
 
 ### MD8 — md8 Row-Count Correction
 
@@ -69,7 +69,7 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 | FIX-04 | Phase 26 | Complete |
 | HARD-01 | Phase 26 | Pending |
 | HARD-02 | Phase 26 | Pending |
-| HARD-03 | Phase 26 | Pending |
+| HARD-03 | Phase 26 | Complete |
 | MD8-01 | Phase 27 | Pending |
 | MD8-02 | Phase 27 | Pending |
 | LINK-01 | Phase 28 | Pending |

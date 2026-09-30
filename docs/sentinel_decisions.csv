@@ -96,7 +96,7 @@ CPT_1_Description,PR RMVL LUNG OTHER THAN PNEUMONECTOMY 1 LOBE LOBECT,505220524D
 CPT_1_Description,"PR TRANSECT OTHER CRAN N,EXTRADURAL",5052205452414E53454354204F54484552204352414E204E2C4558545241445552414C,35,"PR TRANSECT OTHER CRAN N,EXTRADURAL",char,1,0.0024,,REVIEW,0,CONTAINS,KEEP,Contains-rule false positive (OTHER/ANOTHER/N-A substring in a real value),Gerard,2026-09-28
 CPT_1_Description,PR TRANSVRS A-ARCH GRF W/CARD BYP PRFD HYPOTHERMIA,5052205452414E5356525320412D415243482047524620572F43415244204259502050524644204859504F544845524D4941,50,PR TRANSVRS A-ARCH GRF W/CARD BYP PRFD HYPOTHERMIA,char,5,0.0122,,REVIEW,0,CONTAINS,KEEP,Contains-rule false positive (OTHER/ANOTHER/N-A substring in a real value),Gerard,2026-09-28
 Charlson_Comorbidity_Index,0,30,1,0,num,25023,60.8092,SCORE,AMBIGUOUS,0,AMBIGUOUS_SCORE_ZERO,KEEP,0 is a valid score/count (no events / criterion not met),Gerard,2026-09-28
-Cognitive_Score,0,30,1,0,num,11687,28.4010,SCORE,AMBIGUOUS,0,AMBIGUOUS_SCORE_ZERO,KEEP,KEEP pending check: 28% of rows score 0; confirm 0 is a valid score for this instrument and not not-assessed (compare with Cognitive_Category),Gerard,2026-09-28
+Cognitive_Score,0,30,1,0,num,11687,28.4010,SCORE,AMBIGUOUS,0,AMBIGUOUS_SCORE_ZERO,MISSING,FIX-04: placeholder sentinel; 0 is not a valid Cognitive Score (lowest real score > 0); D-05,Gerard,2026-09-30
 Death_Days_After_Surgery,99,3939,2,99,num,4,0.0097,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28
 Dischg_Disposition,?,3F,1,?,char,3,0.0073,,AUTO,0,EXACT,MISSING,? placeholder (also covered by wildcard),Gerard,2026-09-28
 Dischg_Disposition,TO ANOTHER HOSPITAL,544F20414E4F5448455220484F53504954414C,19,TO ANOTHER HOSPITAL,char,22,0.0535,,REVIEW,0,CONTAINS,KEEP,Contains-rule false positive (OTHER/ANOTHER/N-A substring in a real value),Gerard,2026-09-28
@@ -490,7 +490,7 @@ rt_ANCHOR_to_SURGERY_days,888,383838,3,888,num,20,0.0486,,REVIEW,0,NUMERIC_SENTI
 rt_AN_START_to_AN_END_mins,99,3939,2,99,num,122,0.2965,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28
 rt_BLOCK_START_TO_BLOCK_END_mins,99,3939,2,99,num,1,0.0024,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28
 rt_INCISE_to_DRESS_mins,99,3939,2,99,num,137,0.3329,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28
-rt_RM_START_to_AN_START_mins,-9,2D39,2,-9,num,380,0.9235,,REVIEW,0,NUMERIC_SENTINEL,KEEP,KEEP pending check: 380 rows at exactly -9 is a possible spike; compare frequencies of -12..-6 before confirming,Gerard,2026-09-28
+rt_RM_START_to_AN_START_mins,-9,2D39,2,-9,num,380,0.9235,,REVIEW,0,NUMERIC_SENTINEL,MISSING,FIX-04: sentinel -9 code (not a real negative interval); D-06,Gerard,2026-09-30
 rt_RM_START_to_AN_START_mins,99,3939,2,99,num,1,0.0024,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28
 rt_RM_START_to_DRESS_mins,99,3939,2,99,num,145,0.3524,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28
 rt_RM_START_to_EMERGENCE_mins,777,373737,3,777,num,1,0.0024,,REVIEW,0,NUMERIC_SENTINEL,KEEP,Plausible real value for this measure; frequency not a spike,Gerard,2026-09-28

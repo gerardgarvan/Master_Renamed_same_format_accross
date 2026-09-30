@@ -55,7 +55,16 @@ title;
    The seed refuses to run while this is blank, so "any eight files in
    the directory" can never become the baseline.
    ============================================================ */
-%let md_expected_files = ;
+%let md_expected_files =
+  2018_2019_CPT_ROLLUP_X_MASTER_DATASET_20200801.csv
+  2018_2019_X_MASTER_DATASET_20200801.csv
+  2018_2022_X_MASTER_DATASET_20240402.csv
+  2020_CPT_ROLLUP_X_MASTER_DATASET_20210609.csv
+  2020_X_MASTER_DATASET_20210519.csv
+  2021_X_MASTER_DATASET_20230512.csv
+  2022_MASTER_DATASET_20231024.csv
+  ALL_AIM2_MASTER_DATASET_20210917.xlsx
+;
 
 
 /* ============================================================

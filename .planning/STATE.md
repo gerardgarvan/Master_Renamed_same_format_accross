@@ -34,7 +34,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 Phase: 26 (v2.1-carry-forward-source-hardening) — EXECUTING
 Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-09-30
+Last activity: 2026-09-30 - Completed quick task 260930-mze: HARD-02 source hash guard
 
 ### v2.2 Phase Status
 
@@ -182,6 +182,12 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 ### Blockers
 
 None at roadmap definition.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260930-mze | HARD-02 source hash guard: 00_config.sas macros, 19c seed, SECTION 14 guard, PCM-D-30 | 2026-09-30 | 820c4d1 | [260930-mze-implement-hard-02-source-hash-guard-add-](.planning/quick/260930-mze-implement-hard-02-source-hash-guard-add-/) |
 
 ---
 

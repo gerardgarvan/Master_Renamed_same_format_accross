@@ -12,7 +12,7 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 ### FIX — v2.1 Carry-Forward
 
 - [ ] **FIX-03**: Program 23's contains-rule sentinel matching is cleaned up and the corresponding KEEP rows are removed from `docs/sentinel_decisions.csv` in the same change, so the decisions file stays consistent with the program logic
-- [ ] **FIX-04**: QC checks for `Cognitive_Score = 0` and `rt_RM_START_to_AN_START_mins = -9` are added to the appropriate program and pass on a clean pipeline run
+- [x] **FIX-04**: QC checks for `Cognitive_Score = 0` and `rt_RM_START_to_AN_START_mins = -9` are added to the appropriate program and pass on a clean pipeline run
 
 ### HARD — Source Directory Hardening
 
@@ -66,7 +66,7 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FIX-03 | Phase 26 | Pending |
-| FIX-04 | Phase 26 | Pending |
+| FIX-04 | Phase 26 | Complete |
 | HARD-01 | Phase 26 | Pending |
 | HARD-02 | Phase 26 | Pending |
 | HARD-03 | Phase 26 | Pending |

@@ -8,7 +8,9 @@
   Paths   : Code and docs on C: (version-controlled).
             Data, QC output, and logs on P: (PHI -- outside the repo).
   Author  : Path fix (2026-08-27)
-  Revised :
+  Revised : 2026-09-30 -- Phase 26 / HARD-02: source-file hash guard scope
+            (src_hash_files, src_hash_baseline) and shared macros
+            %_src_fail and %src_hash_compute used by 19c and program 19 SECTION 14.
 ==========================================================================*/
 
 /* ---- Code paths (C: -- in git) ---- */
@@ -27,6 +29,17 @@
 
 /* ---- Raw supplemental source path (P: -- NOT in git) ---- */
 %let raw_path = P:\PeCAN Master Data\Gerard\raw;
+
+/* ---- Phase 26 / HARD-02: source-file hash guard scope ----
+   HARD-01 (program 19 SECTION 13) hashes the ORIGINALS in &raw_path.\master.
+   Programs 01-08 read the RENAMED files in &source_path (as .sas7bdat) -- a different
+   directory -- so these are hashed separately:
+     19c_seed_source_hash_baseline.sas  seeds docs\source_hash_baseline.csv once
+     19_raw_dir_inventory.sas SECTION 14 checks it on every pipeline run.
+   KEEP THIS LIST IN SYNC with the files 01-08 actually import.            */
+%let src_hash_files    = master_data_1.sas7bdat master_data_2.sas7bdat master_data_3.sas7bdat master_data_4.sas7bdat
+                         master_data_5.sas7bdat master_data_6.sas7bdat master_data_7.sas7bdat master_data_8.sas7bdat;
+%let src_hash_baseline = &docs_path.\source_hash_baseline.csv;
 
 /* ---- Phase 18 / PCM-D-15 approval gate ----
    0 = awaiting Gerard review of qc\18_gap_candidates.txt
@@ -77,6 +90,7 @@
 %put NOTE: [00_config] logs_path   = &logs_path;
 %put NOTE: [00_config] raw_path          = &raw_path;
 %put NOTE: [00_config] xwalk_backup_path = &xwalk_backup_path;
+%put NOTE: [00_config] src_hash_baseline = &src_hash_baseline;
 %put NOTE: [00_config] D15_APPROVED      = &D15_APPROVED;
 %put NOTE: [00_config] in_pipeline       = &in_pipeline;
 
@@ -88,3 +102,44 @@
    NEVER use bare put(x,$hex.) -- default width 4 encodes only the first 2 bytes,
    so UNKNOWN and UNK both produce 554E and -999/-99 both produce 2D39. */
 %macro hexkey(var);substr(put(&var, $hex400.), 1, 2*length(&var))%mend hexkey;
+
+/* ---- Shared source-hash macros (Phase 26 / HARD-02) ----
+   %_src_fail(msg)  : ERROR line + %abort cancel. Messages must not contain
+                      commas (macro parameter delimiter) -- use dashes.
+   %src_hash_compute: one row per file in &src_hash_files with sha256 (upper-case
+                      hex) and byte size. status = OK / NOT_FOUND / OPEN_FAILED /
+                      HASH_FAILED. Requires SAS 9.4M6+ (HASHING_FILE).        */
+%macro _src_fail(msg);
+  %put ERROR: &msg;
+  %abort cancel;
+%mend _src_fail;
+
+%macro src_hash_compute(out=work._src_hash_now);
+  data &out;
+    length file_name $64 full_path $512 sha256 $64 bytes 8 status $12;
+    drop i rc fid full_path;
+    do i = 1 to countw("&src_hash_files", ' ');
+      file_name = scan("&src_hash_files", i, ' ');
+      full_path = catx('\', "&source_path", file_name);
+      sha256 = ' ';
+      bytes  = .;
+      if not fileexist(full_path) then status = 'NOT_FOUND';
+      else do;
+        rc  = filename('_shf', full_path);
+        fid = fopen('_shf');
+        if fid > 0 then do;
+          bytes = input(finfo(fid, 'File Size (bytes)'), ?? 32.);
+          rc    = fclose(fid);
+          /* option 4 = second argument is a path name, not a fileref */
+          sha256 = upcase(hashing_file('SHA256', strip(full_path), 4));
+          if lengthn(sha256) = 64 and not missing(bytes) then status = 'OK';
+          else status = 'HASH_FAILED';
+        end;
+        else status = 'OPEN_FAILED';   /* typically: file open in Excel */
+        rc = filename('_shf');
+      end;
+      output;
+    end;
+    stop;
+  run;
+%mend src_hash_compute;

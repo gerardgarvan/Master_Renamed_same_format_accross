@@ -8,6 +8,7 @@
 
   Writes  : qc/19_raw_inventory.xlsx  -- seven-sheet human-facing workbook
             qc/19_raw_files.csv       -- machine-readable Phase 20 handoff
+            qc/19_source_hash_check.csv -- HARD-02 source hash audit (written every run)
             logs/19_raw_dir_inventory.log
 
   XCMD required: certutil and dir are called through PIPE; the batch session
@@ -34,6 +35,7 @@
             single-type tables)
             2026-09-29 (round 5 -- %unquote on digit-prefix sheet name literals;
             Excel ~$ owner files classified as lockfile, listed-not-profiled)
+            2026-09-30 (round 6 -- SECTION 14 HARD-02 source hash guard for &source_path sas7bdat files)
 ==========================================================================*/
 
 /* ============================================================
@@ -981,7 +983,84 @@ run;
 
 
 /* ============================================================
-   SECTION 14 -- ODS Excel (D-05): KEY leftmost, UF blue headers
+   SECTION 14 -- HARD-02 source hash guard
+   Reads docs/source_hash_baseline.csv (seeded once by 19c).
+   Requires 8 data rows; aborts if sha256 or byte_size drifted.
+   Writes qc/19_source_hash_check.csv on every run (pass or fail)
+   so drift is auditable even when the run succeeds.
+   &src_hash_baseline and %src_hash_compute are defined in 00_config.sas.
+   ============================================================ */
+
+%macro check_source_hash_baseline;
+  %local n_base n_drift;
+  %let n_base  = 0;
+  %let n_drift = 0;
+
+  /* 14a -- Baseline must exist and have data rows */
+  %if %sysfunc(fileexist(&src_hash_baseline)) = 0 %then %do;
+    %fail_out(msg=HARD-02 baseline docs/source_hash_baseline.csv not found -- run 19c once to seed it);
+  %end;
+
+  data work._src_baseline;
+    length file_name $64 sha256 $64 byte_size 8 seeded_date $12;
+    infile "&src_hash_baseline" dsd dlm=',' firstobs=2 truncover lrecl=500;
+    input file_name $ sha256 $ byte_size seeded_date $;
+  run;
+
+  proc sql noprint;
+    select count(*) into :n_base trimmed from work._src_baseline;
+  quit;
+  %if &n_base ne 8 %then %do;
+    %fail_out(msg=HARD-02 baseline row count is &n_base -- expected 8. Re-seed docs/source_hash_baseline.csv by running 19c.);
+  %end;
+
+  /* 14b -- Compute live hashes of the 8 source sas7bdat files */
+  %src_hash_compute(out=work._src_hash_now);
+
+  /* 14c -- Compare; write audit CSV regardless of result */
+  proc sql noprint;
+    create table work._src_hash_check as
+    select b.file_name,
+           b.sha256     as baseline_sha256    length=64,
+           b.byte_size  as baseline_bytes,
+           n.sha256     as current_sha256     length=64,
+           n.bytes      as current_bytes,
+           n.status     as hash_status        length=12,
+           case when n.status ne 'OK'                             then 'HASH_ERROR'
+                when lowcase(strip(b.sha256)) ne
+                     lowcase(strip(coalesce(n.sha256,'')))        then 'SHA256_DRIFT'
+                when b.byte_size ne coalesce(n.bytes, -1)         then 'SIZE_DRIFT'
+                else 'OK'
+           end as check_result length=12,
+           put(today(), yymmdd10.) as check_date length=10
+    from work._src_baseline b
+    left join work._src_hash_now n
+      on upcase(strip(b.file_name)) = upcase(strip(n.file_name));
+  quit;
+
+  proc export data=work._src_hash_check
+    outfile="&qc_path.\19_source_hash_check.csv"
+    dbms=csv replace;
+  run;
+  %put NOTE: qc/19_source_hash_check.csv written (HARD-02 audit);
+
+  proc sql noprint;
+    select count(*) into :n_drift trimmed
+    from work._src_hash_check
+    where check_result ne 'OK';
+  quit;
+
+  %if &n_drift > 0 %then %do;
+    %fail_out(msg=HARD-02 HASH GUARD FAILED -- &n_drift source file(s) in &source_path changed since baseline. Delete docs/source_hash_baseline.csv and re-run 19c to acknowledge new sources.);
+  %end;
+
+  %put NOTE: HARD-02 hash guard passed -- all 8 source sas7bdat sha256 values match baseline.;
+%mend check_source_hash_baseline;
+%check_source_hash_baseline;
+
+
+/* ============================================================
+   SECTION 15 -- ODS Excel (D-05): KEY leftmost, UF blue headers
    ============================================================ */
 proc sql noprint;
   create table work.sheets_rpt as
@@ -1093,7 +1172,7 @@ ods listing;
 
 
 /* ============================================================
-   SECTION 15 -- Output verification and log restore
+   SECTION 16 -- Output verification and log restore
    No literal quotes inside %sysfunc(fileexist()) (B-06).
    ============================================================ */
 %macro verify_output;
@@ -1111,6 +1190,9 @@ ods listing;
   %end;
   %if %sysfunc(fileexist(&qc_path.\19_raw_variables_md3.csv)) = 0 %then %do;
     %fail_out(msg=OUTPUT MISSING -- qc/19_raw_variables_md3.csv was not created);
+  %end;
+  %if %sysfunc(fileexist(&qc_path.\19_source_hash_check.csv)) = 0 %then %do;
+    %fail_out(msg=OUTPUT MISSING -- qc/19_source_hash_check.csv was not created);
   %end;
   %put NOTE: Phase 19 outputs verified;
 %mend verify_output;

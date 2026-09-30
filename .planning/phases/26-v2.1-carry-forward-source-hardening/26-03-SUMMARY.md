@@ -24,9 +24,9 @@ decisions:
   - "docs/raw_hash_baseline.csv force-added to git (overriding *.csv gitignore rule) because it is a version-controlled security artifact"
   - "Source-path discrepancy noted: program 19 hashes &raw_path.\\master files; programs 01-08 read &source_path files; these are different P: drive directories -- human review needed to confirm they are the same underlying files or to extend the guard"
 metrics:
-  duration: ~25 minutes
-  completed: "2026-09-29"
-  tasks_completed: 3
+  duration: ~30 minutes
+  completed: "2026-09-30"
+  tasks_completed: 4
   tasks_total: 4
   files_changed: 4
 ---
@@ -43,9 +43,13 @@ Implemented a stored-baseline sha256 guard on the md1-md8 source extracts. Creat
 | 2 | Add hash-guard section to program 19 | 7d5727d | sas/19_raw_dir_inventory.sas |
 | 2b | Move program 19 ahead of merge programs in run_pipeline.cmd | a626b81 | run_pipeline.cmd |
 
-## Checkpoint Reached
+## Task 3: Human Verification (APPROVED)
 
-Task 3 is `checkpoint:human-verify` -- awaiting human verification that the guard aborts on a tampered hash and passes after restore.
+Hash guard verified by human on 2026-09-30:
+- Step 1 (baseline present): HARD-01 hash guard passed
+- Step 3 (after seeding): HARD-01 hash guard passed
+- Step 5 (tampered sha256): HARD-01 HASH GUARD FAILED + %ABORT CANCEL fired correctly
+- Step 7 (after restore): HARD-01 hash guard passed
 
 ## Decisions Made
 
@@ -73,7 +77,7 @@ Task 3 is `checkpoint:human-verify` -- awaiting human verification that the guar
 
 ## Known Stubs
 
-- `docs/raw_hash_baseline.csv` contains only the header row. The 8 real md1-md8 sha256 rows must be populated by running `sas/19b_seed_hash_baseline.sas` interactively with SAS (with P: drive connected and `qc/19_raw_files.csv` current). Until seeded, the hash guard in program 19 SECTION 13 will abort with "baseline row count is 0 -- expected 8".
+- `docs/raw_hash_baseline.csv` in the worktree commit contains only the header row (committed as git-tracked placeholder). The human has confirmed the real 8-row seeded file is present on disk after running 19b. The git-tracked stub should be replaced with the seeded file after merge.
 
 ## Self-Check
 

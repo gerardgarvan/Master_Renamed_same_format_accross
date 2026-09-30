@@ -781,6 +781,8 @@ No Price review required for the default KEEP position.)
 
 **Resolved:** 2026-09-28 | Owner: Gerard | Phase 23 Plan 03
 
+**Amendment (2026-09-29, Phase 26 FIX-04):** Cognitive_Score = 0 and rt_RM_START_to_AN_START_mins = -9 approved as MISSING in docs/sentinel_decisions.csv; program 24 asserts neither survives. Decided by: Gerard.
+
 ---
 
 ## PCM-D-25 -- Declined/Refused Companion-Column Reason Preservation
@@ -873,3 +875,31 @@ Recoded values (e.g., 4,586 EmployeeStatus "Unknown" -> missing; 758 race refuse
 
 **Owner:** Gerard (decided 2026-09-28); Price required for any future repoint.
 **Resolved:** 2026-09-28 -- Phase 25.
+
+---
+
+## PCM-D-29 -- Source File Write/Delete Protection (documentation note)
+
+**Date:** 2026-09-29
+**Decided by:** Gerard
+**Status:** RESOLVED (documentation note; no pipeline code change)
+
+**Question:** Is the read-only file attribute set on md1-md8 source extracts sufficient
+to prevent tampering with the source data on the network share?
+
+**Decision:** No. The read-only file attribute is insufficient protection on a network
+share: folder-level write and delete permissions can still permit deletion or replacement
+of a source extract even when its read-only attribute is set.
+
+The Phase 26 hash guard (program 19 SECTION 13, comparing each md1-md8 sha256 against
+docs/raw_hash_baseline.csv) is a DETECTIVE control that fails the pipeline after
+tampering, not a PREVENTIVE one.
+
+Full source protection requires IT engagement to remove folder-level write and delete
+permissions from the network share for all non-admin accounts. This is a recommendation
+only; no pipeline code change is required for this entry.
+
+**Traceability:** HARD-03 requirement; Phase 26 Plan 04; docs/raw_hash_baseline.csv
+(detective control seeded in Phase 26 Plan 03).
+
+**Resolved:** 2026-09-29 | Owner: Gerard | Phase 26 Plan 04

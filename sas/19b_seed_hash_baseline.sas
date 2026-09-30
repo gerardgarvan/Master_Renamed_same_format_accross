@@ -155,6 +155,7 @@ run;
 %macro assert_md_rows;
   %local n_md n_distinct n_badhash n_badsize n_unexpected;
   %let n_md = 0;
+  options noquotelenmax;
   proc sql noprint;
     select count(*),
            count(distinct upcase(filename)),

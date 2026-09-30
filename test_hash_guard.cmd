@@ -22,6 +22,10 @@ REM       -> restore -> expect both passed
 REM    6. HARD-02 cycle: tamper source baseline -> expect HARD-01
 REM       passed AND HARD-02 FAILED -> restore -> expect both passed
 REM
+REM  Revised 2026-09-30 (b): :count_lines fixed -- find /c on a named
+REM    file prints "---------- FILE: n", so %%R picked up the dashes and
+REM    every line-count test misfired. Now pipes through type.
+REM    HARD-02 patterns aligned with the SECTION 14 messages in program 19.
 REM  Revised 2026-09-30:
 REM    - Adds 19c seeding and the SECTION 14 (HARD-02) tamper cycle.
 REM    - Seeding decided by line count, not file existence (stub trap).
@@ -45,8 +49,8 @@ REM Anchored patterns: %put output starts in column 1; echoed source
 REM lines start with a line number, so they can never match /b.
 set PAT_PASS1=NOTE: HARD-01 hash guard passed
 set PAT_FAIL1=ERROR: HARD-01 HASH GUARD FAILED
-set PAT_PASS2=NOTE: HARD-02 source hash guard passed
-set PAT_FAIL2=ERROR: HARD-02 SOURCE HASH GUARD FAILED
+set PAT_PASS2=NOTE: HARD-02 hash guard passed
+set PAT_FAIL2=ERROR: HARD-02 HASH GUARD FAILED
 set ZEROS=0000000000000000000000000000000000000000000000000000000000000000
 
 REM ---- Machine-specific SAS_EXE override (mirrors run_pipeline.cmd) ----
@@ -184,7 +188,7 @@ REM ---- :count_lines <file>  -> sets _ROWS (0 if missing) ----
 :count_lines
 set _ROWS=0
 if not exist "%~1" exit /b 0
-for /f %%R in ('find /c /v "" "%~1" 2^>nul') do set _ROWS=%%R
+for /f %%R in ('type "%~1" ^| find /c /v ""') do set _ROWS=%%R
 exit /b 0
 
 REM ---- :expect_clean <log> <label>  -> both PASS lines, no ERROR ----

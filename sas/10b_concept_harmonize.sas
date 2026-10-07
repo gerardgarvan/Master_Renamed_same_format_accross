@@ -1155,13 +1155,18 @@ quit;
     from dictionary.tables
     where libname='G' and memname='MASTER_DATA_MERGED';
   quit;
-  %if &n_merged_cols ne 176 %then %do;
-    %fail_out(msg=g.master_data_merged has &n_merged_cols columns post-run -- expected 176 -- it was modified);
+  /* Phase 29 gap-fill wiring (PCM-D-15): g.master_data_merged gains new columns from
+     g.gapfill_r1-r6 when approved=Y rows exist in docs/gapfill_allowlist.csv.
+     Pre-wiring baseline is 176 columns; each approved gap-fill column adds 1.
+     Assert >= 176 (not exactly 176) so the check passes before and after wiring.
+     A column count below 176 still catches unintended column loss. */
+  %if &n_merged_cols < 176 %then %do;
+    %fail_out(msg=g.master_data_merged has &n_merged_cols columns post-run -- expected at least 176 -- columns may have been dropped);
   %end;
   %if &n_merged_rows ne &n_rows %then %do;
     %fail_out(msg=g.master_data_merged has &n_merged_rows rows post-run -- expected &n_rows -- it was modified);
   %end;
-  %put NOTE: [10b] g.master_data_merged confirmed post-run -- 176 columns and &n_merged_rows rows -- unmodified.;
+  %put NOTE: [10b] g.master_data_merged confirmed post-run -- &n_merged_cols columns (>= 176 expected) and &n_merged_rows rows -- unmodified.;
 %mend assert_merged_unchanged;
 %assert_merged_unchanged;
 

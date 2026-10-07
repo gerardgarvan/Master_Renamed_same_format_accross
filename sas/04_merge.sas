@@ -29,7 +29,14 @@
    ========================================================================= */
 options nodate nonumber ps=max ls=200 mprint nofmterr;
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
-libname g "&g_path";
+libname g    "&g_path";
+libname snap "&snap_path";
+
+/* %fail_out: abort with a labelled ERROR message (PCM-R-05: %abort cancel inside named macro) */
+%macro fail_out(msg=);
+  %put ERROR: [04_merge] &msg;
+  %abort cancel;
+%mend fail_out;
 
 %put NOTE: ==== Phase 4 merge starting ====;
 
@@ -258,6 +265,157 @@ proc sort data=work.md8_donors;
   by PRECEDE_STUDY_ID;
 run;
 
+/* =========================================================================
+   SECTION 2c: Phase 29 gap-fill pre-merge checks (GAP-01, GAP-03)
+   =========================================================================
+   10b_concept_harmonize.sas: confirmed no explicit KEEP list on the DATA step
+   that reads g.master_data_merged -- new columns pass through automatically to
+   g.master_data_harmonized. No change needed in 10b for the merge step.
+   (10b asserts n_merged_cols >= 176 post-run; that assertion updated to accommodate
+   new gap-fill columns when they are added.)
+
+   PCM-D-28: r7/r8/r9 excluded from gap-fill wiring. No ENCRYPTED_MRN crosswalk
+   exists for r7/r8/r9; PRECEDE_STUDY_ID linking yields 0 matches at 0% both
+   directions (qc/28_linkage_investigation.csv). Reopening condition: re-extract
+   r7/r8/r9 with ENCRYPTED_MRN or provide a PRECEDE_STUDY_ID crosswalk table.
+
+   DESIGN: new-columns-only merge pattern. g.gapfill_rN datasets contain only
+   PRECEDE_STUDY_ID + approved new columns (never columns already in g.master_data_merged).
+   No COALESCE, no conditional assignment -- new columns appear in output automatically
+   via SAS MERGE DATA step.
+
+   PCM-T-02: do NOT write `data g.master_data_merged; merge g.master_data_merged ...`.
+   That is an in-place rewrite. Instead, g.gapfill_rN are added to the EXISTING DATA step
+   that creates g.master_data_merged from its spine inputs below.
+   ========================================================================= */
+
+/* ---- Step 2c-1: Pre-merge column collision check ---- */
+/* Checks cross-donor collisions AND snap-baseline collisions.
+   Do NOT check against g.master_data_merged output from a previous run -- on the
+   second run the output already contains the gap-fill columns and the check would
+   abort incorrectly. Check against snap baseline (pre-wiring column list) instead. */
+%macro check_column_collisions;
+  /* Only run if any gapfill_rN datasets exist in the g library */
+  %let _ngf = 0;
+  proc sql noprint;
+    select count(*) into :_ngf trimmed
+    from dictionary.tables
+    where libname='G'
+      and memname in ('GAPFILL_R1','GAPFILL_R2','GAPFILL_R3',
+                      'GAPFILL_R4','GAPFILL_R5','GAPFILL_R6');
+  quit;
+  %if &_ngf = 0 %then %do;
+    %put NOTE: [04_merge GAP-03] No g.gapfill_rN datasets found -- skip collision check (allowlist has no approved=Y columns yet);
+    %return;
+  %end;
+
+  /* Cross-donor collision: any column name appearing in 2+ gapfill_rN donors? */
+  %let _collision_n = 0;
+  proc sql noprint;
+    select count(*) into :_collision_n trimmed
+    from (
+      select upcase(name) as uname, count(distinct memname) as n_donors
+      from dictionary.columns
+      where libname = 'G'
+        and memname in ('GAPFILL_R1','GAPFILL_R2','GAPFILL_R3',
+                        'GAPFILL_R4','GAPFILL_R5','GAPFILL_R6')
+        and upcase(name) ne 'PRECEDE_STUDY_ID'
+      group by uname
+      having n_donors > 1
+    );
+  quit;
+  %if &_collision_n > 0 %then %do;
+    %fail_out(msg=Pre-merge collision check failed -- &_collision_n column name(s) appear in multiple g.gapfill_rN donors -- review gapfill_allowlist.csv);
+  %end;
+
+  /* Snap-baseline collision: any gapfill_rN column already in the pre-wiring snap? */
+  %let _snap_collision_n = 0;
+  %let _snap_ok = %sysfunc(fileexist(&snap_path.\master_data_merged.sas7bdat));
+  %if &_snap_ok = 0 %then %do;
+    %put NOTE: [04_merge GAP-03] snap\master_data_merged.sas7bdat not found -- skipping snap-baseline collision check (run 29_gapfill_compare.sas PASS 1 before running the full pipeline);
+  %end;
+  %else %do;
+    proc sql noprint;
+      select count(*) into :_snap_collision_n trimmed
+      from dictionary.columns as d
+      inner join dictionary.columns as s
+        on upcase(d.name) = upcase(s.name)
+      where d.libname = 'G'
+        and d.memname in ('GAPFILL_R1','GAPFILL_R2','GAPFILL_R3',
+                          'GAPFILL_R4','GAPFILL_R5','GAPFILL_R6')
+        and s.libname = 'SNAP' and s.memname = 'MASTER_DATA_MERGED'
+        and upcase(d.name) ne 'PRECEDE_STUDY_ID';
+    quit;
+    %if &_snap_collision_n > 0 %then %do;
+      %fail_out(msg=Pre-merge collision check failed -- &_snap_collision_n column(s) in g.gapfill_rN already existed in snap baseline -- remove from gapfill_allowlist.csv);
+    %end;
+    %else %do;
+      %put NOTE: [04_merge GAP-03] Pre-merge collision check passed -- no donor columns duplicate baseline or each other;
+    %end;
+  %end;
+%mend check_column_collisions;
+%check_column_collisions;
+
+/* ---- Step 2c-2: Per-donor match count checks ---- */
+/* Abort if any donor has 0 matched rows -- catches normalization failures before merge.
+   Only run for donors that actually exist in the g library. */
+%macro check_donor_match(rn=);
+  %let _rn_exists = 0;
+  proc sql noprint;
+    select count(*) into :_rn_exists trimmed
+    from dictionary.tables
+    where libname='G' and memname=upcase("GAPFILL_R&rn");
+  quit;
+  %if &_rn_exists = 0 %then %do;
+    %put NOTE: [04_merge] g.gapfill_r&rn not found -- skip match count (no approved=Y columns for r&rn yet);
+    %return;
+  %end;
+  %let _rn_match = 0;
+  proc sql noprint;
+    select count(*) into :_rn_match trimmed
+    from g.gapfill_r&rn as d
+    inner join g.master_data_merged as b
+      on d.PRECEDE_STUDY_ID = b.PRECEDE_STUDY_ID;
+  quit;
+  %if &_rn_match = 0 %then %do;
+    %fail_out(msg=r&rn donor matched 0 rows in g.master_data_merged -- PRECEDE_STUDY_ID normalization may have failed in 03r_prep_gapfill.sas);
+  %end;
+  %else %do;
+    %put NOTE: [04_merge] r&rn matched &_rn_match rows in g.master_data_merged;
+  %end;
+%mend check_donor_match;
+%check_donor_match(rn=1);
+%check_donor_match(rn=2);
+%check_donor_match(rn=3);
+%check_donor_match(rn=4);
+%check_donor_match(rn=5);
+%check_donor_match(rn=6);
+
+/* ---- Step 2c-3: Sort g.gapfill_rN donors (only those that exist) ---- */
+/* r7/r8/r9 EXCLUDED: PCM-D-28 -- no ENCRYPTED_MRN crosswalk available;
+   reopening condition: re-extract r7-r9 with PRECEDE_STUDY_ID or crosswalk */
+%macro sort_gapfill_donors;
+  %if %sysfunc(exist(g.gapfill_r1)) %then %do;
+    proc sort data=g.gapfill_r1; by PRECEDE_STUDY_ID; run;
+  %end;
+  %if %sysfunc(exist(g.gapfill_r2)) %then %do;
+    proc sort data=g.gapfill_r2; by PRECEDE_STUDY_ID; run;
+  %end;
+  %if %sysfunc(exist(g.gapfill_r3)) %then %do;
+    proc sort data=g.gapfill_r3; by PRECEDE_STUDY_ID; run;
+  %end;
+  %if %sysfunc(exist(g.gapfill_r4)) %then %do;
+    proc sort data=g.gapfill_r4; by PRECEDE_STUDY_ID; run;
+  %end;
+  %if %sysfunc(exist(g.gapfill_r5)) %then %do;
+    proc sort data=g.gapfill_r5; by PRECEDE_STUDY_ID; run;
+  %end;
+  %if %sysfunc(exist(g.gapfill_r6)) %then %do;
+    proc sort data=g.gapfill_r6; by PRECEDE_STUDY_ID; run;
+  %end;
+%mend sort_gapfill_donors;
+%sort_gapfill_donors;
+
 data g.master_data_merged;
   length
     /* Key */
@@ -377,8 +535,28 @@ data g.master_data_merged;
        reason to depend on how SAS sequences the second instance under BY-group
        processing when a separate dataset is equivalent and obviously correct.  */
     work.md8_donors
+
+    /* MRG-06-r1 through MRG-06-r6: Phase 29 gap-fill donors (new-columns-only pattern).
+       Only include datasets Plan 02 (03r_prep_gapfill.sas) actually created -- guarded
+       by %sysfunc(exist()) so that an empty allowlist (no approved=Y columns yet) does
+       not abort the merge with a dataset-not-found error.
+       New columns appear in output automatically -- no assignment statements needed.
+       PCM-D-28: r7/r8/r9 excluded -- no ENCRYPTED_MRN crosswalk available;
+       reopening: re-extract r7-r9 with ENCRYPTED_MRN or provide PRECEDE_STUDY_ID crosswalk. */
+    %if %sysfunc(exist(g.gapfill_r1)) %then g.gapfill_r1;
+    %if %sysfunc(exist(g.gapfill_r2)) %then g.gapfill_r2;
+    %if %sysfunc(exist(g.gapfill_r3)) %then g.gapfill_r3;
+    %if %sysfunc(exist(g.gapfill_r4)) %then g.gapfill_r4;
+    %if %sysfunc(exist(g.gapfill_r5)) %then g.gapfill_r5;
+    %if %sysfunc(exist(g.gapfill_r6)) %then g.gapfill_r6;
     ;
   by PRECEDE_STUDY_ID;
+
+  /* Fan-out guard: in3 is the md3 spine flag. Restricting to spine rows ensures that
+     gap-fill donor IDs not in the base do not add rows to the output.
+     The existing sort_and_check gate guarantees md3 has exactly 41,150 unique keys,
+     so this guard maintains the row count at 41,150 after r1-r6 donors are added. */
+  if in3;
 
   /* Provenance flags -- assigned immediately after BY (MRG-03 audit trail) */
   in_md1 = in1; in_md2 = in2; in_md3 = in3; in_md4 = in4;
@@ -476,6 +654,23 @@ data g.master_data_merged;
      still reconciles against the ownership map (MRG-04).                       */
   drop _d8_:;
 run;
+
+/* ---- GAP-03 row-count assertion: g.master_data_merged must still have 41,150 rows ----
+   If any g.gapfill_rN donor introduced duplicate IDs not in the md3 spine, the `if in3;`
+   guard above keeps the count at 41,150. A deviation here means the guard failed.        */
+%let _n_merged = 0;
+proc sql noprint;
+  select count(*) into :_n_merged trimmed from g.master_data_merged;
+quit;
+%macro assert_row_count_merged;
+  %if &_n_merged ne 41150 %then %do;
+    %fail_out(msg=GAP-03 FAILED -- g.master_data_merged has &_n_merged rows after r1-r6 gap-fill -- expected 41150 -- fan-out detected or spine restriction failed);
+  %end;
+  %else %do;
+    %put NOTE: [GAP-03] Row count assertion PASSED -- g.master_data_merged = &_n_merged rows;
+  %end;
+%mend assert_row_count_merged;
+%assert_row_count_merged;
 
 %put NOTE: DATA step merge complete. Proceeding to SECTION 4 log.;
 
@@ -728,7 +923,18 @@ proc sql noprint;
                              'IN_MD5','IN_MD6','IN_MD7','IN_MD8','N_SOURCES',
                              'RT_ENVELOPE_FLAG',
                              'RT_INCISE_TO_DRESS_NEG','RT_RM_START_TO_INCISION_NEG',
-                             'RT_RM_START_TO_RM_END_NEG');
+                             'RT_RM_START_TO_RM_END_NEG')
+    /* Phase 29 gap-fill columns: new columns sourced from g.gapfill_r1-r6 are not in
+       the ownership_map (which is built from the original 8 sources only). Exclude any
+       column that appears in any g.gapfill_rN dataset -- these are legitimately unmapped
+       by design (PCM-D-15, PCM-D-28). */
+    and upcase(name) not in (
+      select upcase(name) from dictionary.columns
+      where libname='G'
+        and memname in ('GAPFILL_R1','GAPFILL_R2','GAPFILL_R3',
+                        'GAPFILL_R4','GAPFILL_R5','GAPFILL_R6')
+        and upcase(name) ne 'PRECEDE_STUDY_ID'
+    );
     /* RT_ENVELOPE_FLAG is derived in SECTION 3 (MRG-05), not read from a source, so it
        is legitimately absent from the ownership map. Omitting it here would make MRG-04
        fail on the merges own derived column.                                         */

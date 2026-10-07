@@ -89,7 +89,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 28-01-PLAN.md — LINK-01/LINK-02: read 20_linkage_reach.txt + provenance search; build standalone sas/28_linkage_investigation.sas (3 blocks)
+- [x] 28-01-PLAN.md — LINK-01/LINK-02: read 20_linkage_reach.txt + provenance search; build standalone sas/28_linkage_investigation.sas (3 blocks)
 - [ ] 28-02-PLAN.md — LINK-03: run program, review qc/28_linkage_investigation.csv, record PCM-D-28 in docs/DECISIONS.md
 
 ---
@@ -182,7 +182,7 @@ Plans:
 |-------|------|----------------|--------|-----------|
 | 26 | v2.1 Carry-Forward & Source Hardening | 4/4 | Complete   | 2026-09-30 |
 | 27 | md8 Row-Count Correction | 2/2 | Complete    | 2026-10-07 |
-| 28 | r7/r8/r9 Linkage Investigation | 0/2 | Planned | - |
+| 28 | r7/r8/r9 Linkage Investigation | 1/2 | In Progress|  |
 | 29 | Gap-Fill Wiring (r1-r6) | 0/? | Not started | - |
 | 30 | pcnr Normalization & Type Conversion | 0/? | Not started | - |
 

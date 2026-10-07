@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
-status: verifying
-last_updated: "2026-10-07T16:25:41.472Z"
-last_activity: 2026-10-07
+status: executing
+last_updated: "2026-10-07T17:19:21.923Z"
+last_activity: 2026-10-07 -- Phase 28 Plan 01 complete; 28_linkage_investigation.sas written
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 8
+  completed_plans: 7
+  percent: 88
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -25,15 +25,15 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 **Core value:** A single `run_pipeline.cmd` that runs all SAS programs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), `g.pcnr_harmonized` (41,150 rows), `g.pcnr_analytic_cohort` (13,890 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current focus:** Phase 27 — md8-row-count-correction
+**Current focus:** Phase 28 — r7-r8-r9-linkage-investigation
 
 ---
 
 ## Current Position
 
-Phase: 27
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 28 (r7-r8-r9-linkage-investigation) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-10-07
 
 ### v2.2 Phase Status
@@ -46,7 +46,7 @@ Last activity: 2026-10-07
 | 29 | Gap-Fill Wiring (r1-r6) | Not started |
 | 30 | pcnr Normalization & Type Conversion | Not started |
 
-**Progress:** [██████████] 100%
+**Progress:** [█████████░] 88%
 
 ### v2.1 Phase Status (shipped 2026-09-29)
 
@@ -127,6 +127,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Phase 26 P04 | 10 | 1 tasks | 1 files |
 | Phase 27 P01 | 25 | 1 tasks | 1 files |
 | Phase 27 P02 | 15 | 2 tasks | 4 files |
+| Phase 28 P01 | 45 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,8 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 - Single ownership per variable (prevents last-wins overwrite, PCM-T-05)
 - PCM-D-15 APPROVED 2026-09-22: per-column gap candidates for r1-r9; r1-r6 wired in Phase 29; r7-r9 pending PCM-D-28
 - PCM-D-16 DIAGNOSED: r7/r8/r9 2022 IDs match 0 base rows -- PCM-D-28 investigation in Phase 28
+- LINK-01 ESTABLISHED 2026-10-07 (Phase 28 Plan 01): r7/r8/r9 have no ENCRYPTED_MRN column; MRN linking infeasible with current extracts
+- PROVENANCE FINDING 2026-10-07: figures 14.5/64/41 in PROJECT.md have no documented source pair, key, normalization, or denominator; must NOT be cited in PCM-D-28
 
 ### Open Decisions (v2.2)
 

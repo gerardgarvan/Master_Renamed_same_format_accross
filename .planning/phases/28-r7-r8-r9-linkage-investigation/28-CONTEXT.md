@@ -32,27 +32,34 @@ Pre-established finding from 19_raw_files.csv (program may verify, not re-derive
 
 **Block 2 — ID-format profile**
 
-Profile PRECEDE_STUDY_ID for the following, reporting type, width, and count of non-missing values. For ENCRYPTED_MRN: report width and count only — no min/max, no sample values (PHI guard).
+Profile PRECEDE_STUDY_ID for the following, reporting type, width, and count of non-missing values. r7/r8/r9 have no ENCRYPTED_MRN column; the PHI guard applies to ENCRYPTED_MRN in the Crypto files and md3/md7 only (width and count only — no min/max, no sample values).
 
 Files to profile:
-- r7: `P:\PeCAN Master Data\Gerard\raw\2022_Education_20240124.csv` — 9,215 rows, 2 cols
-- r8: `P:\PeCAN Master Data\Gerard\raw\2022_RES_20230927.csv` — 9,485 rows, 4 cols
-- r9: `P:\PeCAN Master Data\Gerard\raw\All_YEARS_LAT_LONG_20231127.csv` — 41,150 rows, 4 cols
-- md3's 2022 rows: read `P:\PeCAN Master Data\Gerard\raw\2018_2022_X_MASTER_DATASET_20240402.csv` (41,150 rows, 124 cols) and subset where `YEAR = 2022`; this makes the subset reproducible without needing src.master_data_3
-- `src.master_data_7` (SAS dataset on P: drive, read via libname src)
+- r7: `P:\PeCAN Master Data\Gerard\raw\2022_Education_20240124.csv` — 9,215 rows, 2 cols (PRECEDE_Study_ID numeric, Education)
+- r8: `P:\PeCAN Master Data\Gerard\raw\2022_RES_20230927.csv` — 9,485 rows, 4 cols (PRECEDE_Study_ID numeric, Race, Ethnicity, Sex)
+- r9: `P:\PeCAN Master Data\Gerard\raw\All_YEARS_LAT_LONG_20231127.csv` — 41,150 rows across all years; PRECEDE_STUDY_ID is character $12, YEAR is character $9. Profile distinct YEAR values before subsetting — YEAR may not hold the plain string "2022"
+- md3's 2022 rows: read `P:\PeCAN Master Data\Gerard\raw\master\2018_2022_X_MASTER_DATASET_20240402.csv` (raw\master copy — the one the pipeline's md3 came from) and subset where YEAR = 2022; optionally also run against the raw\ copy as a second row to document the difference
+- md7: `src.master_data_7` (SAS dataset on P: drive, read via libname src) — this is 2022_MASTER_DATASET, a different file from r7; profile PRECEDE_STUDY_ID type/width/count
 
-r7 and r8 may have numeric PRECEDE_STUDY_ID; r9 is expected to be character. Profile each independently and document the actual type found.
+r7 and r8 have numeric PRECEDE_STUDY_ID; r9 is character $12; md7 is numeric. Profile each independently and document the actual type found. Block 3 normalizations are derived from the Block 2 profile — do not assume before profiling. A safe default for numeric-vs-character comparison: `input(compress(id,,'kd'), best32.)` (digits only on both sides).
 
 **Block 3 — Normalized ID match**
 
-Each comparison gets its own documented normalization. Report both directions: match_rate_left = n_matched / n_left, match_rate_right = n_matched / n_right.
+Each comparison gets its own documented normalization derived from Block 2 profile results. Report both directions: match_rate_left = n_matched / n_left, match_rate_right = n_matched / n_right. Guard against division by zero: if n_left = 0 or n_right = 0, set the corresponding rate to `.` (SAS missing).
+
+md3-2022 source (decisive): `&raw_path.\master\2018_2022_X_MASTER_DATASET_20240402.csv` — the raw\master copy, which is what the pipeline's md3 (and PCM-D-16's mismatch count) came from. Optionally add a second row using the raw\ copy for comparison.
+
+Profile r9's distinct YEAR values in Block 2 first; subset r9 to 2022 rows using the label found (YEAR is $9, may not be plain "2022"). A full-file r9 comparison makes match_rate_left meaningless.
 
 Comparisons and normalizations:
-- r7 vs md3-2022: if r7 is numeric, convert to character with PUT and strip leading zeros before matching; document normalization in the CSV row
-- r8 vs md3-2022: same normalization logic as r7
-- r9 vs md3-2022: if r9 is character $12 matching md3, try direct match first, then strip; document
-- 2018_2019_MRN_Crypto_Data20260814.csv (file_id 5, 14,781 rows, 2 cols) vs 2018_2019_X_MASTER: PRECEDE_Study_ID is $18 in Crypto vs $12 in masters — normalization: strip and left-pad or right-pad to $12, or compare as numeric after stripping leading zeros; document which worked
-- 2018_2019_ENCOUNTER_Crypto_Data_20260814.csv (file_id 4, 14,781 rows, 2 cols) vs 2018_2019_X_MASTER: same normalization as MRN Crypto
+- r7_vs_md3_2022: r7 numeric vs md3-2022 character $12 — digits-only comparison; document normalization
+- r8_vs_md3_2022: same normalization as r7
+- r9_vs_md3_2022: subset r9 to 2022 rows; r9 is character $12 — try direct match first, then digits-only; document
+- md7_vs_md3_2022: md7 numeric vs md3-2022 character $12 — root question: do md3's 2022 IDs and md7's 2022 IDs share an ID space? Same normalization as r7. If about 0%, the PCM-D-16 mismatch implicates md3 vs md7 more broadly, not just r7-r9
+- r7_vs_md7: both numeric — direct numeric match. If ~100% while md7_vs_md3_2022 is ~0%, the PCM-D-16 mismatch is an md3-vs-md7 problem, not specific to r7-r9
+- r8_vs_md7: both numeric — direct numeric match; same diagnostic purpose as r7_vs_md7
+- 2018_2019_MRN_Crypto_Data20260814.csv (14,781 rows, 2 cols) vs 2018_2019_X_MASTER (raw\master copy): PRECEDE_Study_ID is $18 in Crypto vs $12 in master — digits-only normalization; additionally run a count-only ENCRYPTED_MRN equality match (Crypto $41 vs master $40) — output n_matched only (PHI-safe), this settles which encryption the Crypto files share with which master copy; also run against the raw\ copy as a second row
+- 2018_2019_ENCOUNTER_Crypto_Data_20260814.csv (14,781 rows, 2 cols) vs 2018_2019_X_MASTER: same normalization as MRN Crypto
 
 Before re-deriving the 14.5% / 64% / 41% rates from PROJECT.md, check the git log, Phase 20 SUMMARY, and Phase 21 SUMMARY to establish their provenance (which files, which key, whether IDs were normalized, what the denominator was). If the program reproduces them with documented denominators and both-direction rates, PCM-D-28 may cite those values. If not, do not include the unprovenanced figures in the decision record.
 
@@ -60,7 +67,7 @@ Before re-deriving the 14.5% / 64% / 41% rates from PROJECT.md, check the git lo
 
 ### D-02 — v2.3 Scope Statement in PCM-D-28
 
-The determination is "unknown pending a specific check" rather than "not feasible" unless the program produces positive evidence of infeasibility. PCM-D-28 must state the condition for reopening r7-r9 linkage in v2.3 — for example: a 2022 Crypto file from the extract producer, or an ID crosswalk mapping r7-r9 PRECEDE_STUDY_IDs to the base cohort.
+The determination is "MRN linking infeasible with the current extracts because r7/r8/r9 have no ENCRYPTED_MRN column" — this is positive evidence about the extract format, not an unexplained mismatch. Recovery is still possible. PCM-D-28 must state the specific condition for reopening r7-r9 linkage in v2.3 — for example: a re-extract of r7/r8/r9 that includes ENCRYPTED_MRN, or an ID crosswalk mapping r7-r9 PRECEDE_STUDY_IDs to the base cohort.
 
 Phase 29 excludes r7-r9 tentatively, with a reference to PCM-D-28 and the stated reopening condition. A permanent exclusion requires positive evidence, not just unexplained mismatches.
 
@@ -86,9 +93,9 @@ One row per comparison. Counts only, no PHI. PCM-D-28 cites this file the same w
 ### Pre-Established Findings (for program design)
 
 These are known from existing evidence; the program confirms or elaborates, not re-discovers:
-- r7 (`2022_Education_20240124.csv`), r8 (`2022_RES_20230927.csv`), r9 (`All_YEARS_LAT_LONG_20231127.csv`) carry ENCRYPTED_MRN but match 0 rows in pecan_id_xwalk on PRECEDE_STUDY_ID (PCM-F-20, PCM-D-16)
+- r7 (`2022_Education_20240124.csv`), r8 (`2022_RES_20230927.csv`), r9 (`All_YEARS_LAT_LONG_20231127.csv`) do NOT carry ENCRYPTED_MRN; they have only PRECEDE_STUDY_ID (numeric for r7/r8, character $12 for r9) plus their domain columns. MRN-based linking is therefore infeasible with the current extracts. They match 0 rows in pecan_id_xwalk on PRECEDE_STUDY_ID (PCM-F-20, PCM-D-16)
 - The 2018-2019 Crypto files cover 2018–2019 only (14,781 rows each); they cannot speak to 2022 linkage
-- 2020–2022 raw\ / raw\master pairs are same byte size but have different SHA-256 values — not byte-identical
+- 2020–2022 raw\ / raw\master pairs are same byte size — whether SHA-256 values differ is to be confirmed by Block 1
 - The 80,233-byte constant difference for the three 2018-2019 and 2018-2022 file pairs is an observed, unexplained finding; the raw\ copies bear an August 2026 modification date
 
 ### Claude's Discretion

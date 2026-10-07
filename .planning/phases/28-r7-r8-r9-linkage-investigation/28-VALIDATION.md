@@ -38,11 +38,10 @@ created: 2026-10-07
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 28-01-01 | 01 | 1 | provenance check | manual | `git log --oneline --all -- .planning/` | ✅ | ⬜ pending |
-| 28-01-02 | 01 | 1 | SAS program exists | file | `ls sas/28_linkage_investigation.sas` | ❌ W0 | ⬜ pending |
-| 28-01-03 | 01 | 2 | CSV output exists | file | `ls qc/28_linkage_investigation.csv` | ❌ W0 | ⬜ pending |
-| 28-01-04 | 01 | 2 | CSV has 9 columns | manual | inspect header row of CSV | ❌ W0 | ⬜ pending |
-| 28-01-05 | 01 | 3 | PCM-D-28 written | grep | `grep -c "PCM-D-28" docs/DECISIONS.md` | ✅ | ⬜ pending |
+| 28-01-T1 | 01 | 1 | LINK-01 provenance | manual | `git log --all --oneline -S "14.5" -- .planning/ docs/ \| head` | ✅ | ⬜ pending |
+| 28-01-T2 | 01 | 1 | LINK-02 SAS program | file+grep | `test -f sas/28_linkage_investigation.sas && grep -c "md7_vs_md3_2022" sas/28_linkage_investigation.sas` | ❌ W0 | ⬜ pending |
+| 28-02-T1 | 02 | 2 | LINK-02 CSV | checkpoint | manual run on P: drive; `ls qc/28_linkage_investigation.csv 2>/dev/null \|\| echo RUNTIME` | ❌ runtime | ⬜ pending |
+| 28-02-T2 | 02 | 2 | LINK-03 PCM-D-28 | grep | `grep -c "PCM-D-28" docs/DECISIONS.md` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

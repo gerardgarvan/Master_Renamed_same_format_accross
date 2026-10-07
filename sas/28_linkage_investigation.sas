@@ -103,6 +103,9 @@ libname src "&source_path" access=readonly;
 %check_file(path=&raw_path.\2018_2019_ENCOUNTER_Crypto_Data_20260814.csv,
             label=ENCOUNTER Crypto file);
 
+/* src.master_data_3 (md3 = 2018_2022_X_MASTER_DATASET SAS dataset) */
+%check_dataset(dsn=src.master_data_3, label=md3 SAS dataset);
+
 /* src.master_data_7 (md7 = 2022_MASTER_DATASET SAS dataset) */
 %check_dataset(dsn=src.master_data_7, label=md7 SAS dataset);
 
@@ -420,21 +423,49 @@ libname src "&source_path" access=readonly;
   quit;
   %put NOTE: r9 YEAR=&r9_year_label subset n=&r9_n_2022;
 
-  /* --- md3-2022: raw\master 2018_2022_X_MASTER_DATASET_20240402.csv, YEAR=2022 --- */
-  /* Read full CSV, subset YEAR=2022; PRECEDE_STUDY_ID is character $12            */
-  /* ENCRYPTED_MRN: PHI guard -- width and count only                              */
-  data work._md3_2022_raw;
-    length PRECEDE_STUDY_ID $ 12 ENCRYPTED_MRN $ 40 YEAR $ 4;
-    infile "&raw_path.\master\2018_2022_X_MASTER_DATASET_20240402.csv"
-           dsd dlm=',' firstobs=2 truncover lrecl=5000;
-    input PRECEDE_STUDY_ID $ ENCRYPTED_MRN $ YEAR $;
-    /* NOTE: positional read of first 3 columns only.                      */
-    /* ENCRYPTED_MRN must not appear in output beyond count -- PHI guard.  */
-    if strip(YEAR) = '2022';
-    id_c = strip(PRECEDE_STUDY_ID);
-    has_enc = (not missing(ENCRYPTED_MRN) and upcase(strip(ENCRYPTED_MRN)) ne 'NULL');
-    keep id_c has_enc;
+  /* --- md3-2022: src.master_data_3 (SAS dataset = 2018_2022_X_MASTER), YEAR=2022 --- */
+  /* Use SAS dataset to avoid column-position ambiguity in the multi-column raw CSV.   */
+  /* ENCRYPTED_MRN: PHI guard -- width and count only.                                 */
+  proc contents data=src.master_data_3
+    out=work._md3_meta(keep=name type length) noprint;
   run;
+
+  proc sql noprint;
+    select type into :md3_year_type trimmed
+    from work._md3_meta
+    where upcase(name) = 'YEAR';
+    /* PHI guard: ENCRYPTED_MRN width only */
+    select length into :md3_2022_enc_width trimmed
+    from work._md3_meta
+    where upcase(name) = 'ENCRYPTED_MRN';
+  quit;
+  %put NOTE: md3 YEAR type=&md3_year_type (1=numeric 2=character);
+  %put NOTE: md3 ENCRYPTED_MRN width=&md3_2022_enc_width [PHI guard];
+
+  /* Build md3-2022 subset; handle numeric or character YEAR */
+  %macro _build_md3_2022;
+    %if &md3_year_type = 1 %then %do;
+      proc sql noprint;
+        create table work._md3_2022_raw as
+        select strip(PRECEDE_STUDY_ID) as id_c length=12,
+               (not missing(ENCRYPTED_MRN) and
+                upcase(strip(ENCRYPTED_MRN)) ne 'NULL') as has_enc
+        from src.master_data_3
+        where YEAR = 2022;
+      quit;
+    %end;
+    %else %do;
+      proc sql noprint;
+        create table work._md3_2022_raw as
+        select strip(PRECEDE_STUDY_ID) as id_c length=12,
+               (not missing(ENCRYPTED_MRN) and
+                upcase(strip(ENCRYPTED_MRN)) ne 'NULL') as has_enc
+        from src.master_data_3
+        where strip(YEAR) = '2022';
+      quit;
+    %end;
+  %mend _build_md3_2022;
+  %_build_md3_2022;
 
   proc sql noprint;
     select count(*) into :md3_2022_n trimmed from work._md3_2022_raw;
@@ -444,33 +475,24 @@ libname src "&source_path" access=readonly;
   quit;
   %let md3_2022_id_type  = character;
   %let md3_2022_id_width = 12;
-  /* PHI guard: ENCRYPTED_MRN width (40) from length declaration above */
-  %let md3_2022_enc_width = 40;
-  %put NOTE: md3-2022 (raw\master) n=&md3_2022_n PRECEDE_STUDY_ID type=&md3_2022_id_type width=&md3_2022_id_width;
+  %put NOTE: md3-2022 (src.master_data_3) n=&md3_2022_n PRECEDE_STUDY_ID type=&md3_2022_id_type width=&md3_2022_id_width;
   %put NOTE: md3-2022 ENCRYPTED_MRN width=&md3_2022_enc_width nonmiss=&md3_2022_enc_nonmiss [PHI guard -- no sample values];
 
-  /* Build md3-2022 ID lookup table for Block 3 joins */
+  /* Build md3-2022 ID lookup tables for Block 3 joins */
   data work._md3_2022;
     set work._md3_2022_raw (keep=id_c);
     where not missing(id_c) and id_c ne '';
   run;
 
-  /* Also read raw\ copy for secondary comparison rows */
+  /* rawcopy: same src dataset -- secondary comparison rows will be identical */
   data work._md3_2022_rawcopy;
-    length PRECEDE_STUDY_ID $ 12 ENCRYPTED_MRN $ 40 YEAR $ 4;
-    infile "&raw_path.\2018_2022_X_MASTER_DATASET_20240402.csv"
-           dsd dlm=',' firstobs=2 truncover lrecl=5000;
-    input PRECEDE_STUDY_ID $ ENCRYPTED_MRN $ YEAR $;
-    if strip(YEAR) = '2022';
-    id_c = strip(PRECEDE_STUDY_ID);
-    keep id_c;
-    where not missing(id_c) and id_c ne '';
+    set work._md3_2022;
   run;
 
   proc sql noprint;
     select count(*) into :md3_2022_rawcopy_n trimmed from work._md3_2022_rawcopy;
   quit;
-  %put NOTE: md3-2022 raw\ copy n=&md3_2022_rawcopy_n;
+  %put NOTE: md3-2022 rawcopy (same src.master_data_3) n=&md3_2022_rawcopy_n;
 
   /* --- md7: src.master_data_7 (2022_MASTER_DATASET SAS dataset) --- */
   /* Discover type and length via PROC CONTENTS -- not assumed           */
@@ -501,10 +523,10 @@ libname src "&source_path" access=readonly;
   %put NOTE: md7 PRECEDE_STUDY_ID type=&md7_id_type length=&md7_id_len nonmiss=&md7_id_nonmiss;
   %put NOTE: md7 ENCRYPTED_MRN width=&md7_enc_width nonmiss=&md7_enc_nonmiss [PHI guard -- no sample values];
 
-  /* Build md7 ID lookup (numeric; put to character for joining) */
+  /* Build md7 ID lookup -- PRECEDE_STUDY_ID is character (type=2, length=12) per PROC CONTENTS */
   proc sql noprint;
     create table work._md7_ids as
-    select distinct strip(put(PRECEDE_STUDY_ID, best32.)) as id_c length=32
+    select distinct strip(PRECEDE_STUDY_ID) as id_c length=32
     from src.master_data_7
     where not missing(PRECEDE_STUDY_ID);
   quit;
@@ -550,11 +572,12 @@ libname src "&source_path" access=readonly;
           n_enc_left_encc n_enc_right_encc n_enc_matched_encc;
 
   /* Helper macro to compute both-direction rates with division-by-zero guard */
+  /* Note: %sysevalf without a conversion type returns float in SAS 9.4      */
   %macro _calc_rates(nleft=, nright=, nmatched=, mleft=, mright=);
     %if &&&nleft = 0 %then %let &mleft = .;
-    %else %let &mleft = %sysevalf(&&&nmatched / &&&nleft, float);
+    %else %let &mleft = %sysevalf(&&&nmatched / &&&nleft);
     %if &&&nright = 0 %then %let &mright = .;
-    %else %let &mright = %sysevalf(&&&nmatched / &&&nright, float);
+    %else %let &mright = %sysevalf(&&&nmatched / &&&nright);
   %mend _calc_rates;
 
   /* ===== Build normalized left-side ID tables ===== */

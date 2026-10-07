@@ -22,7 +22,7 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 
 ### MD8 — md8 Row-Count Correction
 
-- [ ] **MD8-01**: A SAS program counts md8 rows where any of the 68 columns is non-missing (treating literal `NULL` as missing) and compares the result against a count taken independently (from the `raw\` copy or the generating query), so the check can genuinely disagree; both counts are reported
+- [x] **MD8-01**: A SAS program counts md8 rows where any of the 68 columns is non-missing (treating literal `NULL` as missing) and compares the result against a count taken independently (from the `raw\` copy or the generating query), so the check can genuinely disagree; both counts are reported
 - [ ] **MD8-02**: DECISIONS.md and pipeline documentation are updated to reflect that the remaining rows beyond 22,473 are blank trailing rows (not lost data), and that the `raw\` copy is a row-count reference only — its MRNs use a different encryption and the two files are not interchangeable
 
 ### LINK — r7/r8/r9 Linkage Investigation (PCM-D-16)
@@ -70,7 +70,7 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 | HARD-01 | Phase 26 | Pending |
 | HARD-02 | Phase 26 | Pending |
 | HARD-03 | Phase 26 | Complete |
-| MD8-01 | Phase 27 | Pending |
+| MD8-01 | Phase 27 | Complete |
 | MD8-02 | Phase 27 | Pending |
 | LINK-01 | Phase 28 | Pending |
 | LINK-02 | Phase 28 | Pending |

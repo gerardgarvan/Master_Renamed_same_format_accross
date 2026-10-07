@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
 status: executing
-last_updated: "2026-09-30T20:05:24.370Z"
-last_activity: 2026-09-30
+last_updated: "2026-10-07T15:41:07.100Z"
+last_activity: 2026-10-07
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_plans: 6
+  completed_plans: 5
+  percent: 83
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 **Core value:** A single `run_pipeline.cmd` that runs all SAS programs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), `g.pcnr_harmonized` (41,150 rows), `g.pcnr_analytic_cohort` (13,890 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current focus:** Phase 26 — v2.1-carry-forward-source-hardening
+**Current focus:** Phase 27 — md8-row-count-correction
 
 ---
 
 ## Current Position
 
-Phase: 26 (v2.1-carry-forward-source-hardening) — EXECUTING
-Plan: 3 of 4
+Phase: 27 (md8-row-count-correction) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-09-30 - Completed quick task 260930-mze: HARD-02 source hash guard
+Last activity: 2026-10-07
 
 ### v2.2 Phase Status
 
@@ -46,7 +46,7 @@ Last activity: 2026-09-30 - Completed quick task 260930-mze: HARD-02 source hash
 | 29 | Gap-Fill Wiring (r1-r6) | Not started |
 | 30 | pcnr Normalization & Type Conversion | Not started |
 
-**Progress:** [██████████] 100%
+**Progress:** [████████░░] 83%
 
 ### v2.1 Phase Status (shipped 2026-09-29)
 
@@ -125,6 +125,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 ---
 | Phase 26 P02 | 20 | 2 tasks | 2 files |
 | Phase 26 P04 | 10 | 1 tasks | 1 files |
+| Phase 27 P01 | 25 | 1 tasks | 1 files |
 
 ## Accumulated Context
 

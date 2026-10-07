@@ -1118,22 +1118,20 @@ Reopening condition: If Gerard explicitly requests PACU_STAY analysis, run it th
 
 ## PCM-D-32 -- r2/r4 De-Duplication Rules (Phase 29)
 
-**Status:** PENDING -- requires Gerard review of qc/29_dup_ids.txt (r2 and r4 only)
+**Status:** Resolved -- no de-dup rules needed
 **Date:** 2026-10-07
-**Decided by:** [Gerard -- to fill in after reviewing qc/29_dup_ids.txt]
+**Decided by:** Gerard (diagnostic run 2026-10-07)
 
 **r1 excluded:** Both r1 columns (`rt_RM_START_to_INDUCTION_mins`, `rt_RM_START_to_EMERGENCE_mins`)
 are already present in `g.master_data_merged`. Confirmed 2026-10-07 via `sas/29_r1_key_diag.sas`.
-r1 marked `approved=N` in `docs/gapfill_allowlist.csv`. No de-dup rule needed for r1.
+r1 marked `approved=N` in `docs/gapfill_allowlist.csv`.
 
-Duplicate PRECEDE_STUDY_ID counts requiring de-dup rules:
-| File | Total rows | Cohort N | Excess rows |
-|------|-----------|---------|-------------|
-| r2 (2018_2019_Precede_Database.xlsx) | 14,807 | 14,778 | 29 |
-| r4 (2020_Precede_Database_Edu.xlsx) | 7,696 | 7,695 | 1 |
+**r2 and r4: 0 duplicate PRECEDE_STUDY_IDs after key normalization.** The excess row counts
+from CONTEXT.md (r2: 29, r4: 1) do not manifest as duplicate keys after the `Precede`-prefix
+normalization step in `sas/03r_prep_gapfill.sas`. No de-dup step is needed for either file.
 
-**De-dup rule per file (Gerard to complete):**
-- r2: [PENDING -- review qc/29_dup_ids.txt for duplicate IDs]
-- r4: [PENDING -- review qc/29_dup_ids.txt for duplicate IDs]
-
-Plan 2 will NOT proceed until this entry is updated with approved de-dup rules for r2 and r4.
+Confirmed by `proc sort nodupkey` in the diagnostic stub run 2026-10-07:
+| File | Raw rows | Post-sort rows | Dups removed |
+|------|----------|----------------|--------------|
+| r2 (2018_2019_Precede_Database.xlsx) | 14,807 | 14,807 | 0 |
+| r4 (2020_Precede_Database_Edu.xlsx) | 7,696 | 7,696 | 0 |

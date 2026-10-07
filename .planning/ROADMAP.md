@@ -112,7 +112,7 @@ Plans:
 
 Plans:
 - [x] 29-01-PLAN.md — Diagnostic stub: import r1-r6, detect dup IDs, write qc/29_dup_ids.txt, snap_path + PACU_STAY note (checkpoint)
-- [ ] 29-02-PLAN.md — Full prep program: encode approved de-dup rules; produce g.gapfill_r1 through g.gapfill_r6 permanent datasets (r7/r8/r9 excluded per PCM-D-28)
+- [x] 29-02-PLAN.md — Full prep program: encode approved de-dup rules; produce g.gapfill_r1 through g.gapfill_r6 permanent datasets (r7/r8/r9 excluded per PCM-D-28)
 - [ ] 29-03-PLAN.md — Merge block in 04_merge.sas (new-columns-only, in=inbase guard, collision check, per-donor match count, row-count assertion); create sas/29_gapfill_compare.sas standalone two-pass snapshot+compare program
 - [ ] 29-04-PLAN.md — pcnr map extension: re-run program 23, draft sentinel_decisions.csv rows, update 24_pcnr_build.sas assertions (checkpoint)
 - [ ] 29-05-PLAN.md — Integration: wire 03r_prep_gapfill.sas into run_pipeline.cmd + end-to-end verification
@@ -190,7 +190,7 @@ Plans:
 | 26 | v2.1 Carry-Forward & Source Hardening | 4/4 | Complete   | 2026-09-30 |
 | 27 | md8 Row-Count Correction | 2/2 | Complete    | 2026-10-07 |
 | 28 | r7/r8/r9 Linkage Investigation | 2/2 | Complete    | 2026-10-07 |
-| 29 | Gap-Fill Wiring (r1-r6) | 1/5 | In Progress|  |
+| 29 | Gap-Fill Wiring (r1-r6) | 2/5 | In Progress|  |
 | 30 | pcnr Normalization & Type Conversion | 0/? | Not started | - |
 
 ---

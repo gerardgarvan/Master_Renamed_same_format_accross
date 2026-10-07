@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
 status: verifying
-last_updated: "2026-10-07T17:39:43.919Z"
-last_activity: 2026-10-07 -- Phase 28 Plan 02 complete; PCM-D-28 written; Phase 28 complete
+last_updated: "2026-10-07T17:47:54.006Z"
+last_activity: 2026-10-07
 progress:
   total_phases: 3
   completed_phases: 3
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 ## Current Position
 
-Phase: 28 (r7-r8-r9-linkage-investigation) — EXECUTING
-Plan: 2 of 2
+Phase: 28
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-10-07
 

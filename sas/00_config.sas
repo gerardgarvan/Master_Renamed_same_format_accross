@@ -22,6 +22,7 @@
 %let g_path      = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge;
 %let qc_path     = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\qc;
 %let logs_path   = P:\PeCAN Master Data\Gerard\Master_Renamed_same_format_accross\merge\logs;
+%let snap_path   = &source_path.\snap;
 
 /* ---- Phase 20 / PCM-D-17: crosswalk dated-backup path ----
    Outside qc/ and outside git. ENCRYPTED_MRN (PHI) lives here. */
@@ -88,6 +89,7 @@
 %put NOTE: [00_config] g_path      = &g_path;
 %put NOTE: [00_config] qc_path     = &qc_path;
 %put NOTE: [00_config] logs_path   = &logs_path;
+%put NOTE: [00_config] snap_path         = &snap_path;
 %put NOTE: [00_config] raw_path          = &raw_path;
 %put NOTE: [00_config] xwalk_backup_path = &xwalk_backup_path;
 %put NOTE: [00_config] src_hash_baseline = &src_hash_baseline;

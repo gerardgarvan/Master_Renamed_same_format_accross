@@ -36,6 +36,7 @@
             2. otherwise the contributing source with the highest row count:
                md3 41150 > md8 22473 > md1 = md2 14778 > md6 9462 > md7 9215
                         > md4 = md5 7695
+               (md8 = 22,473 verified by sas/27_md8_count.sas, Phase 27, PCM-D-31 -- not assumed)
             3. ties break to the lowest source number (md1 before md2,
                md4 before md5)
             4. explicit override for the five frailty components -- see below

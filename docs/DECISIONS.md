@@ -941,3 +941,42 @@ run_pipeline.cmd (same constraint as 19b for HARD-01).
 docs/source_hash_baseline.csv (detective control).
 
 **Resolved:** 2026-09-30 | Owner: Gerard | Phase 26 quick
+
+
+## PCM-D-31 -- md8 Row Count: Trailing Padding, Not Truncation: RESOLVED
+
+**Date:** 2026-10-07
+**Decided by:** Gerard
+**Status:** RESOLVED
+
+**Question:** Is md8's row count below the raw\master copy's 1,048,575 evidence of lost data,
+and what is md8's true N?
+
+**Decision:**
+
+md8's true non-missing N is 22,473. Confirmed by sas/27_md8_count.sas (Phase 27, MD8-01) with
+two independent counts and three checks, result committed to qc/27_md8_count.csv:
+  - Count A (pipeline any-column non-missing sweep over all 68 columns, literal NULL treated as
+    missing per PCM-F-05): 22,473
+  - Count B (independent, raw\ALL_AIM2_MASTER_DATASET_20210917.xlsx, any-column non-missing
+    sweep via XLSX libname -- same rule as Count A): 22,473
+  - Contiguity: last non-missing row position = 22,473 (rows beyond are contiguous trailing
+    blank padding, not scattered gaps)
+  - PRECEDE_STUDY_ID non-missing count = 22,473
+
+Rows beyond 22,473 are blank trailing rows (Excel used-range / export padding), NOT lost data.
+The raw\master copy's 1,048,575 figure is the Excel sheet maximum minus header -- a used-range
+artifact, not real rows.
+
+The raw\ copy is a ROW-COUNT REFERENCE ONLY. Its MRNs use a different encryption scheme
+(PCM-D-16); the raw\ copy and the pipeline source are NOT interchangeable for any purpose other
+than counting rows. Weaker informational cross-check: Induction_Emergent (2018-2020) has 22,476
+rows, 3 more than md8 -- noted for context, not used as a count source.
+
+The pipeline now enforces this permanently: sas/03_prep_md8.sas drops all-missing rows before
+promoting g.prep_md8 and asserts N = 22,473 on every run (MD8-02).
+
+**Traceability:** MD8-01, MD8-02; sas/27_md8_count.sas; qc/27_md8_count.csv;
+sas/03_prep_md8.sas; PCM-D-16 (encryption mismatch).
+
+**Resolved:** 2026-10-07 | Owner: Gerard | Phase 27

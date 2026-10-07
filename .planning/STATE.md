@@ -120,7 +120,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | pcnr recoded cells | reported | — | Phase 24 (PCNR-10) |
 | g.pcnr_harmonized | 41,150 rows | **41,150** | Phase 24; all sentinel values set to missing; all analysis variables renamed pcnr_* |
 | g.pcnr_analytic_cohort | 13,890 rows | **13,890** | Phase 25; PRECEDE_STUDY_ID set identical to g.analytic_cohort |
-| md8 non-missing rows | TBD | TBD | Phase 27 (MD8-01) |
+| md8 non-missing rows | 22,473 | **22,473** | Phase 27 (MD8-01); dual count + contiguity, PCM-D-31 |
 
 ---
 | Phase 26 P02 | 20 | 2 tasks | 2 files |

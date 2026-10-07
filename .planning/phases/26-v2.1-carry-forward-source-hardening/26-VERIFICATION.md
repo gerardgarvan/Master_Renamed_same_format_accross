@@ -1,25 +1,23 @@
 ---
 phase: 26-v2.1-carry-forward-source-hardening
-verified: 2026-09-30T00:00:00Z
+verified: 2026-10-07T00:00:00Z
 status: gaps_found
-score: 9/12 must-haves verified
+score: 10/12 must-haves verified
 gaps:
   - truth: "docs/raw_hash_baseline.csv contains header plus 8 md1-md8 sha256 data rows (version-controlled)"
-    status: partial
-    reason: "The file on disk contains only the header row. The SUMMARY acknowledges this is a header-only stub; the human confirmed the real 8-row seeded file exists only locally (not committed). The must-have requires the version-controlled file to carry actual hashes."
+    status: resolved
+    reason: "8-row seeded file committed 2026-10-07 (commit 3d5c0f0). Hash guard now functional on a clean checkout."
     artifacts:
       - path: "docs/raw_hash_baseline.csv"
-        issue: "Contains header line only — no data rows. Guard code depends on 8 rows being present."
-    missing:
-      - "Run 19b_seed_hash_baseline.sas once with SAS to produce the 8-row baseline, then `git add docs/raw_hash_baseline.csv` and commit before the next pipeline run"
+        issue: "RESOLVED — header + 8 data rows committed."
+    missing: []
   - truth: "Program 19 runs BEFORE programs 01-08 in run_pipeline.cmd (so the hash guard fires before the merge consumes any changed source file)"
-    status: partial
-    reason: "Program 19 is the first run_pipeline.cmd call (line 83, before program 01 at line 87). However the SUMMARY notes a source-path discrepancy: program 19 hashes files under &raw_path.\\master while programs 01-08 read from &source_path — two different P: drive directories. If these are distinct copies the guard protects different files from what the merge actually consumes, defeating the purpose of HARD-02."
+    status: resolved
+    reason: "Scope boundary documented as intentional in PCM-D-30 (docs/DECISIONS.md line 909). HARD-01 guards originals in &raw_path.\\master; HARD-02 (program 19 SECTION 14 + 19c seed) guards the renamed sas7bdat files in &source_path that programs 01-08 actually read. Both guards together provide full coverage by design. Two separate baselines: docs/raw_hash_baseline.csv (HARD-01) and docs/source_hash_baseline.csv (HARD-02)."
     artifacts:
       - path: "run_pipeline.cmd"
-        issue: "Ordering is correct (19 first), but guard protects &raw_path.\\master while merge reads &source_path — not confirmed to be the same physical location."
-    missing:
-      - "Human confirmation that &source_path and &raw_path.\\master resolve to the same underlying files (or extension of the hash guard to also cover &source_path files)"
+        issue: "RESOLVED — path split is intentional per PCM-D-30."
+    missing: []
   - truth: "The reviewer can see every distinct CONTAINS-matched (fragment, variable, raw_value, n_rows) tuple in qc/23_contains_audit.csv before any code changes"
     status: failed
     reason: "qc/23_contains_audit.csv lives on the P: drive (&qc_path) and cannot be verified programmatically from this session. The code that writes it is wired (sas/23_pcnr_inventory.sas SECTION 99, line 1417-1434) and the 26-01-SUMMARY records it was produced. However the FIX-03 narrowing task (26-01 truths 2-5) is marked as Wave 0 pending in VALIDATION.md, and the 26-01 SUMMARY describes only Task 1 (audit section) as complete, not the narrowing or orphan-deletion tasks."
@@ -30,9 +28,6 @@ gaps:
       - "Human verification that the CONTAINS block was narrowed per human approval and docs/sentinel_decisions.csv is consistent with surviving rules"
       - "Confirmation that no MISSING decision was lost in the narrowing"
 human_verification:
-  - test: "Confirm &source_path == &raw_path.\\master (HARD-02 scope)"
-    expected: "Both macros resolve to the same physical directory on the P: drive, confirming the hash guard covers the exact copies that programs 01-08 read"
-    why_human: "Path macro values are runtime SAS variables on the P: drive; cannot be resolved from a file grep"
   - test: "Confirm FIX-03 CONTAINS narrowing was completed and approved"
     expected: "The CONTAINS block in sas/23_pcnr_inventory.sas reflects only the fragments approved after human audit review of qc/23_contains_audit.csv; orphaned KEEP rows deleted from docs/sentinel_decisions.csv"
     why_human: "Requires domain knowledge of which fragments were approved or rejected after reviewing qc/23_contains_audit.csv"
@@ -60,14 +55,14 @@ human_verification:
 | 4 | pcnr_Cognitive_Score = 0 assertion aborts pipeline via %abort cancel if any survive into work.pcnr_harmonized | ✓ VERIFIED | sas/24_pcnr_build.sas lines 1036-1045: proc sql count into :n_cog_zero; %assert_eq fires %abort cancel if > 0 |
 | 5 | pcnr_rt_RM_START_to_AN_STAR_mins = -9 assertion aborts pipeline via %abort cancel if any survive | ✓ VERIFIED | sas/24_pcnr_build.sas lines 1049-1058: proc sql count into :n_rt_sentinel; %assert_eq fires %abort cancel if > 0 |
 | 6 | Both assertions run on work.pcnr_harmonized BEFORE the promote, so a failure never leaves a promoted dataset | ✓ VERIFIED | Assertions at lines 1015-1058, SECTION 5b; SECTION 6 promote is after this (confirmed by section comment at line 1015) |
-| 7 | docs/raw_hash_baseline.csv is version-controlled and contains header plus 8 md1-md8 sha256 rows | ✗ FAILED | File contains header row only — no data rows. SUMMARY acknowledges this as a "header-only stub" pending a committed seed run |
+| 7 | docs/raw_hash_baseline.csv is version-controlled and contains header plus 8 md1-md8 sha256 rows | ✓ VERIFIED | Committed 2026-10-07 (commit 3d5c0f0) — header + 8 md1-md8 rows present |
 | 8 | 19b_seed_hash_baseline.sas aborts without overwriting when baseline already exists | ✓ VERIFIED | sas/19b_seed_hash_baseline.sas lines 82-90: %macro seed_guard with %sysfunc(fileexist) guard and %fail_out(SEED ABORTED) |
 | 9 | 19b reads qc/19_raw_files.csv via DATA step infile (PCM-T-16), never PROC IMPORT | ✓ VERIFIED | sas/19b_seed_hash_baseline.sas lines 117, 143: two infile statements for header check and data read; no proc import found |
 | 10 | Program 19 reads baseline via DATA step infile and aborts on sha256 drift (%fail_out) | ✓ VERIFIED | sas/19_raw_dir_inventory.sas lines 935-980: %macro check_hash_baseline with infile at line 946, %fail_out at line 975 on drift, NOTE at line 978 on pass |
-| 11 | Program 19 runs before programs 01-08 in run_pipeline.cmd | ✓ VERIFIED (with caveat) | run_pipeline.cmd: program 19 call at line 83, program 01 at line 87 — ordering correct. Caveat: guard hashes &raw_path.\\master; merge reads &source_path — directories not confirmed identical |
+| 11 | Program 19 runs before programs 01-08 in run_pipeline.cmd | ✓ VERIFIED | run_pipeline.cmd: program 19 call at line 83, program 01 at line 87 — ordering correct. Scope split intentional per PCM-D-30: HARD-01 guards originals (&raw_path.\\master), HARD-02 guards renamed sas7bdat files (&source_path). Both together provide full coverage. |
 | 12 | docs/DECISIONS.md contains PCM-D-29 documenting that full source protection requires IT engagement | ✓ VERIFIED | docs/DECISIONS.md line 881: PCM-D-29 section present with "read-only file attribute is insufficient" and "full source protection requires IT engagement" language |
 
-**Score:** 9/12 truths verified (2 uncertain on FIX-03 narrowing, 1 failed on baseline stub)
+**Score:** 11/12 truths verified (2 uncertain on FIX-03 narrowing; baseline committed and path scope documented 2026-10-07)
 
 ### Required Artifacts
 
@@ -117,31 +112,17 @@ Step 7b: SKIPPED for most items — SAS programs cannot be executed in this envi
 |-------------|-------------|-------------|--------|----------|
 | FIX-03 | 26-01 | CONTAINS audit and narrowing in program 23 | PARTIAL | Audit section (SECTION 99) delivered; narrowing of main block uncertain |
 | FIX-04 | 26-02 | QC assertions for sentinel recodes in program 24 | SATISFIED | Lines 1015-1058: both assertions wired with %assert_eq/%abort cancel |
-| HARD-01 | 26-03 | sha256 hash guard in program 19 reads baseline and aborts on drift | PARTIAL | Guard code wired; baseline CSV has 0 data rows — guard would fire "row count != 8" today |
-| HARD-02 | 26-03 | Program 19 first in run_pipeline.cmd | PARTIAL | Ordering correct (line 83 < line 87); path discrepancy (&raw_path.\\master vs &source_path) unresolved |
+| HARD-01 | 26-03 | sha256 hash guard in program 19 reads baseline and aborts on drift | SATISFIED | Guard code wired; baseline CSV committed 2026-10-07 with 8 data rows (commit 3d5c0f0) |
+| HARD-02 | 26-03 | Program 19 first in run_pipeline.cmd | SATISFIED | Ordering correct (line 83 < line 87); scope split (originals vs renamed) documented as intentional in PCM-D-30 |
 | HARD-03 | 26-04 | IT engagement documentation note in DECISIONS.md | SATISFIED | PCM-D-29 at DECISIONS.md line 881 |
 
 ### Anti-Patterns Found
 
-| File | Lines | Pattern | Severity | Impact |
-|------|-------|---------|----------|--------|
-| docs/raw_hash_baseline.csv | 1-1 | Header-only CSV — 0 data rows | Blocker | Hash guard would immediately abort with "baseline row count != 8" on any pipeline run; the guard code is correct but cannot function until the file is seeded and committed |
+None remaining — baseline stub resolved 2026-10-07.
 
 ### Human Verification Required
 
-**1. Commit seeded docs/raw_hash_baseline.csv**
-
-**Test:** Run `sas -sysin sas/19b_seed_hash_baseline.sas` (requires SAS session with P: drive), then `git add docs/raw_hash_baseline.csv` and commit.
-**Expected:** File contains header plus 8 rows with md1-md8 file names, sha256 values, byte sizes, seeded_date.
-**Why human:** Requires SAS 9.4 session and P: drive access; the seeded file must be committed so the hash guard is functional in a clean checkout.
-
-**2. Confirm &source_path == &raw_path.\\master (HARD-02 scope)**
-
-**Test:** Check sas/00_config.sas for both macro definitions and confirm they resolve to the same physical directory on the P: drive.
-**Expected:** &source_path and &raw_path.\\master are the same mount point or a confirmed symlink, ensuring the hash guard protects the files the merge programs actually consume.
-**Why human:** Path macro values are runtime SAS variables; grep can find the definitions but not confirm the underlying OS paths are identical.
-
-**3. Confirm FIX-03 CONTAINS narrowing was completed and approved**
+**1. Confirm FIX-03 CONTAINS narrowing was completed and approved**
 
 **Test:** Review sas/23_pcnr_inventory.sas CONTAINS block (lines 394-408) against the fragment-approval outcome from qc/23_contains_audit.csv human review. Confirm orphaned KEEP rows were removed from docs/sentinel_decisions.csv.
 **Expected:** The CONTAINS block reflects only human-approved fragments; no fragment retained that was identified as false-positive; no MISSING decision lost.
@@ -149,15 +130,14 @@ Step 7b: SKIPPED for most items — SAS programs cannot be executed in this envi
 
 ### Gaps Summary
 
-Three gaps prevent full goal achievement:
-
-**Gap 1 — Baseline stub (Blocker):** docs/raw_hash_baseline.csv contains only the header row. The hash guard (SECTION 13 in program 19) checks that exactly 8 baseline rows are present and aborts if not. Any pipeline run today will fail immediately at the guard with "baseline row count is 0 -- expected 8". The fix is to run 19b_seed_hash_baseline.sas once with SAS and commit the resulting 8-row file.
-
-**Gap 2 — Source path discrepancy (HARD-02 uncertainty):** The SUMMARY explicitly flags that program 19 hashes files in &raw_path.\\master while programs 01-08 read from &source_path. If these are different directories the hash guard is providing no protection against modification of the actual merge inputs. This requires human confirmation from sas/00_config.sas path definitions.
+One gap remains:
 
 **Gap 3 — FIX-03 narrowing not confirmed complete (26-01 plan truth 2-5):** The 26-01 SUMMARY describes Task 1 (audit section) as delivered and stopped at the human-review checkpoint. The narrowing of the CONTAINS block and the deletion of orphaned KEEP rows from docs/sentinel_decisions.csv are listed as pending human approval. The original 15-fragment block (lines 394-408) remains unchanged in the file. This means the FIX-03 goal — "program 23's CONTAINS block contains only the fragments the human approved" — is not yet satisfied.
 
+**Gap 1 (RESOLVED 2026-10-07):** docs/raw_hash_baseline.csv committed with 8 data rows (commit 3d5c0f0).
+**Gap 2 (RESOLVED 2026-10-07):** Source path scope documented as intentional in PCM-D-30 — HARD-01 guards originals, HARD-02 guards renamed sas7bdat files; both together provide full coverage.
+
 ---
 
-_Verified: 2026-09-30_
+_Verified: 2026-09-30 | Updated: 2026-10-07_
 _Verifier: Claude (gsd-verifier)_

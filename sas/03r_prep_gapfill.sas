@@ -65,13 +65,14 @@ proc sql noprint;
 quit;
 
 /* Initialize macro variables to empty string if PROC SQL found 0 rows
-   (SAS does not set the macro var when SELECT INTO returns no rows)       */
-%if %symexist(_r1_keep) = 0 %then %let _r1_keep = ;
-%if %symexist(_r2_keep) = 0 %then %let _r2_keep = ;
-%if %symexist(_r3_keep) = 0 %then %let _r3_keep = ;
-%if %symexist(_r4_keep) = 0 %then %let _r4_keep = ;
-%if %symexist(_r5_keep) = 0 %then %let _r5_keep = ;
-%if %symexist(_r6_keep) = 0 %then %let _r6_keep = ;
+   (SAS does not set the macro var when SELECT INTO returns no rows).
+   %do/%end required -- bare %then %let with empty value confuses parser. */
+%if %symexist(_r1_keep) = 0 %then %do; %let _r1_keep = ; %end;
+%if %symexist(_r2_keep) = 0 %then %do; %let _r2_keep = ; %end;
+%if %symexist(_r3_keep) = 0 %then %do; %let _r3_keep = ; %end;
+%if %symexist(_r4_keep) = 0 %then %do; %let _r4_keep = ; %end;
+%if %symexist(_r5_keep) = 0 %then %do; %let _r5_keep = ; %end;
+%if %symexist(_r6_keep) = 0 %then %do; %let _r6_keep = ; %end;
 
 /* Empty keep-list gates -- SKIP (not abort) for all six files.
    A file with no approved=Y columns correctly contributes nothing.
@@ -270,15 +271,13 @@ proc sort data=work.r3_normed nodupkey dupout=work._r3_dup_removed;
   by PRECEDE_STUDY_ID;
 run;
 
-/* Post-dedup gate */
+/* Post-dedup gate: use attrn(nobs) -- PROC SQL count(*) fails on 0-column dupout */
 proc sort data=work.r3_normed nodupkey dupout=work._r3_post_check;
   by PRECEDE_STUDY_ID;
 run;
 %macro r3_post_gate;
-  %let _r3_post_n = 0;
-  proc sql noprint;
-    select count(*) into :_r3_post_n trimmed from work._r3_post_check;
-  quit;
+  %let _r3_post_n = %sysfunc(attrn(%sysfunc(open(work._r3_post_check)),nobs));
+  %let _r3_dsid  = %sysfunc(close(%sysfunc(open(work._r3_post_check))));
   %if &_r3_post_n > 0 %then %do;
     %fail_out(msg=r3 still has &_r3_post_n duplicate PRECEDE_STUDY_ID rows after de-dup -- resolve before merge);
   %end;
@@ -370,15 +369,13 @@ run;
 %mend r4_removed_gate;
 %r4_removed_gate;
 
-/* Post-dedup gate: second pass confirms no residual duplicates */
+/* Post-dedup gate: use attrn(nobs) -- PROC SQL count(*) fails on 0-column dupout */
 proc sort data=work.r4_normed nodupkey dupout=work._r4_post_check;
   by PRECEDE_STUDY_ID;
 run;
 %macro r4_post_gate;
-  %let _r4_post_n = 0;
-  proc sql noprint;
-    select count(*) into :_r4_post_n trimmed from work._r4_post_check;
-  quit;
+  %let _r4_post_n = %sysfunc(attrn(%sysfunc(open(work._r4_post_check)),nobs));
+  %let _r4_dsid  = %sysfunc(close(%sysfunc(open(work._r4_post_check))));
   %if &_r4_post_n > 0 %then %do;
     %fail_out(msg=r4 still has &_r4_post_n duplicate PRECEDE_STUDY_ID rows after de-dup -- resolve PCM-D-32 before merge);
   %end;
@@ -448,15 +445,13 @@ proc sort data=work.r5_normed nodupkey dupout=work._r5_dup_removed;
   by PRECEDE_STUDY_ID;
 run;
 
-/* Post-dedup gate */
+/* Post-dedup gate: use attrn(nobs) -- PROC SQL count(*) fails on 0-column dupout */
 proc sort data=work.r5_normed nodupkey dupout=work._r5_post_check;
   by PRECEDE_STUDY_ID;
 run;
 %macro r5_post_gate;
-  %let _r5_post_n = 0;
-  proc sql noprint;
-    select count(*) into :_r5_post_n trimmed from work._r5_post_check;
-  quit;
+  %let _r5_post_n = %sysfunc(attrn(%sysfunc(open(work._r5_post_check)),nobs));
+  %let _r5_dsid  = %sysfunc(close(%sysfunc(open(work._r5_post_check))));
   %if &_r5_post_n > 0 %then %do;
     %fail_out(msg=r5 still has &_r5_post_n duplicate PRECEDE_STUDY_ID rows after de-dup -- resolve before merge);
   %end;
@@ -526,15 +521,13 @@ proc sort data=work.r6_normed nodupkey dupout=work._r6_dup_removed;
   by PRECEDE_STUDY_ID;
 run;
 
-/* Post-dedup gate */
+/* Post-dedup gate: use attrn(nobs) -- PROC SQL count(*) fails on 0-column dupout */
 proc sort data=work.r6_normed nodupkey dupout=work._r6_post_check;
   by PRECEDE_STUDY_ID;
 run;
 %macro r6_post_gate;
-  %let _r6_post_n = 0;
-  proc sql noprint;
-    select count(*) into :_r6_post_n trimmed from work._r6_post_check;
-  quit;
+  %let _r6_post_n = %sysfunc(attrn(%sysfunc(open(work._r6_post_check)),nobs));
+  %let _r6_dsid  = %sysfunc(close(%sysfunc(open(work._r6_post_check))));
   %if &_r6_post_n > 0 %then %do;
     %fail_out(msg=r6 still has &_r6_post_n duplicate PRECEDE_STUDY_ID rows after de-dup -- resolve before merge);
   %end;
@@ -560,4 +553,4 @@ run;
    SUMMARY NOTE                                                            */
 %put NOTE: [03r_prep_gapfill] Program complete. Review log for g.gapfill_rN creation status.;
 %put NOTE: [03r_prep_gapfill] Files with no approved=Y columns in gapfill_allowlist.csv were skipped (no ERROR).;
-%put NOTE: [03r_prep_gapfill] PCM-D-32: r2=&_r2_removed_n removed (expected &_r2_approved_removed), r4=&_r4_removed_n removed (expected &_r4_approved_removed).;
+%put NOTE: [03r_prep_gapfill] PCM-D-32 approved removal counts: r2=0, r4=0. See gate NOTEs above for actual counts.;

@@ -1,8 +1,8 @@
 ---
 phase: 26-v2.1-carry-forward-source-hardening
 verified: 2026-10-07T00:00:00Z
-status: gaps_found
-score: 10/12 must-haves verified
+status: verified
+score: 12/12 must-haves verified
 gaps:
   - truth: "docs/raw_hash_baseline.csv contains header plus 8 md1-md8 sha256 data rows (version-controlled)"
     status: resolved
@@ -19,14 +19,12 @@ gaps:
         issue: "RESOLVED — path split is intentional per PCM-D-30."
     missing: []
   - truth: "The reviewer can see every distinct CONTAINS-matched (fragment, variable, raw_value, n_rows) tuple in qc/23_contains_audit.csv before any code changes"
-    status: failed
-    reason: "qc/23_contains_audit.csv lives on the P: drive (&qc_path) and cannot be verified programmatically from this session. The code that writes it is wired (sas/23_pcnr_inventory.sas SECTION 99, line 1417-1434) and the 26-01-SUMMARY records it was produced. However the FIX-03 narrowing task (26-01 truths 2-5) is marked as Wave 0 pending in VALIDATION.md, and the 26-01 SUMMARY describes only Task 1 (audit section) as complete, not the narrowing or orphan-deletion tasks."
+    status: resolved
+    reason: "All 15 CONTAINS fragments approved by Gerard 2026-10-07 after review of qc/23_contains_audit.csv. No narrowing required — the full 15-fragment block is the correct approved set. FIX-03 satisfied."
     artifacts:
       - path: "sas/23_pcnr_inventory.sas"
-        issue: "SECTION 99 audit appended and wired. Narrowing of the CONTAINS block (truths 2-5) not verified as complete — original 15-fragment block still present at lines 394-408."
-    missing:
-      - "Human verification that the CONTAINS block was narrowed per human approval and docs/sentinel_decisions.csv is consistent with surviving rules"
-      - "Confirmation that no MISSING decision was lost in the narrowing"
+        issue: "RESOLVED — 15-fragment CONTAINS block confirmed approved; SECTION 99 audit wired."
+    missing: []
 human_verification:
   - test: "Confirm FIX-03 CONTAINS narrowing was completed and approved"
     expected: "The CONTAINS block in sas/23_pcnr_inventory.sas reflects only the fragments approved after human audit review of qc/23_contains_audit.csv; orphaned KEEP rows deleted from docs/sentinel_decisions.csv"
@@ -50,8 +48,8 @@ human_verification:
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
 | 1 | CONTAINS audit CSV (qc/23_contains_audit.csv) is producible from SECTION 99 in program 23 | ✓ VERIFIED | sas/23_pcnr_inventory.sas lines 1339-1434: SECTION 99 appended, iterates 15 fragments, writes to &qc_path.\\23_contains_audit.csv via data _null_ put |
-| 2 | Program 23's CONTAINS block contains only the fragments approved after audit review | ? UNCERTAIN | Original 15-fragment block still present at lines 394-408; 26-01 SUMMARY documents only Task 1 (audit section creation) as delivered, not the narrowing step |
-| 3 | No MISSING decision is lost; AMBIGUOUS values still reported after narrowing (PCNR-03) | ? UNCERTAIN | Depends on narrowing completion — cannot verify without knowing which fragments were approved |
+| 2 | Program 23's CONTAINS block contains only the fragments approved after audit review | ✓ VERIFIED | All 15 fragments approved by Gerard 2026-10-07 after reviewing qc/23_contains_audit.csv — full block is the correct approved set |
+| 3 | No MISSING decision is lost; AMBIGUOUS values still reported after narrowing (PCNR-03) | ✓ VERIFIED | No narrowing required; all 15 fragments retained; no MISSING decisions lost |
 | 4 | pcnr_Cognitive_Score = 0 assertion aborts pipeline via %abort cancel if any survive into work.pcnr_harmonized | ✓ VERIFIED | sas/24_pcnr_build.sas lines 1036-1045: proc sql count into :n_cog_zero; %assert_eq fires %abort cancel if > 0 |
 | 5 | pcnr_rt_RM_START_to_AN_STAR_mins = -9 assertion aborts pipeline via %abort cancel if any survive | ✓ VERIFIED | sas/24_pcnr_build.sas lines 1049-1058: proc sql count into :n_rt_sentinel; %assert_eq fires %abort cancel if > 0 |
 | 6 | Both assertions run on work.pcnr_harmonized BEFORE the promote, so a failure never leaves a promoted dataset | ✓ VERIFIED | Assertions at lines 1015-1058, SECTION 5b; SECTION 6 promote is after this (confirmed by section comment at line 1015) |
@@ -62,7 +60,7 @@ human_verification:
 | 11 | Program 19 runs before programs 01-08 in run_pipeline.cmd | ✓ VERIFIED | run_pipeline.cmd: program 19 call at line 83, program 01 at line 87 — ordering correct. Scope split intentional per PCM-D-30: HARD-01 guards originals (&raw_path.\\master), HARD-02 guards renamed sas7bdat files (&source_path). Both together provide full coverage. |
 | 12 | docs/DECISIONS.md contains PCM-D-29 documenting that full source protection requires IT engagement | ✓ VERIFIED | docs/DECISIONS.md line 881: PCM-D-29 section present with "read-only file attribute is insufficient" and "full source protection requires IT engagement" language |
 
-**Score:** 11/12 truths verified (2 uncertain on FIX-03 narrowing; baseline committed and path scope documented 2026-10-07)
+**Score:** 12/12 truths verified — all gaps resolved 2026-10-07
 
 ### Required Artifacts
 
@@ -110,7 +108,7 @@ Step 7b: SKIPPED for most items — SAS programs cannot be executed in this envi
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|-------------|-------------|--------|----------|
-| FIX-03 | 26-01 | CONTAINS audit and narrowing in program 23 | PARTIAL | Audit section (SECTION 99) delivered; narrowing of main block uncertain |
+| FIX-03 | 26-01 | CONTAINS audit and narrowing in program 23 | SATISFIED | All 15 fragments approved by Gerard 2026-10-07; SECTION 99 audit wired; no narrowing required |
 | FIX-04 | 26-02 | QC assertions for sentinel recodes in program 24 | SATISFIED | Lines 1015-1058: both assertions wired with %assert_eq/%abort cancel |
 | HARD-01 | 26-03 | sha256 hash guard in program 19 reads baseline and aborts on drift | SATISFIED | Guard code wired; baseline CSV committed 2026-10-07 with 8 data rows (commit 3d5c0f0) |
 | HARD-02 | 26-03 | Program 19 first in run_pipeline.cmd | SATISFIED | Ordering correct (line 83 < line 87); scope split (originals vs renamed) documented as intentional in PCM-D-30 |
@@ -122,22 +120,17 @@ None remaining — baseline stub resolved 2026-10-07.
 
 ### Human Verification Required
 
-**1. Confirm FIX-03 CONTAINS narrowing was completed and approved**
-
-**Test:** Review sas/23_pcnr_inventory.sas CONTAINS block (lines 394-408) against the fragment-approval outcome from qc/23_contains_audit.csv human review. Confirm orphaned KEEP rows were removed from docs/sentinel_decisions.csv.
-**Expected:** The CONTAINS block reflects only human-approved fragments; no fragment retained that was identified as false-positive; no MISSING decision lost.
-**Why human:** Requires domain knowledge of which fragments were approved or rejected; the 26-01 SUMMARY covers only the audit task, not the narrowing.
+None remaining.
 
 ### Gaps Summary
 
-One gap remains:
-
-**Gap 3 — FIX-03 narrowing not confirmed complete (26-01 plan truth 2-5):** The 26-01 SUMMARY describes Task 1 (audit section) as delivered and stopped at the human-review checkpoint. The narrowing of the CONTAINS block and the deletion of orphaned KEEP rows from docs/sentinel_decisions.csv are listed as pending human approval. The original 15-fragment block (lines 394-408) remains unchanged in the file. This means the FIX-03 goal — "program 23's CONTAINS block contains only the fragments the human approved" — is not yet satisfied.
+All gaps resolved 2026-10-07:
 
 **Gap 1 (RESOLVED 2026-10-07):** docs/raw_hash_baseline.csv committed with 8 data rows (commit 3d5c0f0).
 **Gap 2 (RESOLVED 2026-10-07):** Source path scope documented as intentional in PCM-D-30 — HARD-01 guards originals, HARD-02 guards renamed sas7bdat files; both together provide full coverage.
+**Gap 3 (RESOLVED 2026-10-07):** All 15 CONTAINS fragments approved by Gerard after reviewing qc/23_contains_audit.csv — FIX-03 satisfied as-is.
 
 ---
 
-_Verified: 2026-09-30 | Updated: 2026-10-07_
+_Verified: 2026-09-30 | All gaps resolved: 2026-10-07_
 _Verifier: Claude (gsd-verifier)_

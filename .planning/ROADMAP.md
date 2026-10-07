@@ -65,7 +65,11 @@ Plans:
   3. `docs/DECISIONS.md` and any pipeline documentation that previously referenced an incorrect md8 row count have been updated to state that rows beyond 22,473 are blank trailing rows, not lost data
   4. The documentation explicitly notes that the `raw\` copy serves as a row-count reference only — its MRNs use a different encryption and the two files are not interchangeable
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 27-01-PLAN.md — MD8-01: standalone dual-count verification program (27_md8_count.sas) + three checks + qc/27_md8_count.csv
+- [ ] 27-02-PLAN.md — MD8-02: permanent all-missing-row drop + 22,473 assertion in 03_prep_md8.sas; PCM-D-31; 00_ownership_rule comment; STATE.md metric
 
 ---
 
@@ -173,7 +177,7 @@ Plans:
 | Phase | Name | Plans Complete | Status | Completed |
 |-------|------|----------------|--------|-----------|
 | 26 | v2.1 Carry-Forward & Source Hardening | 4/4 | Complete   | 2026-09-30 |
-| 27 | md8 Row-Count Correction | 0/? | Not started | - |
+| 27 | md8 Row-Count Correction | 0/2 | Not started | - |
 | 28 | r7/r8/r9 Linkage Investigation | 0/? | Not started | - |
 | 29 | Gap-Fill Wiring (r1-r6) | 0/? | Not started | - |
 | 30 | pcnr Normalization & Type Conversion | 0/? | Not started | - |

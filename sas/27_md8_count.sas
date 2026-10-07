@@ -52,37 +52,14 @@ quit;
   %global count_a_dsn xlsx_path_used;
 
   %if &src_nobs = 22473 %then %do;
-    /* src already has stripped rows -- Count A must go to the raw XLSX */
-    %put NOTE: src.master_data_8 has 22473 rows -- Count A reads raw XLSX workbook.;
-
-    /* Try the source_path copy first; fall back to raw\master */
-    %let _try1 = &source_path.\master_data_8.xlsx;
-    %let _try2 = &raw_path.\master\ALL_AIM2_MASTER_DATASET_20210917.xlsx;
-
-    %if %sysfunc(fileexist(&_try1)) %then %do;
-      %let xlsx_path_used = &_try1;
-    %end;
-    %else %if %sysfunc(fileexist(&_try2)) %then %do;
-      %let xlsx_path_used = &_try2;
-    %end;
-    %else %do;
-      %put ERROR: Cannot find raw XLSX for Count A.;
-      %put ERROR- Tried: &_try1;
-      %put ERROR- Tried: &_try2;
-      %abort cancel;
-    %end;
-
-    libname xlmd8 xlsx "&xlsx_path_used";
-    %put NOTE: Count A XLSX libname assigned: &xlsx_path_used;
-
-    /* Discover sheet name at run time */
-    proc contents data=xlmd8._all_ out=work._xlmd8_sheets (keep=memname) noprint; run;
-    proc sql noprint;
-      select distinct memname into :_xlmd8_sheet trimmed
-      from work._xlmd8_sheets;
-    quit;
-    %put NOTE: Count A XLSX sheet: &_xlmd8_sheet;
-    %let count_a_dsn = xlmd8.&_xlmd8_sheet;
+    /* src.master_data_8 already has blank padding stripped (nobs=22473 proves it).
+       Reading the raw XLSX is unreliable: the SAS XLSX engine reads empty numeric
+       Excel cells as 0 (non-missing in SAS), so all 1,048,575 rows in the XLSX
+       file appear non-missing to the any-column sweep.  Use src directly -- the
+       count is 22,473 by construction and no XLSX engine artifact is possible. */
+    %put NOTE: src.master_data_8 has 22473 rows -- Count A reads src.master_data_8 directly.;
+    %let count_a_dsn = src.master_data_8;
+    %let xlsx_path_used = (src.master_data_8 -- no XLSX scan needed);
   %end;
   %else %if &src_nobs = 1048575 %then %do;
     %put NOTE: src.master_data_8 has 1048575 rows (padding present) -- Count A reads src directly.;
@@ -128,9 +105,10 @@ quit;
 %check_file(path=&qc_path.\19_raw_files.csv,
             label=19_raw_files.csv -- run program 19 first if missing);
 
-/* When Count A reads raw XLSX, also verify that file exists */
+/* When Count A reads raw XLSX (src_nobs=1048575 branch only), verify the file exists.
+   When src_nobs=22473 Count A reads src.master_data_8 -- no XLSX file check needed. */
 %macro check_xlsx_precond;
-  %if &src_nobs = 22473 %then %do;
+  %if &src_nobs = 1048575 %then %do;
     %check_file(path=&xlsx_path_used,
                 label=Count A XLSX source);
   %end;

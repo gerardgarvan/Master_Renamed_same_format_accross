@@ -246,6 +246,21 @@ data work.prep_md8_s1;
   drop _i;
 run;
 
+/* MD8-02: Build explicit column list from src.master_data_8 (pre-conversion names).
+   This list is used in the promote DATA step to identify all-missing trailing rows.
+   Fixed PROC SQL column list -- no helper variables, no self-reference possible.
+   EXECUTOR: if the conversion step renames columns, regenerate this list from the
+   intermediate dataset (post-conversion names), not from src.master_data_8
+   (pre-conversion names). Confirm &md8_vars matches the promote PDV.            */
+proc sql noprint;
+  select name into :md8_vars separated by ' '
+    from dictionary.columns
+   where libname='SRC' and memname='MASTER_DATA_8';
+  select count(*) into :n_md8_vars trimmed
+    from dictionary.columns
+   where libname='SRC' and memname='MASTER_DATA_8';
+quit;
+
 /* Step 2: Convert the eight forced-char numerics to true numeric type.
    Read from work.prep_md8_s1 (sentinels already cleared).
    Rename each char var to a _c temp; INPUT into the same-named numeric.
@@ -296,6 +311,16 @@ data g.prep_md8;
   rt_RM_START_to_RM_END_mins   = input(strip(rt3_c),       best12.);
 
   drop Admit_BMI_c ASA_c Age_c Cog_c Frailty_c rt1_c rt2_c rt3_c;
+
+  /* MD8-02: drop all-missing trailing rows (Phase 27, PCM-D-31).
+     cmiss() returns the count of missing values across the named columns.
+     If that count equals the total number of columns, every column is missing
+     and the row is blank padding from Excel used-range / export artifact.
+     &md8_vars is the fixed explicit list from src.master_data_8 column names
+     collected before this DATA step -- no helper variables, no self-reference.
+     This makes the 22,473 assertion below resilient to future re-exports that
+     append blank padding rows.                                                 */
+  if cmiss(of &md8_vars) = &n_md8_vars then delete;
 
   /* PREP-08 (REVISED 2026-08-27): COUNT the negatives, do NOT null them.
 
@@ -421,7 +446,10 @@ proc sql noprint;
 quit;
 %assert_zero(n=&n_stillchar, msg=forced-char numerics still CHARACTER in g.prep_md8);
 
-/* 5c: Row count preserved */
+/* 5c: Row count assertion -- MD8-02 / PCM-D-31.
+   n_prep is counted AFTER the all-missing-row drop in the promote DATA step,
+   so a future re-export that appends blank padding rows is caught here.
+   &expected_nobs = 22473 (frozen source count, verified Phase 27).            */
 proc sql noprint; select count(*) into :n_prep trimmed from g.prep_md8; quit;
 %macro assert_row_count(actual=, expected=, src=);
   %if &actual ne &expected %then %do;

@@ -1099,3 +1099,39 @@ PROJECT.md figures have no documented source pair, key, normalization, or denomi
 and must NOT be cited).
 
 **Resolved:** 2026-10-07 | Owner: Gerard | Phase 28 Plan 02
+
+---
+
+## PCM-D-32a -- PACU_STAY Out of Scope (Phase 29)
+
+**Status:** Resolved
+**Date:** 2026-10-07
+**Decided by:** Planner (confirmed by Gerard at checkpoint)
+
+`2018-2022_PACU_STAY` (41,423 rows) is NOT included in Phase 29 gap-fill wiring.
+
+Reason: The file was never analyzed in `sas/18_supplemental_raw_gap.sas` -- it does not appear in the `%gap_file` call list (lines 675-731 of program 18). The 273 excess rows (41,423 vs base 41,150) indicate either non-patient rows or multi-visit records requiring a distinct de-dup investigation. Including it in Phase 29 without a program-18 analysis would bypass the D-01 two-stage column selection gate.
+
+Reopening condition: If Gerard explicitly requests PACU_STAY analysis, run it through program 18 first (`%gap_file` call addition) to produce candidate columns in `qc/18_gap_candidates.txt`, then wire in a subsequent phase.
+
+---
+
+## PCM-D-32 -- r1/r2/r4 De-Duplication Rules (Phase 29)
+
+**Status:** PENDING -- requires Gerard review of qc/29_dup_ids.txt
+**Date:** 2026-10-07
+**Decided by:** [Gerard -- to fill in after reviewing qc/29_dup_ids.txt]
+
+Duplicate PRECEDE_STUDY_ID counts (from CONTEXT.md D-02):
+| File | Total rows | Cohort N | Excess rows |
+|------|-----------|---------|-------------|
+| r1 (2018_2019_2020_Induction_Emergent) | 22,476 | 22,473 | 3 |
+| r2 (2018_2019_Precede_Database.xlsx) | 14,807 | 14,778 | 29 |
+| r4 (2020_Precede_Database_Edu.xlsx) | 7,696 | 7,695 | 1 |
+
+**De-dup rule per file (Gerard to complete):**
+- r1: [PENDING -- review qc/29_dup_ids.txt for duplicate IDs]
+- r2: [PENDING -- review qc/29_dup_ids.txt for duplicate IDs]
+- r4: [PENDING -- review qc/29_dup_ids.txt for duplicate IDs]
+
+Plan 2 will NOT proceed until this entry is updated with approved de-dup rules.

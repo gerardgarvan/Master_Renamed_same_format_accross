@@ -93,12 +93,17 @@ data work.r3_normed;
 run;
 
 /* ========================================================================
-   SECTION 4: r4 -- 2020_Precede_Database_Edu.xlsx (key=studyid NUMERIC) */
+   SECTION 4: r4 -- 2020_Precede_Database_Edu.xlsx (key=studyid CHARACTER)
+   studyid confirmed character from import log -- same prefix logic as r2/r3/r5/r6. */
 %import_xlsx(r4, 2020_Precede_Database_Edu.xlsx)
 
-/* For numeric key: check max post-normalization length */
 proc sql noprint;
-  select max(length('Precede' || strip(put(studyid, best32.)))) into :_r4_k_maxlen trimmed
+  select max(
+    case when index(upcase(strip(studyid)),'PRECEDE')=0
+      then length('Precede'||strip(studyid))
+      else length('Precede'||substr(strip(studyid),8))
+    end
+  ) into :_r4_k_maxlen trimmed
   from work.r4_s1;
 quit;
 %macro r4_len_gate;
@@ -114,8 +119,9 @@ quit;
 data work.r4_normed;
   length PRECEDE_STUDY_ID $12;
   set work.r4_s1 (keep=studyid rename=(studyid=_k_raw));
-  /* _k_raw is numeric after rename; build Precede-prefixed char key */
-  PRECEDE_STUDY_ID = 'Precede' || strip(put(_k_raw, best32.));
+  if index(upcase(strip(_k_raw)), 'PRECEDE') = 0
+    then PRECEDE_STUDY_ID = 'Precede' || strip(_k_raw);
+    else PRECEDE_STUDY_ID = 'Precede' || substr(strip(_k_raw), 8);
   drop _k_raw;
 run;
 

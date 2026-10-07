@@ -27,9 +27,9 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 
 ### LINK — r7/r8/r9 Linkage Investigation (PCM-D-16)
 
-- [ ] **LINK-01**: `qc\20_linkage_reach.txt` is read and findings documented — confirm whether r7-r9 carry a character `ENCRYPTED_MRN` column
-- [ ] **LINK-02**: The 2018_2019 MRN/ENCOUNTER Crypto files and the same-named `raw\` files (2018_2019 X_MASTER/CPT_ROLLUP, 2018_2022 X_MASTER, ALL_AIM2) are examined; their crosswalk match rates (14.5%, 64%, and 41%) and their relationship to a second encryption scheme are documented as a finding regardless of outcome, so no later phase uses a `raw\` copy under the wrong encryption assumption
-- [ ] **LINK-03**: A determination is recorded as PCM-D-28: which encryption scheme r7-r9 use, and whether the 2022 mismatch (PCM-D-16, 9,215 IDs) is recoverable; any wiring is scoped to v2.3, not this milestone
+- [x] **LINK-01**: `qc\20_linkage_reach.txt` is read and findings documented — confirm whether r7-r9 carry a character `ENCRYPTED_MRN` column
+- [x] **LINK-02**: The 2018_2019 MRN/ENCOUNTER Crypto files and the same-named `raw\` files (2018_2019 X_MASTER/CPT_ROLLUP, 2018_2022 X_MASTER, ALL_AIM2) are examined; their crosswalk match rates (14.5%, 64%, and 41%) and their relationship to a second encryption scheme are documented as a finding regardless of outcome, so no later phase uses a `raw\` copy under the wrong encryption assumption
+- [x] **LINK-03**: A determination is recorded as PCM-D-28: which encryption scheme r7-r9 use, and whether the 2022 mismatch (PCM-D-16, 9,215 IDs) is recoverable; any wiring is scoped to v2.3, not this milestone
 
 ### GAP — Gap-Fill Wiring (PCM-D-15)
 
@@ -72,9 +72,9 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 | HARD-03 | Phase 26 | Complete |
 | MD8-01 | Phase 27 | Complete |
 | MD8-02 | Phase 27 | Complete |
-| LINK-01 | Phase 28 | Pending |
-| LINK-02 | Phase 28 | Pending |
-| LINK-03 | Phase 28 | Pending |
+| LINK-01 | Phase 28 | Complete |
+| LINK-02 | Phase 28 | Complete |
+| LINK-03 | Phase 28 | Complete |
 | GAP-01 | Phase 29 | Pending |
 | GAP-02 | Phase 29 | Pending |
 | GAP-03 | Phase 29 | Pending |

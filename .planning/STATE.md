@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
-status: executing
-last_updated: "2026-10-07T17:19:21.923Z"
-last_activity: 2026-10-07 -- Phase 28 Plan 01 complete; 28_linkage_investigation.sas written
+status: verifying
+last_updated: "2026-10-07T17:39:43.919Z"
+last_activity: 2026-10-07 -- Phase 28 Plan 02 complete; PCM-D-28 written; Phase 28 complete
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 Phase: 28 (r7-r8-r9-linkage-investigation) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-07
 
 ### v2.2 Phase Status
@@ -46,7 +46,7 @@ Last activity: 2026-10-07
 | 29 | Gap-Fill Wiring (r1-r6) | Not started |
 | 30 | pcnr Normalization & Type Conversion | Not started |
 
-**Progress:** [█████████░] 88%
+**Progress:** [██████████] 100%
 
 ### v2.1 Phase Status (shipped 2026-09-29)
 
@@ -128,6 +128,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Phase 27 P01 | 25 | 1 tasks | 1 files |
 | Phase 27 P02 | 15 | 2 tasks | 4 files |
 | Phase 28 P01 | 45 | 2 tasks | 1 files |
+| Phase 28 P02 | 15 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -174,10 +175,11 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 - PCM-D-16 DIAGNOSED: r7/r8/r9 2022 IDs match 0 base rows -- PCM-D-28 investigation in Phase 28
 - LINK-01 ESTABLISHED 2026-10-07 (Phase 28 Plan 01): r7/r8/r9 have no ENCRYPTED_MRN column; MRN linking infeasible with current extracts
 - PROVENANCE FINDING 2026-10-07: figures 14.5/64/41 in PROJECT.md have no documented source pair, key, normalization, or denominator; must NOT be cited in PCM-D-28
+- PCM-D-28 RESOLVED 2026-10-07 (Phase 28 Plan 02): r7/r8/r9 have no ENCRYPTED_MRN; MRN linking infeasible; 9,215-ID mismatch unrecoverable with current extracts (r7_vs_md7=0%, r8_vs_md7=0%, md7_vs_md3_2022=100%); v2.3 reopening condition is re-extract with ENCRYPTED_MRN or PRECEDE_STUDY_ID crosswalk table; Phase 29 excludes r7-r9 tentatively
 
 ### Open Decisions (v2.2)
 
-- **PCM-D-28** — which encryption scheme r7-r9 use and whether the 9,215-ID mismatch (PCM-D-16) is recoverable; recorded in Phase 28
+None -- PCM-D-28 resolved. Phase 28 complete.
 
 ### Pending Todos
 

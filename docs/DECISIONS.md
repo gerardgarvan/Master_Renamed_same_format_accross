@@ -980,3 +980,122 @@ promoting g.prep_md8 and asserts N = 22,473 on every run (MD8-02).
 sas/03_prep_md8.sas; PCM-D-16 (encryption mismatch).
 
 **Resolved:** 2026-10-07 | Owner: Gerard | Phase 27
+
+---
+
+## PCM-D-28 -- r7/r8/r9 Linkage Infeasibility and 9,215-ID Mismatch Recoverability: RESOLVED
+
+**Date:** 2026-10-07
+**Decided by:** Gerard
+**Status:** RESOLVED
+
+**Question:** Do r7/r8/r9 carry ENCRYPTED_MRN (enabling MRN-based linking), and is the
+PCM-D-16 9,215-ID 2022 mismatch recoverable via MRN or PRECEDE_STUDY_ID linking?
+
+**Decision:**
+
+MRN-based linking of r7/r8/r9 is infeasible with the current extracts. The extracts do
+not carry ENCRYPTED_MRN. This is positive evidence about the extract format, not an
+inference from failed matching.
+
+Column evidence (Phase 19 inventory, authoritative read-only source):
+  r7 (2022_Education_20240124.csv): 2 columns -- PRECEDE_Study_ID (numeric) + Education
+  r8 (2022_RES_20230927.csv):       4 columns -- PRECEDE_Study_ID (numeric) + Race + Ethnicity + Sex
+  r9 (All_YEARS_LAT_LONG_20231127.csv): 4 columns -- PRECEDE_STUDY_ID (character $12) + Latitude + Longitude + YEAR
+
+None of r7, r8, or r9 carry ENCRYPTED_MRN. Linking must be done on PRECEDE_STUDY_ID only.
+
+**PRECEDE_STUDY_ID match rates (from qc/28_linkage_investigation.csv, Block 3):**
+
+The decisive diagnostic is md7_vs_md3_2022 -- it establishes whether md7 and md3 share
+an ID space before evaluating r7/r8:
+
+  source_pair           | n_left | n_right | n_matched | match_rate_left | match_rate_right
+  ----------------------|--------|---------|-----------|-----------------|------------------
+  md7_vs_md3_2022       |  9,215 |   9,215 |     9,215 |         1.00000 |          1.00000
+  r7_vs_md3_2022        |  9,215 |   9,215 |         0 |         0.00000 |          0.00000
+  r8_vs_md3_2022        |  9,485 |   9,215 |         0 |         0.00000 |          0.00000
+  r9_vs_md3_2022        |  9,215 |   9,215 |         0 |         0.00000 |          0.00000
+  r7_vs_md7             |  9,215 |   9,215 |         0 |         0.00000 |          0.00000
+  r8_vs_md7             |  9,485 |   9,215 |         0 |         0.00000 |          0.00000
+
+Normalization applied: digits-only comparison (compress(id,,'kd'), input(...,best32.)) for
+all numeric-vs-character comparisons; direct numeric match for r7_vs_md7 and r8_vs_md7;
+both normalizations were tried for r9 (direct and compress-kd-input-best32) -- both gave
+n_matched = 0.
+
+**Interpretation:**
+
+md7_vs_md3_2022 at 100% both directions confirms that md7 (2022_MASTER_DATASET, the
+pipeline's master_data_7) and md3's 2022 rows are the same 9,215 patients sharing the
+same PRECEDE_STUDY_ID space. The PCM-D-16 mismatch is therefore NOT a linkage problem
+specific to r7/r8/r9 -- it is a fundamental ID-space incompatibility between the r7/r8/r9
+extracts and the master cohort.
+
+r7_vs_md7 = 0% and r8_vs_md7 = 0% (both directions) confirm this: r7 and r8 cannot match
+even md7, the dataset that IS the 2022 cohort. Digits-only normalization was applied and
+still produced 0 matches. This is not a formatting issue; the PRECEDE_STUDY_ID values in
+r7/r8/r9 do not belong to the master cohort ID space.
+
+**Recoverability of the PCM-D-16 9,215-ID mismatch:**
+
+MRN-based recovery is infeasible for two independent reasons: (1) r7/r8/r9 carry no
+ENCRYPTED_MRN column (LINK-01 above), and (2) even PRECEDE_STUDY_ID matching yields 0
+hits at 0% both directions (qc/28_linkage_investigation.csv rows r7_vs_md3_2022,
+r8_vs_md3_2022, r9_vs_md3_2022). The 9,215-ID mismatch documented in PCM-D-16 cannot
+be recovered by any linking strategy available in the current extracts.
+
+The 2018-2019 Crypto files (2018_2019_MRN_Crypto_Data20260814.csv,
+2018_2019_ENCOUNTER_Crypto_Data_20260814.csv) cover 2018-2019 only (14,781 rows each).
+Their PRECEDE_Study_ID matches the 2018-2019 master copy at ~100% (n_matched = 14,777;
+match_rate_left = 0.99973, match_rate_right = 0.99993 per qc/28_linkage_investigation.csv
+rows for both Crypto files vs raw\master and vs raw\). These files cannot speak to 2022
+linkage and do not help recover the 9,215-ID mismatch, which is a 2022 cohort issue.
+
+The count-only ENCRYPTED_MRN comparison (PHI guard, no values in CSV) showed 0 matches
+between Crypto ENCRYPTED_MRN and master ENCRYPTED_MRN (n_matched = 0), indicating a
+different encryption scheme or column content in the Crypto files vs the master pipeline.
+This finding is noted but does not affect the LINK-01 conclusion.
+
+**SHA findings (from qc/28_linkage_investigation.csv, Block 1):**
+
+All 7 raw\ vs raw\master file pairs show sha_identical_flag = NO. For 3 pairs
+(2018_2019_X_MASTER, 2018_2019_CPT_ROLLUP_X_MASTER, 2018_2022_X_MASTER) the raw\
+copy is 80,233 bytes larger than the raw\master copy; this constant difference is
+observed across files of very different row counts and is an unexplained, observed finding.
+For the 4 2020-2022 pairs (2020_X_MASTER, 2020_CPT_ROLLUP_X_MASTER, 2021_X_MASTER,
+2022_MASTER), the raw\ and raw\master copies are the same byte size but differ in
+SHA-256 -- not byte-identical; sha_identical_flag = NO confirmed. The sha_identical_flag
+column in qc/28_linkage_investigation.csv records each pair independently. Raw\ and
+raw\master copies are NOT interchangeable for any purpose other than row counting
+(PCM-D-31).
+
+**v2.3 reopening condition (LINK-03):**
+
+Linking r7/r8/r9 to the master cohort may be reopened in v2.3 under either of these
+specific conditions:
+
+  1. A re-extract of r7/r8/r9 that includes ENCRYPTED_MRN (the column present in
+     master_data_1 through master_data_8 but absent from r7/r8/r9), or
+  2. An ID crosswalk table mapping r7/r8/r9 PRECEDE_STUDY_IDs to master cohort
+     PRECEDE_STUDY_IDs (accounting for the ID-space incompatibility confirmed above).
+
+"Investigate later" is not sufficient to reopen; the specific artifact (re-extract with
+ENCRYPTED_MRN, or crosswalk table committed to qc/) must be provided before any linkage
+attempt is made.
+
+**Phase 29 scope note:**
+
+Phase 29 excludes r7, r8, and r9 from gap-fill wiring, citing PCM-D-28. This exclusion
+is tentative, not permanent: it is based on infeasibility with current extracts, not
+positive evidence that the data are irretrievably incompatible. Permanent exclusion
+requires either exhausting the v2.3 reopening condition above or a domain decision that
+r7-r9 gap-fill is out of scope for this project.
+
+**Traceability:** LINK-01, LINK-02, LINK-03; sas/28_linkage_investigation.sas;
+qc/28_linkage_investigation.csv; PCM-D-16 (original mismatch); PCM-D-31 (SHA / raw vs
+raw\master distinction); Phase 28 Plan 01 SUMMARY (provenance finding: 14.5%/64%/41%
+PROJECT.md figures have no documented source pair, key, normalization, or denominator
+and must NOT be cited).
+
+**Resolved:** 2026-10-07 | Owner: Gerard | Phase 28 Plan 02

@@ -117,8 +117,10 @@ If all three pass → finding is "trailing padding, not truncation"; md8's true 
 - `sas/00_ownership_rule.sas` line ~37 — embedded 22,473 reference; update comment here
 
 ### Abort and assertion convention
-- `sas/00_config.sas` — `%assert_eq` and `%fail_out` macro definitions (PCM-R-05);
-  permanent assertion must use this pattern
+- `sas/03_prep_md8.sas` — `%assert_row_count` and `%check_libname` inline macros using
+  `%abort cancel` (PCM-R-05); permanent assertion reuses this pattern. NOTE: `%assert_eq`
+  and `%fail_out` are NOT defined in `00_config.sas`; the convention is an inline named
+  macro per-program. `%fail_out` lives in `sas/19_raw_dir_inventory.sas`, not in config.
 
 ### Documentation targets
 - `docs/DECISIONS.md` — append PCM-D-31 after the PCM-D-30 block (line ~950)

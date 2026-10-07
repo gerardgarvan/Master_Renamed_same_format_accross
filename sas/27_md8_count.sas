@@ -160,7 +160,7 @@ data work.md8_flags;
       then _n_nonmiss = _n_nonmiss + 1;
   end;
   do _j = 1 to dim(_numv);
-    if vname(_numv{_j}) not in ('_n_nonmiss','_i','_j')
+    if vname(_numv{_j}) not in ('_n_nonmiss','_i','_j','row_pos','nonmiss')
       and not missing(_numv{_j})
       then _n_nonmiss = _n_nonmiss + 1;
   end;
@@ -227,7 +227,7 @@ data work.raw_flags;
       then _n_nonmiss = _n_nonmiss + 1;
   end;
   do _j = 1 to dim(_numv);
-    if vname(_numv{_j}) not in ('_n_nonmiss','_i','_j')
+    if vname(_numv{_j}) not in ('_n_nonmiss','_i','_j','row_pos','nonmiss')
       and not missing(_numv{_j})
       then _n_nonmiss = _n_nonmiss + 1;
   end;

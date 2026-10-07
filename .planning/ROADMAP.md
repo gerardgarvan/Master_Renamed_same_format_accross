@@ -108,7 +108,14 @@ Plans:
   3. A PROC COMPARE between the pre-change and post-change copies of `g.master_data_merged` and `g.master_data_harmonized` reports zero differences on all pre-existing columns; both datasets remain at 41,150 rows
   4. `g.pcnr_analytic_cohort` remains at 13,890 rows after pipeline re-run; the row-count assertion in program 25 passes without modification
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 29-01-PLAN.md — Diagnostic stub: import r1-r6, detect dup IDs, write qc/29_dup_ids.txt, snap_path + PACU_STAY note (checkpoint)
+- [ ] 29-02-PLAN.md — Full prep program: encode approved de-dup rules, produce work.rN_prepped and work.rN_donors
+- [ ] 29-03-PLAN.md — Merge block in 04_merge.sas + PROC COPY snapshot + PROC COMPARE GAP-03 gate
+- [ ] 29-04-PLAN.md — pcnr map extension: re-run program 23, draft sentinel_decisions.csv rows, update 24_pcnr_build.sas assertions (checkpoint)
+- [ ] 29-05-PLAN.md — Integration: wire 03r_prep_gapfill.sas into run_pipeline.cmd + end-to-end verification
 
 ---
 
@@ -183,7 +190,7 @@ Plans:
 | 26 | v2.1 Carry-Forward & Source Hardening | 4/4 | Complete   | 2026-09-30 |
 | 27 | md8 Row-Count Correction | 2/2 | Complete    | 2026-10-07 |
 | 28 | r7/r8/r9 Linkage Investigation | 2/2 | Complete    | 2026-10-07 |
-| 29 | Gap-Fill Wiring (r1-r6) | 0/? | Not started | - |
+| 29 | Gap-Fill Wiring (r1-r6) | 0/5 | Not started | - |
 | 30 | pcnr Normalization & Type Conversion | 0/? | Not started | - |
 
 ---

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
-status: executing
-last_updated: "2026-10-07T15:41:07.100Z"
+status: verifying
+last_updated: "2026-10-07T15:44:37.537Z"
 last_activity: 2026-10-07
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 Phase: 27 (md8-row-count-correction) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-07
 
 ### v2.2 Phase Status
@@ -46,7 +46,7 @@ Last activity: 2026-10-07
 | 29 | Gap-Fill Wiring (r1-r6) | Not started |
 | 30 | pcnr Normalization & Type Conversion | Not started |
 
-**Progress:** [████████░░] 83%
+**Progress:** [██████████] 100%
 
 ### v2.1 Phase Status (shipped 2026-09-29)
 
@@ -126,6 +126,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Phase 26 P02 | 20 | 2 tasks | 2 files |
 | Phase 26 P04 | 10 | 1 tasks | 1 files |
 | Phase 27 P01 | 25 | 1 tasks | 1 files |
+| Phase 27 P02 | 15 | 2 tasks | 4 files |
 
 ## Accumulated Context
 

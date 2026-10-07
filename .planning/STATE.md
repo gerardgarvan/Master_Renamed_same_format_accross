@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: pcnr Normalization, Gap-Fill & Linkage
-status: verifying
-last_updated: "2026-10-07T17:47:54.006Z"
+status: executing
+last_updated: "2026-10-07T19:33:19.850Z"
 last_activity: 2026-10-07
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_plans: 13
+  completed_plans: 9
+  percent: 69
 ---
 
 # STATE.md — PeCAN Master Dataset Integration
@@ -25,15 +25,15 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.1 milestone shipped)
 
 **Core value:** A single `run_pipeline.cmd` that runs all SAS programs start-to-finish as separate sas.exe sessions per PCM-C-05, producing `g.master_data_merged` (41,150 rows), `g.pcnr_harmonized` (41,150 rows), `g.pcnr_analytic_cohort` (13,890 rows), passing QC reports, a data dictionary, and a resolved DECISIONS.md — with no manual steps.
 
-**Current focus:** Phase 28 — r7-r8-r9-linkage-investigation
+**Current focus:** Phase 29 — gap-fill-wiring-r1-r6
 
 ---
 
 ## Current Position
 
-Phase: 28
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 29 (gap-fill-wiring-r1-r6) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
 Last activity: 2026-10-07
 
 ### v2.2 Phase Status
@@ -46,7 +46,7 @@ Last activity: 2026-10-07
 | 29 | Gap-Fill Wiring (r1-r6) | Not started |
 | 30 | pcnr Normalization & Type Conversion | Not started |
 
-**Progress:** [██████████] 100%
+**Progress:** [███████░░░] 69%
 
 ### v2.1 Phase Status (shipped 2026-09-29)
 
@@ -129,6 +129,7 @@ All 13 v1 phases complete. See .planning/milestones/v1-ROADMAP.md.
 | Phase 27 P02 | 15 | 2 tasks | 4 files |
 | Phase 28 P01 | 45 | 2 tasks | 1 files |
 | Phase 28 P02 | 15 | 2 tasks | 1 files |
+| Phase 29 P01 | 30 | 4 tasks | 5 files |
 
 ## Accumulated Context
 

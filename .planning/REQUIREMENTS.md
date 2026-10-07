@@ -33,9 +33,9 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 
 ### GAP — Gap-Fill Wiring (PCM-D-15)
 
-- [ ] **GAP-01**: Extension-column gap candidates from the D15_APPROVED list for r1-r6 are wired into the base merge; r7-r9 remain excluded pending PCM-D-28
+- [x] **GAP-01**: Extension-column gap candidates from the D15_APPROVED list for r1-r6 are wired into the base merge; r7-r9 remain excluded pending PCM-D-28
 - [ ] **GAP-02**: `docs/pcnr_name_map.csv` and `docs/sentinel_decisions.csv` are extended to cover all new columns through the same review gate as existing columns; column-count assertions in programs 23 and 24 (currently 175 and 163) are updated to match the new totals; program 25's row-count assertion (41,150) stays unchanged, consistent with GAP-03
-- [ ] **GAP-03**: After wiring, a pre-change copy of `g.master_data_merged` and `g.master_data_harmonized` is saved and compared with PROC COMPARE; both datasets remain at 41,150 rows and `g.pcnr_analytic_cohort` remains at 13,890; existing columns are byte-identical before and after; only the newly added columns differ
+- [x] **GAP-03**: After wiring, a pre-change copy of `g.master_data_merged` and `g.master_data_harmonized` is saved and compared with PROC COMPARE; both datasets remain at 41,150 rows and `g.pcnr_analytic_cohort` remains at 13,890; existing columns are byte-identical before and after; only the newly added columns differ
 
 ### NORM — Normalization and Type Conversion (pcnr datasets)
 
@@ -75,9 +75,9 @@ Phase order: FIX/HARD → MD8 → LINK → GAP → NORM
 | LINK-01 | Phase 28 | Complete |
 | LINK-02 | Phase 28 | Complete |
 | LINK-03 | Phase 28 | Complete |
-| GAP-01 | Phase 29 | Pending |
+| GAP-01 | Phase 29 | Complete |
 | GAP-02 | Phase 29 | Pending |
-| GAP-03 | Phase 29 | Pending |
+| GAP-03 | Phase 29 | Complete |
 | NORM-01 | Phase 30 | Pending |
 | NORM-02 | Phase 30 | Pending |
 | NORM-03 | Phase 30 | Pending |

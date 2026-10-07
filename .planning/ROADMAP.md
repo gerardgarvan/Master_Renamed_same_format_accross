@@ -86,7 +86,11 @@ Plans:
   2. The crosswalk match rates for the 2018_2019 MRN/ENCOUNTER Crypto files and the same-named `raw\` files (reported as 14.5%, 64%, and 41%) are documented with a clear statement of what encryption scheme each file uses and whether they are interchangeable with the pipeline crosswalk
   3. PCM-D-28 is recorded in `docs/DECISIONS.md` stating which encryption scheme r7-r9 use, whether the 9,215-ID mismatch diagnosed in PCM-D-16 is recoverable via MRN linking, and what (if any) work is scoped to v2.3
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — LINK-01/LINK-02: read 20_linkage_reach.txt + provenance search; build standalone sas/28_linkage_investigation.sas (3 blocks)
+- [ ] 28-02-PLAN.md — LINK-03: run program, review qc/28_linkage_investigation.csv, record PCM-D-28 in docs/DECISIONS.md
 
 ---
 
@@ -178,7 +182,7 @@ Plans:
 |-------|------|----------------|--------|-----------|
 | 26 | v2.1 Carry-Forward & Source Hardening | 4/4 | Complete   | 2026-09-30 |
 | 27 | md8 Row-Count Correction | 2/2 | Complete    | 2026-10-07 |
-| 28 | r7/r8/r9 Linkage Investigation | 0/? | Not started | - |
+| 28 | r7/r8/r9 Linkage Investigation | 0/2 | Planned | - |
 | 29 | Gap-Fill Wiring (r1-r6) | 0/? | Not started | - |
 | 30 | pcnr Normalization & Type Conversion | 0/? | Not started | - |
 

@@ -1,6 +1,8 @@
-/* 03r_prep_gapfill.sas -- Phase 29: Gap-Fill Prep, r1-r6
+/* 03r_prep_gapfill.sas -- Phase 29: Gap-Fill Prep, r2-r6
+   r1 EXCLUDED: both r1 columns already present in g.master_data_merged (confirmed
+   2026-10-07 via 29_r1_key_diag.sas, PCM-D-32 updated).
    DIAGNOSTIC STUB -- DO NOT ADD TO run_pipeline.cmd until Plan 2 approved
-   Requires: PCM-D-29 de-dup rules approved by Gerard in DECISIONS.md
+   Requires: PCM-D-32 de-dup rules (r2/r4) approved by Gerard in DECISIONS.md
    Requires: docs/gapfill_allowlist.csv approved by Gerard                  */
 
 %include "C:\Master_Renamed_same_format_accross\sas\00_config.sas";
@@ -11,55 +13,9 @@
   %abort cancel;
 %mend fail_out;
 
-/* ========================================================================
-   SECTION 1: r1 -- 2018_2019_2020_Induction_Emergent20231121.csv
-   Key informat $18 in raw (confirmed from program 18 log); normalizing to $12.
-   Max-length gate runs first to catch any value exceeding $12 target.        */
-%import_csv(r1, 2018_2019_2020_Induction_Emergent20231121.csv)
-
-/* Max-length gate: check raw key width before truncation */
-proc sql noprint;
-  select max(length(strip(PRECEDE_Study_ID))) into :_r1_k_maxlen trimmed
-  from work.r1;
-quit;
-%macro r1_len_gate;
-  %if &_r1_k_maxlen > 12 %then %do;
-    %fail_out(msg=r1 key PRECEDE_Study_ID max raw length is &_r1_k_maxlen -- exceeds $12 target -- review before wiring);
-  %end;
-  %else %do;
-    %put NOTE: [03r r1] key max length &_r1_k_maxlen -- fits $12;
-  %end;
-%mend r1_len_gate;
-%r1_len_gate;
-
-/* Normalize key: rename on input to avoid SAS case-insensitivity self-drop.
-   ELSE branch strips existing prefix and re-adds 'Precede' -- normalizes case.
-   'PRECEDE12345' -> 'Precede12345'; 'Precede12345' stays 'Precede12345'.      */
-data work.r1_normed;
-  length PRECEDE_STUDY_ID $12;   /* declare BEFORE set statement */
-  set work.r1 (keep=PRECEDE_Study_ID rename=(PRECEDE_Study_ID=_k_raw));
-  if index(upcase(strip(_k_raw)), 'PRECEDE') = 0
-    then PRECEDE_STUDY_ID = 'Precede' || strip(_k_raw);
-    else PRECEDE_STUDY_ID = 'Precede' || substr(strip(_k_raw), 8); /* strip Precede/PRECEDE (7 chars) and re-add correct case */
-  drop _k_raw;
-run;
-
-/* Blank-key gate: 'Precede'||strip('') = 'Precede' -- all blank keys collide as false dups */
-%macro r1_blank_key_gate;
-  %let _r1_blank_n = 0;
-  proc sql noprint;
-    select count(*) into :_r1_blank_n trimmed from work.r1_normed
-    where strip(PRECEDE_STUDY_ID) in ('', 'Precede');
-  quit;
-  %if &_r1_blank_n > 0 %then %do;
-    %fail_out(msg=r1 has &_r1_blank_n blank/bare-Precede PRECEDE_STUDY_IDs -- review before de-dup);
-  %end;
-%mend r1_blank_key_gate;
-%r1_blank_key_gate;
-
-proc sort data=work.r1_normed nodupkey dupout=work._r1_dups;
-  by PRECEDE_STUDY_ID;
-run;
+/* r1 EXCLUDED -- both columns (rt_RM_START_to_INDUCTION_mins,
+   rt_RM_START_to_EMERGENCE_mins) already present in g.master_data_merged.
+   Confirmed 2026-10-07 via 29_r1_key_diag.sas. See PCM-D-32 in DECISIONS.md. */
 
 /* ========================================================================
    SECTION 2: r2 -- 2018_2019_Precede_Database.xlsx (key=studyid char, sheet 1)
@@ -218,11 +174,9 @@ run;
 /* ========================================================================
    SECTION 7: Duplicate ID report -- written to qc/ before abort */
 %macro report_dups_and_abort;
-  %let _r1_dups = 0;
   %let _r2_dups = 0;
   %let _r4_dups = 0;
   proc sql noprint;
-    select count(*) into :_r1_dups trimmed from work._r1_dups;
     select count(*) into :_r2_dups trimmed from work._r2_dups;
     select count(*) into :_r4_dups trimmed from work._r4_dups;
   quit;
@@ -231,22 +185,14 @@ run;
     file "&qc_path.\29_dup_ids.txt" lrecl=200;
     put "Phase 29 -- Duplicate PRECEDE_STUDY_ID Report";
     put "Generated: %sysfunc(date(), worddate.) %sysfunc(time(), time8.)";
-    put "r1 dup rows removed: &_r1_dups";
+    put "r1: excluded (columns already in g.master_data_merged -- PCM-D-32)";
     put "r2 dup rows removed: &_r2_dups";
     put "r4 dup rows removed: &_r4_dups";
     put "---";
     put "ACTION REQUIRED: Review duplicate IDs below and record de-dup rule";
-    put "in docs/DECISIONS.md as PCM-D-29 before Plan 2 proceeds.";
+    put "in docs/DECISIONS.md as PCM-D-32 before Plan 2 proceeds.";
     put "---";
   run;
-
-  %if &_r1_dups > 0 %then %do;
-    data _null_;
-      set work._r1_dups;
-      file "&qc_path.\29_dup_ids.txt" mod lrecl=200;
-      put "r1 duplicate removed: " PRECEDE_STUDY_ID;
-    run;
-  %end;
 
   %if &_r2_dups > 0 %then %do;
     data _null_;
@@ -265,11 +211,11 @@ run;
   %end;
 
   /* Hard abort if ANY duplicates exist -- de-dup rules must be approved first */
-  %if %eval(&_r1_dups + &_r2_dups + &_r4_dups) > 0 %then %do;
-    %fail_out(msg=03r_prep_gapfill DIAGNOSTIC COMPLETE. Found &_r1_dups r1 + &_r2_dups r2 + &_r4_dups r4 duplicate IDs. Review qc/29_dup_ids.txt and record PCM-D-29 de-dup rules in DECISIONS.md before Plan 2.);
+  %if %eval(&_r2_dups + &_r4_dups) > 0 %then %do;
+    %fail_out(msg=03r_prep_gapfill DIAGNOSTIC COMPLETE. Found &_r2_dups r2 + &_r4_dups r4 duplicate IDs. Review qc/29_dup_ids.txt and record PCM-D-32 de-dup rules in DECISIONS.md before Plan 2.);
   %end;
   %else %do;
-    %put NOTE: [03r_prep_gapfill] No duplicate PRECEDE_STUDY_IDs found in r1/r2/r4. Proceed to Plan 2.;
+    %put NOTE: [03r_prep_gapfill] No duplicate PRECEDE_STUDY_IDs found in r2/r4. Proceed to Plan 2.;
   %end;
 %mend report_dups_and_abort;
 %report_dups_and_abort;

@@ -1,5 +1,6 @@
-file,column_name,approved
-r1,,
+file,column_name,approved,note
+r1,rt_RM_START_to_INDUCTION_mins,N,already in g.master_data_merged -- confirmed 2026-10-07 via 29_r1_key_diag.sas
+r1,rt_RM_START_to_EMERGENCE_mins,N,already in g.master_data_merged -- confirmed 2026-10-07 via 29_r1_key_diag.sas
 r2,,
 r3,,
 r4,,

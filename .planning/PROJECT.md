@@ -27,7 +27,7 @@ DECISIONS.md — with no manual steps.
 
 ---
 
-## Current State (after v2.1 milestone, 2026-09-29)
+## Current State (after Phase 28, 2026-10-07)
 
 **Pipeline datasets:**
 - `g.master_data_merged` -- 41,150 rows, 176 columns, all assertions pass
@@ -202,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-09-29 — v2.2 milestone started (pcnr Normalization, Gap-Fill & Linkage)*
+*Last updated: 2026-10-07 — Phase 28 complete: r7/r8/r9 encryption scheme identified, PCM-D-28 recorded*

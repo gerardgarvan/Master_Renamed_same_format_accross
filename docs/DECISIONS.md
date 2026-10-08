@@ -1135,3 +1135,24 @@ Confirmed by `proc sort nodupkey` in the diagnostic stub run 2026-10-07:
 |------|----------|----------------|--------------|
 | r2 (2018_2019_Precede_Database.xlsx) | 14,807 | 14,807 | 0 |
 | r4 (2020_Precede_Database_Edu.xlsx) | 7,696 | 7,696 | 0 |
+
+---
+
+## PCM-D-33 -- source_hash_baseline.csv Re-Seed Procedure
+
+**Status:** Resolved -- re-seed required when file is deleted
+**Date:** 2026-10-07
+**Decided by:** Gerard
+
+`docs\source_hash_baseline.csv` is the HARD-02 source hash guard baseline. It is NOT
+committed to git (excluded as a derived artifact). If deleted, program 19 will abort at
+Section 14 with exit=2.
+
+**Recovery procedure:** Run `sas\19c_seed_source_hash_baseline.sas` in a fresh SAS session
+before re-running the pipeline. This program hashes the 8 master source files under
+`raw\master\` and writes the baseline CSV. It is safe to re-run at any time as long as
+source files have not changed.
+
+Reopening condition: If source files are intentionally updated (new extract delivered),
+delete `docs\source_hash_baseline.csv` and re-run `19c_seed_source_hash_baseline.sas`
+to update the baseline before the next pipeline run.

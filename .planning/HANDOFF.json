@@ -1,33 +1,42 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-22T18:56:13.644Z",
-  "phase": "between phases",
-  "phase_name": "Phases 15 and 18 both complete this session",
-  "phase_dir": ".planning",
-  "plan": null,
-  "task": null,
+  "timestamp": "2026-10-08T00:33:47.477Z",
+  "phase": "29",
+  "phase_name": "gap-fill-wiring-r1-r6",
+  "phase_dir": ".planning/phases/29-gap-fill-wiring-r1-r6",
+  "plan": 4,
+  "task": 1,
+  "total_tasks": 5,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Phase 18 bug fixes (r4/r6 countw, char-miss, r2 65K overflow)", "status": "done", "commit": "7048998"},
-    {"id": 2, "name": "Phase 18 UAT complete + D15_APPROVED=1", "status": "done", "commit": "04dbc1e"},
-    {"id": 3, "name": "Phase 15-01: PCM-D-13 resolved (CPT1 keep-separate, label sweep no aliases)", "status": "done", "commit": "0f1f3a9"},
-    {"id": 4, "name": "Phase 15-02: 10b re-run clean, h_ssdi_death added (29316/41150, 71.2%)", "status": "done", "commit": "ac6765d"}
+    {"id": "29-01", "name": "Diagnostic stub + allowlist checkpoint", "status": "done", "commit": "7664113"},
+    {"id": "29-02", "name": "Full 6-section prep program (03r_prep_gapfill.sas)", "status": "done", "commit": "8c7e2a2"},
+    {"id": "29-03", "name": "Merge wiring (04_merge.sas) + compare tool (29_gapfill_compare.sas)", "status": "done", "commit": "1d59cd0"}
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "Phase 7 Plan 07-02: update DECISIONS.md with PCM-D-05 resolution (doc-only)", "status": "not_started"},
-    {"id": 6, "name": "Phase 8 Plan 08-02: add Phase 8 block to 99_run_all.sas + PCM-D-12", "status": "not_started"},
-    {"id": 7, "name": "Phase 8 Plan 08-03: full clean-session pipeline run + verify DATA_DICTIONARY.xlsx", "status": "not_started"}
+    {"id": "29-04", "name": "pcnr extension wiring (23/24_pcnr programs + PCNR_APPROVED reset)", "status": "not_started"},
+    {"id": "29-05", "name": "Pipeline wiring (run_pipeline.cmd) + full run validation", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Run 99_run_all.sas in a clean SAS session (Phase 8-03)", "context": "Final end-to-end pipeline verification", "blocking": true}
+    {
+      "action": "Run run_pipeline.cmd (full wired pipeline: 03r -> 04_merge -> 10b -> ...)",
+      "context": "29_gapfill_compare.sas PASS 1 baseline snapshot already taken (41,150 rows, 176 cols). Pipeline must run before PASS 2 can verify GAP-03.",
+      "blocking": true
+    },
+    {
+      "action": "Run 29_gapfill_compare.sas PASS 2 after pipeline completes",
+      "context": "Verifies original columns byte-identical to baseline. sysinfo & 45248 must = 0.",
+      "blocking": true
+    }
   ],
   "decisions": [
-    {"decision": "CPT1_CLASS + CPT1_LABEL: keep separate (not aliases)", "rationale": "Code and label are complementary, not encoding duplicates", "phase": "15"},
-    {"decision": "Label similarity sweep: no true aliases found", "rationale": "All high-scoring pairs are same-template different-measurement (POD days, timing milestones, anesthetic agents)", "phase": "15"},
-    {"decision": "D15_APPROVED=1: gap-fill candidate report accepted", "rationale": "All 9 supplemental files inventoried; r4/r6 bugs fixed; output verified", "phase": "18"}
+    {"decision": "03r_prep_gapfill.sas kernel crash fixed by moving all %if/%do into macros", "rationale": "Open-code %if after %macro definition crashes SAS 9.4 (Read Access Violation)", "phase": "29"},
+    {"decision": "Post-dedup gate uses %sysfunc(attrn nobs) not PROC SQL count(*)", "rationale": "PROC SQL count(*) fails on 0-column dupout datasets", "phase": "29"},
+    {"decision": "10b column assertion relaxed from ne 176 to < 176", "rationale": "Gap-fill adds columns; exact count would abort on first wired run", "phase": "29"},
+    {"decision": "03r_prep_gapfill.sas NOT in run_pipeline.cmd until Plan 5", "rationale": "Plan 3 gate -- must be approved before wiring", "phase": "29"}
   ],
   "uncommitted_files": [],
-  "next_action": "Start Phase 7 Plan 07-02 -- update docs/DECISIONS.md with PCM-D-05 attribution block (low effort, doc-only). Then proceed to Phase 8.",
-  "context_notes": "g.master_data_harmonized now has 12 h_ columns (added h_ssdi_death this session). All HARM-07 assertions pass. g.master_data_merged confirmed at 176 cols / 41150 rows unmodified. Working tree clean, all pushed to origin/master."
+  "next_action": "First: user runs run_pipeline.cmd then 29_gapfill_compare.sas PASS 2 to clear Plan 3 gate. Then execute Plan 29-04: re-run 23_pcnr_inventory.sas, review new sentinel_decisions.csv rows, update 24_pcnr_build.sas, reset PCNR_APPROVED=0.",
+  "context_notes": "Plan 03 complete and merged to master (1d59cd0). PASS 1 baseline snapshot at snap\. 03r_prep_gapfill.sas is clean (0 ERRORs confirmed by Gerard). gapfill_allowlist.csv has no approved=Y rows yet so no g.gapfill_rN datasets produced. Plans 4 and 5 remain."
 }
